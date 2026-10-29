@@ -57,8 +57,9 @@ The system SHALL keep a legacy behavior.
   put('src/add.ts', '// @spec billing/add-an-item\n// @spec billing/add-item\nexport const add = 1;\n');
   put('src/round.py', '# @spec billing/rounding\n');
   put('tests/add.test.ts', "// @spec billing/add-an-item\nit('refuses [billing/reject-empty]', () => {});\nit('old [billing/gone]', () => {});\nit('other [shipping/x]', () => {});\nit('legacy [legacy/x]', () => {});\n");
-  put('openspec/changes/archive/2026-01-02-drop-legacy/specs/legacy/spec.md', '## REMOVED Requirements\n\n### Requirement: Legacy x\n');
+  // Archived changes in the order they were archived: the archive order falls back to the folder mtime, so a reversed write order flips it when a second passes between the writes.
   put('openspec/changes/archive/2026-01-01-legacy/specs/legacy/spec.md', '## ADDED Requirements\n\n### Requirement: Legacy x\nThe system SHALL do x.\n\n#### Scenario: X\n- **WHEN** a\n- **THEN** b\n');
+  put('openspec/changes/archive/2026-01-02-drop-legacy/specs/legacy/spec.md', '## REMOVED Requirements\n\n### Requirement: Legacy x\n');
   put('openspec/changes/refunds/proposal.md', `## Why\nRefunds.\n\n## What Changes\n- x\n`);
   put(
     'openspec/changes/refunds/specs/billing/spec.md',
