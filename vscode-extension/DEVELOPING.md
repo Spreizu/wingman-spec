@@ -36,11 +36,11 @@ A `v*` tag publishes the `.vsix` that CI built to the VS Code Marketplace and to
 
 One-time setup:
 
-1. Publisher: sign in at marketplace.visualstudio.com/manage with a Microsoft account and create the publisher `elmoegers`.
+1. Publisher: sign in at marketplace.visualstudio.com/manage with a Microsoft account and create the publisher `elmo-egers`.
 2. Marketplace sign-in, one of two options. Set the variables under Settings → Secrets and variables → Actions → Variables, for the repository or for the `marketplace` environment.
-   - Trusted Publishing (simplest). On the `elmoegers` publisher page, open Trusted Publishing → Create. Enter owner `Spreizu`, repository `wingman-spec`, workflow `extension.yml` and environment `marketplace`. Then set the variable `VSCE_TRUSTED_PUBLISHING` to `true`.
-   - Microsoft Entra ID. In the Azure portal, create an app registration (Entra ID → App registrations → New registration), or a user-assigned managed identity with the Reader role. Add a federated credential for GitHub Actions: issuer `https://token.actions.githubusercontent.com`, subject `repo:Spreizu/wingman-spec:environment:marketplace`, audience `api://AzureADTokenExchange`. Set the variables `AZURE_CLIENT_ID` and `AZURE_TENANT_ID`, plus `AZURE_SUBSCRIPTION_ID` for a managed identity. Push a tag once: the step "Marketplace profile ID of the Entra identity" prints the identity's ID. On the `elmoegers` publisher page, open Members → Add, enter that ID and choose the Contributor role. Then run the failed job again.
-3. Open VSX: sign in at open-vsx.org with GitHub, link an Eclipse account and sign the publisher agreement. Create an access token in the profile settings, then run `npx ovsx create-namespace elmoegers -p <token>`. Add it as the repository secret `OVSX_PAT`.
+   - Trusted Publishing (simplest). On the `elmo-egers` publisher page, open Trusted Publishing → Create. Enter owner `Spreizu`, repository `wingman-spec`, workflow `extension.yml` and environment `marketplace`. Then set the variable `VSCE_TRUSTED_PUBLISHING` to `true`.
+   - Microsoft Entra ID. In the Azure portal, create an app registration (Entra ID → App registrations → New registration), or a user-assigned managed identity with the Reader role. Add a federated credential for GitHub Actions: issuer `https://token.actions.githubusercontent.com`, subject `repo:Spreizu/wingman-spec:environment:marketplace`, audience `api://AzureADTokenExchange`. Set the variables `AZURE_CLIENT_ID` and `AZURE_TENANT_ID`, plus `AZURE_SUBSCRIPTION_ID` for a managed identity. Push a tag once: the step "Marketplace profile ID of the Entra identity" prints the identity's ID. On the `elmo-egers` publisher page, open Members → Add, enter that ID and choose the Contributor role. Then run the failed job again.
+3. Open VSX: sign in at open-vsx.org with GitHub, link an Eclipse account and sign the publisher agreement. Create an access token in the profile settings, then run `npx ovsx create-namespace elmo-egers -p <token>`. Add it as the repository secret `OVSX_PAT`.
 4. Optional: add required reviewers to the `marketplace` environment (Settings → Environments).
 
 Each release:

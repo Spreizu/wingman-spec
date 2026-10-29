@@ -4,6 +4,7 @@
 
 - The icon is rendered from `assets/icon.svg` in the repository. CI builds and packages the extension on every push to `main`.
 - A `v*` tag publishes the extension to the VS Code Marketplace and Open VSX (used by Cursor). Marketplace metadata: categories, keywords, gallery banner, a shorter description.
+- The publisher id is now `elmo-egers`, so the extension id is `elmo-egers.wingman-spec`. Uninstall a locally installed `elmoegers.wingman-spec` first.
 
 ## 0.11.2
 

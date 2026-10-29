@@ -4,7 +4,7 @@
   "description": "See and steer OpenSpec changes that use the Wingman Spec schema: tasks, specs, ADRs, verifier results, build timeline and requirement-to-code traceability.",
   "version": "0.11.2",
   "author": "Elmo Egers",
-  "publisher": "elmoegers",
+  "publisher": "elmo-egers",
   "icon": "images/icon.png",
   "galleryBanner": {
     "color": "#1B1153",
