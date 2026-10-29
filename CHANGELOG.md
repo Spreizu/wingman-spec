@@ -4,7 +4,7 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
 ## Unreleased
 
-- **Extension CI.** `.github/workflows/extension.yml` runs on pushes and pull requests to `main`: typecheck, tests, production build and `vsce package` on Node 24 with pnpm from `package.json`. The `.vsix` is uploaded as the `wingman-spec-<version>` artifact; a `v*` tag also creates a GitHub release with it.
+- **Extension CI.** `.github/workflows/extension.yml` runs on pushes and pull requests to `main`: typecheck, tests, production build and `vsce package` on Node 24 with pnpm from `package.json`. The `.vsix` is uploaded as the `wingman-spec-<version>` artifact; a `v*` tag also creates a GitHub release with it and publishes it to the VS Code Marketplace and Open VSX (`environment: marketplace`, secrets `VSCE_PAT` and `OVSX_PAT`; a missing secret skips that registry; the tag must match the `package.json` version).
 - **SVG icon.** `assets/icon.svg` is the icon source: the original artwork traced by colour, with a rounded-rect background and one linear gradient per shape (16 KB, no embedded images). The README shows it; `vscode-extension/images/icon.png` is rendered from it at 128 px.
 
 ## 0.11.2

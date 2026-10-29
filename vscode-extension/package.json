@@ -1,20 +1,42 @@
 {
   "name": "wingman-spec",
   "displayName": "Wingman Spec",
-  "description": "Dashboard, ADR hub, spec browser, history and a requirements-to-code traceability view (with each requirement's Why) (tree, CodeLens, hover, go-to-definition, diagnostics for @spec markers) for OpenSpec changes that use the wingman-spec schema.",
+  "description": "See and steer OpenSpec changes that use the Wingman Spec schema: tasks, specs, ADRs, verifier results, build timeline and requirement-to-code traceability.",
   "version": "0.11.2",
   "author": "Elmo Egers",
   "publisher": "elmoegers",
   "icon": "images/icon.png",
-  "private": true,
+  "galleryBanner": {
+    "color": "#1B1153",
+    "theme": "dark"
+  },
   "license": "MIT",
+  "homepage": "https://github.com/Spreizu/wingman-spec#readme",
+  "bugs": {
+    "url": "https://github.com/Spreizu/wingman-spec/issues"
+  },
   "packageManager": "pnpm@11.9.0",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=22.18"
   },
   "categories": [
-    "Other"
+    "AI",
+    "Testing",
+    "Visualization"
+  ],
+  "keywords": [
+    "openspec",
+    "spec-driven",
+    "specification",
+    "requirements",
+    "traceability",
+    "adr",
+    "tdd",
+    "ai-agents",
+    "claude-code",
+    "cursor",
+    "codex"
   ],
   "activationEvents": [
     "workspaceContains:openspec/config.yaml",
