@@ -1,0 +1,5 @@
+VERDICT: fail
+SCORE: 61
+FINDING: blocker | subscriptions/skip-a-week | the deadline is "Tuesday" but the time zone is not stated
+FINDING: major | notifications | no failure scenario for a bounced address
+FINDING: minor | glossary | "Slot" is not defined

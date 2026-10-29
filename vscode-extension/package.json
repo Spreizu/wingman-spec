@@ -1,0 +1,307 @@
+{
+  "name": "wingman-spec",
+  "displayName": "Wingman Spec",
+  "description": "Dashboard, ADR hub, spec browser, history and a requirements-to-code traceability view (with each requirement's Why) (tree, CodeLens, hover, go-to-definition, diagnostics for @spec markers) for OpenSpec changes that use the wingman-spec schema.",
+  "version": "0.11.2",
+  "author": "Elmo Egers",
+  "publisher": "elmoegers",
+  "icon": "images/icon.png",
+  "private": true,
+  "license": "MIT",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "vscode": "^1.85.0",
+    "node": ">=22.18"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:openspec/config.yaml",
+    "workspaceContains:openspec/workspace.yaml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "wingmanSpec.openDashboard",
+        "title": "Wingman Spec: Open Dashboard"
+      },
+      {
+        "command": "wingmanSpec.openAdrHub",
+        "title": "Wingman Spec: Open ADR Hub"
+      },
+      {
+        "command": "wingmanSpec.openSpecs",
+        "title": "Wingman Spec: Browse Specs"
+      },
+      {
+        "command": "wingmanSpec.openHistory",
+        "title": "Wingman Spec: Open History"
+      },
+      {
+        "command": "wingmanSpec.newChange",
+        "title": "Wingman Spec: New Change"
+      },
+      {
+        "command": "wingmanSpec.newAdr",
+        "title": "Wingman Spec: New ADR"
+      },
+      {
+        "command": "wingmanSpec.supersedeAdr",
+        "title": "Wingman Spec: Supersede ADR"
+      },
+      {
+        "command": "wingmanSpec.promoteChange",
+        "title": "Wingman Spec: Promote Change ADRs"
+      },
+      {
+        "command": "wingmanSpec.promoteAdr",
+        "title": "Wingman Spec: Promote ADR"
+      },
+      {
+        "command": "wingmanSpec.refresh",
+        "title": "Wingman Spec: Refresh"
+      },
+      {
+        "command": "wingmanSpec.openFile",
+        "title": "Wingman Spec: Open File"
+      },
+      {
+        "command": "wingmanSpec.openRoute",
+        "title": "Wingman Spec: Open View"
+      },
+      {
+        "command": "wingmanSpec.toggleTask",
+        "title": "Wingman Spec: Toggle Task"
+      },
+      {
+        "command": "wingmanSpec.showAnchors",
+        "title": "Wingman Spec: Show Anchors of Requirement"
+      },
+      {
+        "command": "wingmanSpec.revealRequirement",
+        "title": "Wingman Spec: Reveal Requirement"
+      },
+      {
+        "command": "wingmanSpec.revealScenario",
+        "title": "Wingman Spec: Reveal Scenario"
+      },
+      {
+        "command": "wingmanSpec.pickScenario",
+        "title": "Wingman Spec: Scenarios and Tests of Requirement"
+      },
+      {
+        "command": "wingmanSpec.showTests",
+        "title": "Wingman Spec: Tests of Requirement"
+      },
+      {
+        "command": "wingmanSpec.runTests",
+        "title": "Wingman Spec: Run Tests for Requirement"
+      },
+      {
+        "command": "wingmanSpec.fixMarker",
+        "title": "Wingman Spec: Fix Marker"
+      },
+      {
+        "command": "wingmanSpec.moveMarker",
+        "title": "Wingman Spec: Move Marker into Doc Comment"
+      },
+      {
+        "command": "wingmanSpec.openNodeFile",
+        "title": "Wingman Spec: Open spec.md"
+      },
+      {
+        "command": "wingmanSpec.openBranchReview",
+        "title": "Wingman Spec: Open Branch Review"
+      },
+      {
+        "command": "wingmanSpec.openRoadmap",
+        "title": "Wingman Spec: Open Roadmap (new product)"
+      },
+      {
+        "command": "wingmanSpec.refreshProblems",
+        "title": "Wingman Spec: Refresh Problems (verifier findings)"
+      },
+      {
+        "command": "wingmanSpec.refreshView",
+        "title": "Wingman Spec: Refresh View"
+      },
+      {
+        "command": "wingmanSpec.acceptGap",
+        "title": "Wingman Spec: Accept Drift Gap"
+      },
+      {
+        "command": "wingmanSpec.tagTest",
+        "title": "Wingman Spec: Tag a Test with a Scenario"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "wingmanSpec.openFile",
+          "when": "false"
+        },
+        {
+          "command": "wingmanSpec.openRoute",
+          "when": "false"
+        },
+        {
+          "command": "wingmanSpec.toggleTask",
+          "when": "false"
+        },
+        {
+          "command": "wingmanSpec.promoteAdr",
+          "when": "false"
+        },
+        {
+          "command": "wingmanSpec.showAnchors",
+          "when": "false"
+        },
+        {
+          "command": "wingmanSpec.revealRequirement",
+          "when": "false"
+        },
+        {
+          "command": "wingmanSpec.revealScenario",
+          "when": "false"
+        },
+        {
+          "command": "wingmanSpec.pickScenario",
+          "when": "false"
+        },
+        {
+          "command": "wingmanSpec.showTests",
+          "when": "false"
+        },
+        {
+          "command": "wingmanSpec.runTests",
+          "when": "false"
+        },
+        {
+          "command": "wingmanSpec.fixMarker",
+          "when": "false"
+        },
+        {
+          "command": "wingmanSpec.moveMarker",
+          "when": "false"
+        },
+        {
+          "command": "wingmanSpec.openNodeFile",
+          "when": "false"
+        },
+        {
+          "command": "wingmanSpec.refreshView",
+          "when": "false"
+        },
+        {
+          "command": "wingmanSpec.acceptGap",
+          "when": "false"
+        },
+        {
+          "command": "wingmanSpec.tagTest",
+          "when": "false"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "wingmanSpec.openNodeFile",
+          "when": "view == wingmanSpec.traceability && viewItem == wingmanSpec.revealable",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Wingman Spec",
+      "properties": {
+        "wingmanSpec.adrDirectory": {
+          "type": "string",
+          "default": "adr",
+          "description": "Directory (relative to the OpenSpec root, next to openspec/) that holds promoted ADRs."
+        },
+        "wingmanSpec.openspecPath": {
+          "type": "string",
+          "default": "openspec",
+          "description": "Path to the openspec CLI. Only used to locate a registered OpenSpec store when a folder's openspec/config.yaml contains 'store: <id>'."
+        },
+        "wingmanSpec.diagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Report problems in specs, tasks and ADRs (missing SHALL, scenarios without WHEN/THEN, unfilled ADRs)."
+        },
+        "wingmanSpec.codeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show CodeLens actions on tasks, specs and ADRs."
+        },
+        "wingmanSpec.codeView": {
+          "type": "boolean",
+          "default": true,
+          "description": "In any file: CodeLens, hover, go-to-definition and warnings for `@spec <capability>/<requirement>` markers and `[capability/scenario]` test tags, and anchor counts above requirements in specs."
+        },
+        "wingmanSpec.runTestsLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "On the @spec CodeLens and hover: offer \"Run tests\", which runs the project test command (the \"Test command:\" line of the OpenSpec config) in a terminal, narrowed to the requirement's scenario tags when the runner is known. Off when no test command is set or the workspace is not trusted."
+        },
+        "wingmanSpec.problemsPanel": {
+          "type": "boolean",
+          "default": true,
+          "description": "Publish the verifier's findings (lint, placement, drift gaps, stale and changed anchors, the Why line) in the Problems panel, with quick fixes. Runs `node openspec/scripts/verify-task.cjs problems --json` after saves; off in an untrusted workspace."
+        },
+        "wingmanSpec.verifierTimeoutSeconds": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "description": "How long the extension waits for the verifier script or git before it gives up (Problems panel, change dashboard, branch review)."
+        },
+        "wingmanSpec.verifierNode": {
+          "type": "string",
+          "default": "node",
+          "description": "The node executable used to run openspec/scripts/verify-task.cjs."
+        },
+        "wingmanSpec.dashboardChecks": {
+          "type": "boolean",
+          "default": true,
+          "description": "The change dashboard asks the verifier (read-only `problems` and `sync-check`) what blocks the archive. Off: it shows only what the files say."
+        },
+        "wingmanSpec.branchReviewBase": {
+          "type": "string",
+          "default": "",
+          "description": "Base ref of the Branch Review page. Empty: origin/main, origin/master, main, master, origin/develop or develop, the first that exists; the review compares against the merge base with it."
+        },
+        "wingmanSpec.branchReviewGit": {
+          "type": "boolean",
+          "default": true,
+          "description": "The Branch Review page runs read-only git commands (rev-parse, merge-base, diff, show, ls-files) in the workspace folder. Off: the page stays empty."
+        }
+      }
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "wingmanSpec.traceability",
+          "name": "Wingman Spec: Requirements & Traceability",
+          "when": "wingmanSpec.hasProject"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node esbuild.mjs",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"test/*.test.ts\"",
+    "package": "pnpm run typecheck && pnpm test && node esbuild.mjs --production && vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Spreizu/wingman-spec.git"
+  }
+}

@@ -1,0 +1,2 @@
+VERDICT: blocked
+UNKNOWN: blocker | skeleton | the time zone of the Tuesday deadline is not stated | the owner

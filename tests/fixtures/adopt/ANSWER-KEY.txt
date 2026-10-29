@@ -1,0 +1,9 @@
+Answer key: seeded problems in helpdesk. An adopt run is scored on whether each B-item became a requirement, or was kept as observed, unconfirmed.
+  B1 off-by-one discount: README ">= 100.00 EUR", code ">" (exactly 10000 cents gets no discount)
+  B2 swallowed error: notify.js empty catch; failed e-mail ignored, no log, no test, README says customers get an e-mail
+  B3 leftover debug route: GET /debug/dump returns every order incl. customer e-mail; not documented, not tested
+  B4 rounding: Math.floor vs README "rounded to the nearest cent" (a 1.5 cent fraction floors)
+  B5 unclear: cancelling a SHIPPED order answers {ok:true} but changes nothing; README silent
+  B6 incidental: ids start at 1000
+  B7 incidental: header x-powered-by: helpdesk-dev, and the 404 body text "nope" (a JSON string)
+  Controls (clearly intended: test and/or README): C1 VAT 20% added; C2 empty order 400 "items required"; C3 get order by id (404 if unknown); C4 cancel a pending order; C5 10% discount for orders well over 100 EUR

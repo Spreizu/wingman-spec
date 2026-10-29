@@ -1,0 +1,546 @@
+{
+  "tokens": [
+    {
+      "name": "font-sans",
+      "value": "\"Inter\", ui-sans-serif, system-ui, sans-serif",
+      "norm": "\"inter\", ui-sans-serif, system-ui, sans-serif",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "font-sans"
+      ]
+    },
+    {
+      "name": "color-primary",
+      "value": "#3b5bdb",
+      "norm": "#3b5bdb",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "bg-primary",
+        "text-primary",
+        "border-primary",
+        "ring-primary",
+        "outline-primary",
+        "fill-primary",
+        "stroke-primary",
+        "from-primary",
+        "via-primary",
+        "to-primary",
+        "divide-primary",
+        "accent-primary",
+        "caret-primary",
+        "decoration-primary",
+        "shadow-primary",
+        "placeholder-primary"
+      ]
+    },
+    {
+      "name": "color-primary-strong",
+      "value": "#2f49b0",
+      "norm": "#2f49b0",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "bg-primary-strong",
+        "text-primary-strong",
+        "border-primary-strong",
+        "ring-primary-strong",
+        "outline-primary-strong",
+        "fill-primary-strong",
+        "stroke-primary-strong",
+        "from-primary-strong",
+        "via-primary-strong",
+        "to-primary-strong",
+        "divide-primary-strong",
+        "accent-primary-strong",
+        "caret-primary-strong",
+        "decoration-primary-strong",
+        "shadow-primary-strong",
+        "placeholder-primary-strong"
+      ]
+    },
+    {
+      "name": "color-primary-soft",
+      "value": "#e8edff",
+      "norm": "#e8edff",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "bg-primary-soft",
+        "text-primary-soft",
+        "border-primary-soft",
+        "ring-primary-soft",
+        "outline-primary-soft",
+        "fill-primary-soft",
+        "stroke-primary-soft",
+        "from-primary-soft",
+        "via-primary-soft",
+        "to-primary-soft",
+        "divide-primary-soft",
+        "accent-primary-soft",
+        "caret-primary-soft",
+        "decoration-primary-soft",
+        "shadow-primary-soft",
+        "placeholder-primary-soft"
+      ]
+    },
+    {
+      "name": "color-fg",
+      "value": "#1b1f2a",
+      "norm": "#1b1f2a",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "bg-fg",
+        "text-fg",
+        "border-fg",
+        "ring-fg",
+        "outline-fg",
+        "fill-fg",
+        "stroke-fg",
+        "from-fg",
+        "via-fg",
+        "to-fg",
+        "divide-fg",
+        "accent-fg",
+        "caret-fg",
+        "decoration-fg",
+        "shadow-fg",
+        "placeholder-fg"
+      ]
+    },
+    {
+      "name": "color-fg-muted",
+      "value": "#5b6474",
+      "norm": "#5b6474",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "bg-fg-muted",
+        "text-fg-muted",
+        "border-fg-muted",
+        "ring-fg-muted",
+        "outline-fg-muted",
+        "fill-fg-muted",
+        "stroke-fg-muted",
+        "from-fg-muted",
+        "via-fg-muted",
+        "to-fg-muted",
+        "divide-fg-muted",
+        "accent-fg-muted",
+        "caret-fg-muted",
+        "decoration-fg-muted",
+        "shadow-fg-muted",
+        "placeholder-fg-muted"
+      ]
+    },
+    {
+      "name": "color-border",
+      "value": "#dde1e8",
+      "norm": "#dde1e8",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "bg-border",
+        "text-border",
+        "border-border",
+        "ring-border",
+        "outline-border",
+        "fill-border",
+        "stroke-border",
+        "from-border",
+        "via-border",
+        "to-border",
+        "divide-border",
+        "accent-border",
+        "caret-border",
+        "decoration-border",
+        "shadow-border",
+        "placeholder-border"
+      ]
+    },
+    {
+      "name": "color-surface",
+      "value": "#ffffff",
+      "norm": "#ffffff",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "bg-surface",
+        "text-surface",
+        "border-surface",
+        "ring-surface",
+        "outline-surface",
+        "fill-surface",
+        "stroke-surface",
+        "from-surface",
+        "via-surface",
+        "to-surface",
+        "divide-surface",
+        "accent-surface",
+        "caret-surface",
+        "decoration-surface",
+        "shadow-surface",
+        "placeholder-surface"
+      ]
+    },
+    {
+      "name": "color-canvas",
+      "value": "#f4f5f8",
+      "norm": "#f4f5f8",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "bg-canvas",
+        "text-canvas",
+        "border-canvas",
+        "ring-canvas",
+        "outline-canvas",
+        "fill-canvas",
+        "stroke-canvas",
+        "from-canvas",
+        "via-canvas",
+        "to-canvas",
+        "divide-canvas",
+        "accent-canvas",
+        "caret-canvas",
+        "decoration-canvas",
+        "shadow-canvas",
+        "placeholder-canvas"
+      ]
+    },
+    {
+      "name": "color-danger",
+      "value": "#c92a2a",
+      "norm": "#c92a2a",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "bg-danger",
+        "text-danger",
+        "border-danger",
+        "ring-danger",
+        "outline-danger",
+        "fill-danger",
+        "stroke-danger",
+        "from-danger",
+        "via-danger",
+        "to-danger",
+        "divide-danger",
+        "accent-danger",
+        "caret-danger",
+        "decoration-danger",
+        "shadow-danger",
+        "placeholder-danger"
+      ]
+    },
+    {
+      "name": "color-success",
+      "value": "#2b8a3e",
+      "norm": "#2b8a3e",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "bg-success",
+        "text-success",
+        "border-success",
+        "ring-success",
+        "outline-success",
+        "fill-success",
+        "stroke-success",
+        "from-success",
+        "via-success",
+        "to-success",
+        "divide-success",
+        "accent-success",
+        "caret-success",
+        "decoration-success",
+        "shadow-success",
+        "placeholder-success"
+      ]
+    },
+    {
+      "name": "radius-card",
+      "value": "14px",
+      "norm": "14px",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "rounded-card",
+        "rounded-t-card",
+        "rounded-b-card",
+        "rounded-l-card",
+        "rounded-r-card"
+      ]
+    },
+    {
+      "name": "radius-control",
+      "value": "10px",
+      "norm": "10px",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "rounded-control",
+        "rounded-t-control",
+        "rounded-b-control",
+        "rounded-l-control",
+        "rounded-r-control"
+      ]
+    },
+    {
+      "name": "spacing-gutter",
+      "value": "2rem",
+      "norm": "32px",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "p-gutter",
+        "px-gutter",
+        "py-gutter",
+        "pt-gutter",
+        "pr-gutter",
+        "pb-gutter",
+        "pl-gutter",
+        "m-gutter",
+        "mx-gutter",
+        "my-gutter",
+        "mt-gutter",
+        "mr-gutter",
+        "mb-gutter",
+        "ml-gutter",
+        "gap-gutter",
+        "gap-x-gutter",
+        "gap-y-gutter",
+        "space-x-gutter",
+        "space-y-gutter",
+        "w-gutter",
+        "h-gutter",
+        "size-gutter",
+        "inset-gutter",
+        "top-gutter",
+        "left-gutter",
+        "right-gutter",
+        "bottom-gutter"
+      ]
+    },
+    {
+      "name": "spacing-card",
+      "value": "1.75rem",
+      "norm": "28px",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "p-card",
+        "px-card",
+        "py-card",
+        "pt-card",
+        "pr-card",
+        "pb-card",
+        "pl-card",
+        "m-card",
+        "mx-card",
+        "my-card",
+        "mt-card",
+        "mr-card",
+        "mb-card",
+        "ml-card",
+        "gap-card",
+        "gap-x-card",
+        "gap-y-card",
+        "space-x-card",
+        "space-y-card",
+        "w-card",
+        "h-card",
+        "size-card",
+        "inset-card",
+        "top-card",
+        "left-card",
+        "right-card",
+        "bottom-card"
+      ]
+    },
+    {
+      "name": "spacing-stack",
+      "value": "0.75rem",
+      "norm": "12px",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "p-stack",
+        "px-stack",
+        "py-stack",
+        "pt-stack",
+        "pr-stack",
+        "pb-stack",
+        "pl-stack",
+        "m-stack",
+        "mx-stack",
+        "my-stack",
+        "mt-stack",
+        "mr-stack",
+        "mb-stack",
+        "ml-stack",
+        "gap-stack",
+        "gap-x-stack",
+        "gap-y-stack",
+        "space-x-stack",
+        "space-y-stack",
+        "w-stack",
+        "h-stack",
+        "size-stack",
+        "inset-stack",
+        "top-stack",
+        "left-stack",
+        "right-stack",
+        "bottom-stack"
+      ]
+    },
+    {
+      "name": "text-display",
+      "value": "2.5rem",
+      "norm": "40px",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "text-display"
+      ]
+    },
+    {
+      "name": "text-display--line-height",
+      "value": "1.1",
+      "norm": "1.1",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": []
+    },
+    {
+      "name": "text-title",
+      "value": "1.75rem",
+      "norm": "28px",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "text-title"
+      ]
+    },
+    {
+      "name": "text-title--line-height",
+      "value": "1.25",
+      "norm": "1.25",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": []
+    },
+    {
+      "name": "shadow-card",
+      "value": "0 1px 2px rgb(16 24 40 / 0.06), 0 4px 12px rgb(16 24 40 / 0.06)",
+      "norm": "0 1px 2px rgb(16 24 40 / 0.06), 0 4px 12px rgb(16 24 40 / 0.06)",
+      "file": "src/style.css",
+      "kind": "tailwind-theme",
+      "utilities": [
+        "shadow-card"
+      ]
+    }
+  ],
+  "components": [
+    {
+      "name": "AccountOverview",
+      "file": "src/components/AccountOverview.vue",
+      "shared": false,
+      "props": {}
+    },
+    {
+      "name": "AppHeader",
+      "file": "src/components/AppHeader.vue",
+      "shared": false,
+      "props": {}
+    },
+    {
+      "name": "UiBadge",
+      "file": "src/ui/UiBadge.vue",
+      "shared": true,
+      "props": {
+        "tone": [
+          "primary",
+          "neutral"
+        ]
+      }
+    },
+    {
+      "name": "UiButton",
+      "file": "src/ui/UiButton.vue",
+      "shared": true,
+      "props": {
+        "variant": [
+          "primary",
+          "secondary",
+          "ghost"
+        ],
+        "block": "boolean",
+        "type": [
+          "button",
+          "submit",
+          "reset"
+        ],
+        "disabled": "boolean"
+      }
+    },
+    {
+      "name": "UiCard",
+      "file": "src/ui/UiCard.vue",
+      "shared": true,
+      "props": {
+        "featured": "boolean",
+        "as": "string"
+      }
+    },
+    {
+      "name": "UiInput",
+      "file": "src/ui/UiInput.vue",
+      "shared": true,
+      "props": {
+        "id": "string",
+        "label": "string",
+        "type": "string",
+        "hint": "string",
+        "error": "string",
+        "testid": "string"
+      }
+    },
+    {
+      "name": "UiSelect",
+      "file": "src/ui/UiSelect.vue",
+      "shared": true,
+      "props": {
+        "id": "string",
+        "label": "string",
+        "options": "{ value: string",
+        "testid": "string"
+      }
+    },
+    {
+      "name": "UiSwitch",
+      "file": "src/ui/UiSwitch.vue",
+      "shared": true,
+      "props": {
+        "id": "string",
+        "label": "string",
+        "description": "string",
+        "disabled": "boolean",
+        "testid": "string"
+      }
+    }
+  ],
+  "sources": [
+    {
+      "kind": "tailwind @theme / css variables",
+      "file": "src/style.css"
+    }
+  ],
+  "tailwind": {
+    "version": 4,
+    "entry": "src/style.css"
+  },
+  "ui_library": []
+}

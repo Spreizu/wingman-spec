@@ -1,0 +1,26 @@
+{
+  "test": [
+    "a.test.ts", "src/a.test.tsx", "a.spec.mjs", "src/a.spec.js", "src/__tests__/a.ts", "tests/a.js", "test/a.js", "spec/a.js", "Tests/a.js", "TEST/a.js",
+    "test_a.py", "pkg/test_a.py", "a_test.py", "pkg/a_test.py", "a_test.go", "pkg/a_test.go",
+    "spec/a_spec.rb", "lib/a_spec.rb", "lib/a_test.rb", "test_a.rb", "test/a.rb", "spec/a.rb",
+    "tests/a.rs", "tests/common/mod.rs", "crate/tests/it.rs",
+    "tests/Unit/AThing.php", "Tests/Unit/AThing.php", "src/FooTest.php", "app/Models/FooTests.php", "Test.php",
+    "src/test/java/a/B.java", "src/main/FooTest.java", "FooTests.java", "UserRepositoryIT.java", "FooITCase.java", "TestFoo.java", "Test_Foo.java",
+    "src/test/kotlin/A.kt", "FooTest.kt", "FooTests.kts", "FooSpec.kt", "UserRepositoryIT.kt", "TestFoo.kt",
+    "src/test/scala/A.scala", "FooTest.scala", "FooSpec.scala", "FooSuite.scala", "UserRepositoryIT.scala",
+    "Foo.Tests/A.cs", "Foo.Test/A.cs", "FooTests/A.cs", "src/Foo.Tests/Bar/A.cs", "FooTests.cs", "FooTest.cs",
+    "Tests/FooTests/A.swift", "FooTests.swift", "FooTest.swift", "FooSpec.swift",
+    "a_test.dart", "test/a.dart", "test/a_test.exs", "a_test.exs", "test_a.exs", "test/test_helper.exs",
+    "a_test.cc", "a_test.cpp", "a_test.cxx", "a_test.c", "FooTest.cpp", "FooTest.cc", "a_unittest.cc", "test/a.c", "test/a.h", "tests/a.cpp",
+    "test/app/a_test.clj", "spec/a_spec.lua", "a_test.lua",
+    "Foo.test.vue", "src/Foo.spec.vue", "Foo.test.svelte", "src/Foo.spec.svelte"
+  ],
+  "notTest": [
+    "src/a.ts", "a.ts", "src/latest/a.ts", "latest/a.ts", "src/contest.ts", "contest.py", "attest.go", "src/testing-utils.ts", "src/testing/a.ts", "testdata/a.go", "src/protest/a.js",
+    "lib/protest.rb", "src/spec_helper.rb", "src/specification.js", "src/inspect.ts", "a.test", "test.txt.bak",
+    "Latest.php", "contest.php", "src/Contest.php", "Contest.cs", "src/Contests/A.cs", "src/Latest/A.cs", "Latest.java", "AUDIT.java", "Edit.java", "Testing.java", "Testimony.java", "src/main/java/a/Greet.java", "Greet.kt", "Greeter.scala", "Greet.swift",
+    "src/Attests/A.cs", "Greet/Greet.cs", "src/protest.dart", "lib/greet.dart", "lib/greet.ex", "src/latest.cc", "src/contest.cpp", "src/greet.c", "src/app/greet.clj", "src/greet.lua",
+    "Foo.vue", "src/Latest.vue", "Foo.svelte", "src/Latest.svelte", "Foo.test.vue.bak"
+  ],
+  "notTestFile": ["tests/fixtures/data.json", "test/a.md", "spec/a.png", "tests/a.txt", "src/test/resources/app.properties"]
+}

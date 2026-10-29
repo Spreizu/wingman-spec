@@ -1,0 +1,121 @@
+{
+  "ok": true,
+  "slices": [
+    {
+      "id": "skeleton",
+      "title": "A visitor registers, picks a plan and pays with the sandbox card",
+      "size": "L",
+      "required_size": "L",
+      "milestone": "m1",
+      "status": "planned",
+      "file_status": "planned",
+      "depends_on": [],
+      "capabilities": [
+        "accounts",
+        "subscriptions/choose-a-plan",
+        "billing/contract-paygate-charges-api",
+        "billing/charge-the-weekly-box"
+      ],
+      "requirements": 5,
+      "skeleton": true,
+      "contract_tests": [
+        "billing"
+      ]
+    },
+    {
+      "id": "skip-and-pause",
+      "title": "A subscriber skips a week or pauses and is refunded",
+      "size": "L",
+      "required_size": "L",
+      "milestone": "m1",
+      "status": "planned",
+      "file_status": "planned",
+      "depends_on": [
+        "skeleton"
+      ],
+      "capabilities": [
+        "subscriptions/skip-a-week",
+        "subscriptions/pause-a-subscription",
+        "billing/refund-a-skipped-week"
+      ],
+      "requirements": 3
+    },
+    {
+      "id": "delivery",
+      "title": "Boxes get a courier slot and a visible delivery status",
+      "size": "S",
+      "required_size": "S",
+      "milestone": "m2",
+      "status": "planned",
+      "file_status": "planned",
+      "depends_on": [
+        "skeleton"
+      ],
+      "capabilities": [
+        "delivery-slots"
+      ],
+      "requirements": 3,
+      "contract_tests": [
+        "delivery-slots"
+      ]
+    },
+    {
+      "id": "notices",
+      "title": "Subscribers get an e-mail when their box is dispatched",
+      "size": "S",
+      "required_size": "S",
+      "milestone": "m2",
+      "status": "planned",
+      "file_status": "planned",
+      "depends_on": [
+        "delivery"
+      ],
+      "capabilities": [
+        "notifications"
+      ],
+      "requirements": 2,
+      "contract_tests": [
+        "notifications"
+      ]
+    },
+    {
+      "id": "packing",
+      "title": "Kitchen staff get a daily packing list",
+      "size": "S",
+      "required_size": "S",
+      "milestone": "m3",
+      "status": "planned",
+      "file_status": "planned",
+      "depends_on": [
+        "skeleton"
+      ],
+      "capabilities": [
+        "packing-list"
+      ],
+      "requirements": 1
+    }
+  ],
+  "order": [
+    "skeleton",
+    "skip-and-pause",
+    "delivery",
+    "notices",
+    "packing"
+  ],
+  "next_up": [
+    "skeleton"
+  ],
+  "counts": {
+    "planned": 5,
+    "proposed": 0,
+    "applying": 0,
+    "done": 0
+  },
+  "coverage": {
+    "requirements": 14,
+    "uncovered": [],
+    "overlaps": []
+  },
+  "errors": [],
+  "warnings": []
+}

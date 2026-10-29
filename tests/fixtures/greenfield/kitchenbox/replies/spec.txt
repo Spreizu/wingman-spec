@@ -1,0 +1,5 @@
+VERDICT: pass
+SCORE: 86
+FINDING: minor | accounts/sign-in | no scenario for a locked account that resets the password; say that reset is out of scope
+FINDING: minor | billing/contract-paygate-charges-api | rate limit given, but no scenario for 429 from PayGate
+FINDING: minor | glossary | "Delivery week" is used in subscriptions but defined as a calendar week only

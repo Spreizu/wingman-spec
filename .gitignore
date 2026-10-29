@@ -1,0 +1,12 @@
+.DS_Store
+node_modules/
+out/
+dist/
+*.vsix
+*.bundle
+*.zip
+*.tsbuildinfo
+.apply-runs/
+.eslintcache
+test-results/
+playwright-report/

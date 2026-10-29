@@ -1,0 +1,28 @@
+{
+  "change": "add-discount-codes",
+  "started": "2026-10-25T22:54:05.225Z",
+  "attempts": 0,
+  "last_failure": null,
+  "task": null,
+  "pre_tasks": [
+    {
+      "description": "1.1 Apply a discount code and reject unknown or second codes",
+      "done": true
+    },
+    {
+      "description": "1.2 Show the discount on the summary",
+      "done": true
+    },
+    {
+      "description": "1.R Request code review of the whole change",
+      "done": false
+    }
+  ],
+  "snapshots": [
+    {
+      "file": "/proj/openspec/changes/add-discount-codes/tasks.md",
+      "snap": "/proj/openspec/.apply-runs/add-discount-codes/20261025T225401Z-1362048/pre/1792968845225-0.md"
+    }
+  ],
+  "attempt_open": false
+}

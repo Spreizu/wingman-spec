@@ -1,0 +1,122 @@
+{
+  "ok": false,
+  "mode": "on",
+  "counts": {
+    "error": 6,
+    "warning": 2,
+    "info": 0
+  },
+  "findings": [
+    {
+      "source": "lint",
+      "code": "edge-cases",
+      "severity": "error",
+      "message": "proposal.md has no \"## Edge cases\" section: list every edge case or boundary the request or the user's answers name (long text, empty, error, many items, limits, invalid input), one bullet each ending with \"-> <capability>/<scenario-slug>\" (the scenario that proves it), or \"- none named\"",
+      "file": "/proj/openspec/changes/edit/proposal.md",
+      "line": 1,
+      "col": 1,
+      "length": 7,
+      "change": "edit"
+    },
+    {
+      "source": "lint",
+      "code": "missing-why",
+      "severity": "error",
+      "message": "requirement \"Edit a todo\" has no `Why:` line. Add one line right under its SHALL statement: who wants this and why, e.g. `Why: The account owner wants to reset a forgotten password, so that they are not locked out.`",
+      "file": "/proj/openspec/changes/edit/specs/todo/spec.md",
+      "line": 3,
+      "col": 1,
+      "length": 28,
+      "change": "edit",
+      "fix": {
+        "kind": "add-why"
+      }
+    },
+    {
+      "source": "drift",
+      "code": "untested-requirement",
+      "severity": "error",
+      "key": "untested-requirement:todo/remove-a-todo",
+      "file": "/proj/openspec/specs/todo/spec.md",
+      "line": 14,
+      "col": 1,
+      "length": 30,
+      "fix": {
+        "kind": "add-test-tag",
+        "scenarios": [
+          {
+            "name": "Removed",
+            "id": "todo/removed"
+          }
+        ]
+      },
+      "requirement": "todo/remove-a-todo",
+      "message": "requirement \"Remove a todo\" has code anchors but no test anchor (no test tagged for its scenarios, no @spec marker in a test)"
+    },
+    {
+      "source": "drift",
+      "code": "unanchored-requirement",
+      "severity": "error",
+      "key": "unanchored-requirement:todo/clear-all",
+      "hint": "implemented without a marker, or the code was deleted or moved without its marker",
+      "file": "/proj/openspec/specs/todo/spec.md",
+      "line": 22,
+      "col": 1,
+      "length": 26,
+      "fix": {
+        "kind": "accept"
+      },
+      "requirement": "todo/clear-all",
+      "message": "requirement \"Clear all\" has no code anchor"
+    },
+    {
+      "source": "drift",
+      "code": "orphan-anchor",
+      "severity": "error",
+      "key": "orphan-anchor:todo/gone-requirement@src/todo.js",
+      "file": "/proj/src/todo.js",
+      "line": 13,
+      "col": 10,
+      "length": 21,
+      "message": "`@spec todo/gone-requirement` in src/todo.js:13 points at a requirement that does not exist (removed, renamed or mistyped)"
+    },
+    {
+      "source": "drift",
+      "code": "stale-test-tag",
+      "severity": "error",
+      "key": "stale-test-tag:todo/nothing-here",
+      "file": "/proj/tests/todo.test.js",
+      "line": 3,
+      "col": 12,
+      "length": 17,
+      "message": "test tag [todo/nothing-here] in tests/todo.test.js: no such scenario in the specs"
+    },
+    {
+      "source": "lint",
+      "code": "review",
+      "severity": "warning",
+      "message": "no final \"Request code review of the whole change\" task at the end",
+      "file": "/proj/openspec/changes/edit/tasks.md",
+      "line": 1,
+      "col": 1,
+      "length": 10,
+      "change": "edit"
+    },
+    {
+      "source": "drift",
+      "code": "misplaced-marker",
+      "severity": "warning",
+      "key": "misplaced-marker:trailing-marker@src/todo.js#todo/remove-a-todo",
+      "hint": "move the marker into the doc comment of the whole function, or on its own line directly above the lines that implement the requirement",
+      "file": "/proj/src/todo.js",
+      "line": 10,
+      "col": 45,
+      "length": 24,
+      "fix": {
+        "kind": "move-marker"
+      },
+      "reason": "trailing-marker",
+      "message": "src/todo.js:10: trailing-marker: the marker is at the end of a code line: put it on its own line directly above the code it covers (or in the doc comment of the whole function)"
+    }
+  ]
+}

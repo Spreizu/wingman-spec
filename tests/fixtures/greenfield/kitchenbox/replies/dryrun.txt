@@ -1,0 +1,3 @@
+VERDICT: pass
+UNKNOWN: minor | skeleton | which currency symbol position to use (assume 12,50 EUR)
+UNKNOWN: minor | billing-charges | the retry schedule after a timeout is not stated (assume 1, 5, 30 minutes like MailPost)

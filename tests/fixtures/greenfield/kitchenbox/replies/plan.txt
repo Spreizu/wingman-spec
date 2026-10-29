@@ -1,0 +1,5 @@
+VERDICT: pass
+SCORE: 84
+FINDING: minor | storefront | the pages slice could be split once a design exists
+FINDING: minor | packing | the packing list has no dependency on delivery but is scheduled after it
+FINDING: minor | skeleton | the skeleton uses the sandbox card only; say so in the acceptance criteria

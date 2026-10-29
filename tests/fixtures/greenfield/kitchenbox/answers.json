@@ -1,0 +1,43 @@
+{
+  "answers": {
+    "users": [
+      "answered",
+      "Customers (subscribers), kitchen staff, and the owner as admin. Customers use phones and laptops; staff use a laptop in the kitchen. Source: inputs/brief.md \"What customers do\"."
+    ],
+    "goals": [
+      "answered",
+      "Replace e-mail orders: subscriptions paid weekly, skip and pause self-service, delivery visibility, a packing list. Success: 80% of orders self-service within 3 months. Source: inputs/brief.md."
+    ],
+    "integrations": [
+      "answered",
+      "PayGate, CourierX, MailPost; see inputs/paygate-api.md, courier-api.md, mailpost-api.md. All have sandboxes."
+    ],
+    "failure": [
+      "asked",
+      ""
+    ],
+    "nfr": [
+      "answered",
+      "200 concurrent users, 99.5% monthly availability, invoices kept 7 years, personal data deleted 30 days after closing. Source: inputs/brief.md \"Numbers we know\" and the owner by phone."
+    ],
+    "constraints": [
+      "answered",
+      "Hosted on the owner cloud account, Postgres is licensed, no mobile app. Source: inputs/brief.md \"Systems\"."
+    ],
+    "out-of-scope": [
+      "answered",
+      "No mobile app, no recipes, no discount codes, no multi-country (inputs/brief.md \"Not now\")."
+    ],
+    "environments": [
+      "answered",
+      "staging and production on the owner cloud account; keys PAYGATE_API_KEY, COURIERX_API_KEY, MAILPOST_API_KEY held by finance, logistics, IT; test roles customer, kitchen, admin. Source: inputs/brief.md and owner call."
+    ],
+    "design": [
+      "assumed",
+      ""
+    ]
+  },
+  "late": {
+    "failure": "A failed charge holds the box for 48 hours; after that the week is skipped and the customer is e-mailed. Owner by e-mail, 2026-10-05."
+  }
+}

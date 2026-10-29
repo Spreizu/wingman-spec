@@ -1,0 +1,42 @@
+{
+  "change": "rework-percent-discount",
+  "started": "2026-10-25T22:39:11.215Z",
+  "attempts": 2,
+  "last_failure": "task 1.1 is not ticked in tasks.md\ntasks.md edited outside the target checkbox: tasks.md:8 changed: \"- [ ] 1.R Request code review of the whole change\" -> \"- [x] 1.R Request code review of the whole change\"",
+  "task": {
+    "id": "1",
+    "description": "1.1 Replace SAVE10 by SAVE15 with the 20 euro cap",
+    "line": 3,
+    "file": "/proj/openspec/changes/rework-percent-discount/tasks.md",
+    "label": "1.1",
+    "title": "Replace SAVE10 by SAVE15 with the 20 euro cap",
+    "details": [
+      "Spec: discount-codes > Apply a discount code (all scenarios); discount-codes > Reject unknown codes and second codes (all scenarios); discount-codes > Show the discount on the summary (all scenarios)",
+      "Test first: `test/discount.test.ts`, update the SAVE10 tests to SAVE15 and add `[discount-codes/save15-is-capped-at-twenty-euro]` (20000 -> 2000), `[discount-codes/retired-code-is-unknown]` (SAVE10, \" save10 \"), `[discount-codes/save15-rounds-half-up]` (805 -> 121), `[discount-codes/journey-sn-3-marketing-sees-the-percentage-offer-capped]`",
+      "Files: `src/invoice.ts`, `test/discount.test.ts`",
+      "Done when: `npm test` exits 0"
+    ],
+    "done_when": {
+      "line": "Done when: `npm test` exits 0",
+      "cmd": "npm test"
+    }
+  },
+  "pre_tasks": [
+    {
+      "description": "1.1 Replace SAVE10 by SAVE15 with the 20 euro cap",
+      "done": false
+    },
+    {
+      "description": "1.R Request code review of the whole change",
+      "done": false
+    }
+  ],
+  "snapshots": [
+    {
+      "file": "/proj/openspec/changes/rework-percent-discount/tasks.md",
+      "snap": "/proj/openspec/.apply-runs/rework-percent-discount/20261025T223911Z-1307302/pre/1792967951215-0.md"
+    }
+  ],
+  "attempt_open": true,
+  "review": null
+}
