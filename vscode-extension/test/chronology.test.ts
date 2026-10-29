@@ -58,7 +58,7 @@ test('a legacy archive without the file falls back to the commit time, then the 
   git('commit', '-qm', 'two');
   delete process.env['STAMP'];
   put('openspec/changes/archive/2026-10-20-charlie/tasks.md', '## 1. A\n\n- [x] 1.1 Done\n'); // untracked: the mtime
-  const old = new Date(2026, 9, 20, 7, 0, 0);
+  const old = new Date('2026-10-20T07:00:00+02:00');
   utimesSync(join(a, '2026-10-20-charlie'), old, old);
   const p = await scanProject(root);
   const src = Object.fromEntries(p.archive.map((c) => [c.name, c.archived?.source]));

@@ -9,7 +9,12 @@ const { parseTimeline, groupTimeline, duration, IDLE_GAP_SECONDS, timelinePath }
 const { timelineTab } = await import('../src/webview/timelineView.ts');
 const { STORE_PATTERN } = await import('../src/watcher.ts');
 
-const at = (m: number, s = 0) => `2026-10-29T10:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}+02:00`;
+// Times carry the machine's own offset, so the clock shown is 10:mm:ss in any time zone.
+const pad = (n: number) => String(n).padStart(2, '0');
+const at = (m: number, s = 0) => {
+  const o = -new Date(2026, 9, 29, 10, m, s).getTimezoneOffset();
+  return `2026-10-29T10:${pad(m)}:${pad(s)}${o < 0 ? '-' : '+'}${pad(Math.floor(Math.abs(o) / 60))}:${pad(Math.abs(o) % 60)}`;
+};
 const ev = (o: Record<string, unknown>) => JSON.stringify(o);
 // written out of order on purpose (two parallel commands): the tab orders by time
 const FILE = [
