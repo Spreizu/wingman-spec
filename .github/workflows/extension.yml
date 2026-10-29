@@ -51,6 +51,9 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: marketplace
+    permissions:
+      contents: read
+      id-token: write
     env:
       VSIX: wingman-spec-${{ needs.build.outputs.version }}.vsix
     steps:
@@ -65,15 +68,46 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: wingman-spec-${{ needs.build.outputs.version }}
-      - name: Publish to the VS Code Marketplace
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # VS Code Marketplace, one of two keyless modes (no PAT is stored):
+      # 1. Trusted Publishing: repository variable VSCE_TRUSTED_PUBLISHING=true.
+      # 2. Microsoft Entra ID: repository variables AZURE_CLIENT_ID and AZURE_TENANT_ID
+      #    (and AZURE_SUBSCRIPTION_ID for a managed identity).
+      - name: Marketplace sign-in mode
+        id: vsce
         env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          TRUSTED: ${{ vars.VSCE_TRUSTED_PUBLISHING }}
+          CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
         run: |
-          if [ -z "$VSCE_PAT" ]; then
-            echo "::notice::VSCE_PAT is not set: skipped the VS Code Marketplace"
-            exit 0
+          if [ "$TRUSTED" = "true" ]; then
+            echo "mode=oidc" >> "$GITHUB_OUTPUT"
+          elif [ -n "$CLIENT_ID" ] && [ -n "$TENANT_ID" ]; then
+            echo "mode=entra" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+            echo "::notice::Neither VSCE_TRUSTED_PUBLISHING nor AZURE_CLIENT_ID and AZURE_TENANT_ID is set: skipped the VS Code Marketplace"
           fi
-          npx --yes @vscode/vsce@3.9.2 publish --packagePath "$VSIX"
+      - name: Azure login (Entra ID)
+        if: steps.vsce.outputs.mode == 'entra'
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: ${{ vars.AZURE_SUBSCRIPTION_ID == '' }}
+      - name: Marketplace profile ID of the Entra identity
+        if: steps.vsce.outputs.mode == 'entra'
+        continue-on-error: true
+        run: az rest -u https://app.vssps.visualstudio.com/_apis/profile/profiles/me --resource 499b84ac-1321-427f-aa17-267ca6975798 --query id -o tsv
+      - name: Publish to the VS Code Marketplace (Trusted Publishing)
+        if: steps.vsce.outputs.mode == 'oidc'
+        run: npx --yes @vscode/vsce@4.1.0 publish --oidc --packagePath "$VSIX"
+      - name: Publish to the VS Code Marketplace (Entra ID)
+        if: steps.vsce.outputs.mode == 'entra'
+        run: npx --yes @vscode/vsce@4.1.0 publish --azure-credential --packagePath "$VSIX"
       - name: Publish to Open VSX
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
