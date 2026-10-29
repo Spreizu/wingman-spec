@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The icon is rendered from `assets/icon.svg` in the repository. CI builds and packages the extension on every push to `main`.
+
 ## 0.11.2
 
 - The change page's archive list stays quiet while work is in progress: with open or unverified tasks, no tasks or no verifier run it is one collapsed, muted line ("Before archive: 2 items") without buttons. It opens as a warning ("Blocking archive", yellow, with the steps) only when every task is ticked and something still blocks; steps the page header already offers are not repeated.

@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/logo.png" width="96" height="96" alt="Wingman Spec logo"></p>
+<p align="center"><img src="assets/icon.svg" width="96" height="96" alt="Wingman Spec logo"></p>
 
 <h1 align="center">Wingman Spec</h1>
 

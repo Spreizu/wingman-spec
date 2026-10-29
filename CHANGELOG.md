@@ -2,6 +2,11 @@
 
 Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
+## Unreleased
+
+- **Extension CI.** `.github/workflows/extension.yml` runs on pushes and pull requests to `main`: typecheck, tests, production build and `vsce package` on Node 24 with pnpm from `package.json`. The `.vsix` is uploaded as the `wingman-spec-<version>` artifact; a `v*` tag also creates a GitHub release with it.
+- **SVG icon.** `assets/icon.svg` is the icon source: the original artwork traced by colour, with a rounded-rect background and one linear gradient per shape (16 KB, no embedded images). The README shows it; `vscode-extension/images/icon.png` is rendered from it at 128 px.
+
 ## 0.11.2
 
 - **Shorter, concrete instructions.** The shipped prose (schema, templates, commands, agents, partials, config template, `AGENTS.md` block, skills, docs) follows ten writing rules: one instruction per sentence, numbers instead of "several", no hedges, lists instead of chained clauses. Every operational instruction is kept. Measured with `scripts/prose-lint.cjs --metrics` on the same files: sentences of 30+ words 265 -> 167, of 45+ words 80 -> 31, mean sentence 15.7 -> 13.4 words, lines with 2+ parentheses 154 -> 95, lint warnings 571 -> 339; the rewritten files are 386 words shorter. No shipped sentence is above 60 words (`tests/drift.sh` fails on one).

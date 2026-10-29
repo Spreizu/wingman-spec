@@ -12,6 +12,10 @@ pnpm run build          # bundles to out/extension.js
 pnpm run package        # typecheck, test, bundle, and create a .vsix
 ```
 
+`images/icon.png` is `assets/icon.svg` from the repository root rendered at 128 x 128 px. Edit the SVG, then render it again.
+
+CI (`.github/workflows/extension.yml`) runs the same steps on Node 24 and uploads the `.vsix` as an artifact. A `v*` tag also publishes a GitHub release with the `.vsix`.
+
 Install the `.vsix` with "Extensions: Install from VSIX..." in Cursor or VS Code, then reload the window.
 
 The build bundles `project-template/hooks/spec-guard.cjs` from this repository, so build from a full checkout.
