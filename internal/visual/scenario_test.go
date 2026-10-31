@@ -3,12 +3,14 @@ package visual
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 )
 
-// normalize drops null, "", false and empty values the two parsers may write differently, and decodes to plain values.
+// normalize drops null, "", false and empty values the two parsers may write differently, decodes to plain values, and
+// writes a "file" path with forward slashes (the parser returns the platform's path).
 func normalize(t *testing.T, b []byte) any {
 	t.Helper()
 	var v any
@@ -23,6 +25,9 @@ func normalize(t *testing.T, b []byte) any {
 			for k, v := range y {
 				if v == nil || v == "" || v == false {
 					continue
+				}
+				if f, ok := v.(string); ok && k == "file" {
+					v = filepath.ToSlash(f)
 				}
 				out[k] = walk(v)
 			}

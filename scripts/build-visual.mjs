@@ -29,7 +29,8 @@ const banner = [
 ].join('\n');
 const res = await build({
   entryPoints: [join(root, 'visual', 'wingman-visual.cjs')],
-  bundle: true, platform: 'node', format: 'esm', target: 'node18', write: false, legalComments: 'none',
+  // absWorkingDir: the bundle's module comments name paths relative to it, so the output is the same from any directory.
+  absWorkingDir: root, bundle: true, platform: 'node', format: 'esm', target: 'node18', write: false, legalComments: 'none',
   external: ['playwright', 'playwright-core', '@playwright/test', 'axe-core'], banner: { js: banner }, logLevel: 'warning',
 });
 const code = res.outputFiles[0].text;

@@ -8,11 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // Genesis is the prev of the first chained entry.
@@ -54,24 +52,21 @@ func lastLine(f string) []byte {
 	}
 }
 
-// lock serialises the read-last-line-then-append of Append across processes (best effort: after 3 s it goes ahead).
+// lock serialises the read-last-line-then-append of Append across processes with an exclusive OS lock on
+// timeline.lock (flock on Unix, LockFileEx on Windows). The kernel drops the lock when its process exits, so a killed
+// writer leaves nothing stale. Where the file system cannot lock, Append goes ahead unlocked.
 func lock(dir string) func() {
-	f := filepath.Join(dir, "timeline.lock")
-	until := time.Now().Add(3 * time.Second)
-	for {
-		fh, err := os.OpenFile(f, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
-		if err == nil {
-			_ = fh.Close()
-			return func() { _ = os.Remove(f) }
-		}
-		if !errors.Is(err, fs.ErrExist) || time.Now().After(until) {
-			return func() {}
-		}
-		if st, e := os.Stat(f); e == nil && time.Since(st.ModTime()) > 10*time.Second {
-			_ = os.Remove(f) // left by a killed process
-			continue
-		}
-		time.Sleep(3 * time.Millisecond)
+	fh, err := os.OpenFile(filepath.Join(dir, "timeline.lock"), os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return func() {}
+	}
+	if lockFile(fh) != nil {
+		_ = fh.Close()
+		return func() {}
+	}
+	return func() {
+		_ = unlockFile(fh)
+		_ = fh.Close()
 	}
 }
 

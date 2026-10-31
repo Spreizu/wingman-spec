@@ -16,7 +16,7 @@ At `next`, `check` and `finish` the verifier compares the plan with the last sna
 
 ## Tamper evidence
 
-Each line carries `prev`, the SHA-256 of the line before it (64 zeros for the first). Writers take a short lock file, so parallel commands keep the chain. `wingman-spec validate <change>` and `doctor` warn about a broken chain and name the first entry that does not follow the one before it; the Timeline tab shows the same note. An edited, deleted, inserted or reordered entry breaks the chain. Lines written before 0.12 have no `prev` and are accepted.
+Each line carries `prev`, the SHA-256 of the line before it (64 zeros for the first). Writers hold an exclusive OS lock on `timeline.lock` in the run folder while they append, so parallel commands keep the chain. `wingman-spec validate <change>` and `doctor` warn about a broken chain and name the first entry that does not follow the one before it; the Timeline tab shows the same note. An edited, deleted, inserted or reordered entry breaks the chain. Lines written before 0.12 have no `prev` and are accepted.
 
 This is evidence, not protection. Anyone who can write the file can rewrite it whole with a fresh chain, and an edit of the last entry only shows against an anchor. `archive` anchors the head: `archived.json` records `timeline_head` and `timeline_entries`, and the archive output prints the head so you can put it in the commit message (`Timeline-Head: <hash>`). Once that is committed, git history shows any later change.
 

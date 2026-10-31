@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -45,7 +46,7 @@ func TestGoldenForEditor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v (run with WINGMAN_UPDATE_GOLDEN=1)", err)
 	}
-	if string(want) != string(got) {
+	if strings.ReplaceAll(string(want), "\r\n", "\n") != string(got) { // a CRLF checkout is the same file
 		t.Fatalf("%s is out of date: run WINGMAN_UPDATE_GOLDEN=1 go test ./internal/testpaths/ and check the extension tests", file)
 	}
 }

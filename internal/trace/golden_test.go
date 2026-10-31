@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Spreizu/wingman-spec/internal/anchors"
@@ -135,7 +136,7 @@ func TestGrammarGoldenForEditor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v (WINGMAN_UPDATE_GOLDEN=1 go test ./internal/trace/ writes it)", err)
 	}
-	if string(want) != string(got) {
+	if strings.ReplaceAll(string(want), "\r\n", "\n") != string(got) { // a CRLF checkout is the same file
 		t.Fatalf("%s is stale: WINGMAN_UPDATE_GOLDEN=1 go test ./internal/trace/ rewrites it, then check the editor still agrees", file)
 	}
 }

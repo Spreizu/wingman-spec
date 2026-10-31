@@ -105,7 +105,7 @@ func TestInstall(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, p := range []string{".cursor/skills/s/SKILL.md", ".agents/skills/s/SKILL.md", "CLAUDE.md", Shim} {
+	for _, p := range []string{".cursor/skills/s/SKILL.md", ".agents/skills/s/SKILL.md", "CLAUDE.md", ShimFile()} {
 		if _, err := os.Stat(filepath.Join(d, p)); err != nil {
 			t.Error(err)
 		}

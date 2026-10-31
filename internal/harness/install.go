@@ -28,6 +28,14 @@ func (r *Result) say(f string, a ...any) { r.Lines = append(r.Lines, fmt.Sprintf
 // Shim is the path, relative to the project, that the generated commands run.
 const Shim = ".wingman-spec/bin/wingman-spec"
 
+// ShimFile is the shim's file on this platform: Shim, or Shim.cmd on Windows.
+func ShimFile() string {
+	if runtime.GOOS == "windows" {
+		return Shim + ".cmd"
+	}
+	return Shim
+}
+
 // Block markers of the managed AGENTS.md section.
 const (
 	BlockStart = "<!-- WINGMAN-SPEC:START -->"
@@ -102,7 +110,7 @@ func Install(dir string, src, skills fs.FS, o Options) (*Result, error) {
 	if err := WriteShim(dir, o.Exe); err != nil {
 		return nil, err
 	}
-	r.say("shim        -> %s", Shim)
+	r.say("shim        -> %s", ShimFile())
 	if err := Block(dir, src); err != nil {
 		return nil, err
 	}
@@ -252,7 +260,7 @@ func WriteShim(dir, exe string) error {
 		return err
 	}
 	if runtime.GOOS == "windows" {
-		return writeIfChanged(p+".cmd", []byte("@\""+exe+"\" %*\r\n"), 0o644)
+		return writeIfChanged(filepath.Join(dir, filepath.FromSlash(ShimFile())), []byte("@\""+exe+"\" %*\r\n"), 0o644)
 	}
 	if cur, err := os.Readlink(p); err == nil && cur == exe {
 		return nil
