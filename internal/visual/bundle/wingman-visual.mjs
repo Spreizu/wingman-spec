@@ -854,6 +854,7 @@ var require_visual_check = __commonJS({
       return null;
     }
     function loadPlaywright(codeRoot) {
+      delete process.env.PWDEBUG;
       const env = process.env.WINGMAN_SPEC_VISUAL_PLAYWRIGHT;
       if (env === "none") return null;
       if (env) {
@@ -904,7 +905,7 @@ var require_visual_check = __commonJS({
         if (!fs.existsSync(d)) continue;
         if (rel) {
           const exe = path.join(d, rel);
-          if (fs.existsSync(exe)) return { executablePath: exe, dir: d, source: src, searched: dirs.map((x) => x.d) };
+          if (fs.existsSync(exe)) return { executablePath: headlessShell(d, rel) || exe, dir: d, source: src, searched: dirs.map((x) => x.d) };
         }
       }
       const other = dirs.find(({ d }) => {
@@ -916,10 +917,27 @@ var require_visual_check = __commonJS({
       });
       return { executablePath: null, dir: null, source: null, searched: dirs.map((x) => x.d), mismatch: other ? other.d : null, expected: want };
     }
+    function headlessShell(dir, rel) {
+      const rev = rel.split(path.sep)[0].replace(/^chromium[a-z_-]*-/, "");
+      const root = path.join(dir, `chromium_headless_shell-${rev}`);
+      try {
+        for (const sub of fs.readdirSync(root)) for (const n of ["chrome-headless-shell", "chrome-headless-shell.exe", "headless_shell", "headless_shell.exe"]) {
+          const exe = path.join(root, sub, n);
+          if (fs.existsSync(exe)) return exe;
+        }
+      } catch (e) {
+      }
+      return null;
+    }
+    function launchOptions(executablePath) {
+      if (!executablePath) return { headless: true };
+      const shell = /headless[_-]shell(\.exe)?$/.test(path.basename(executablePath));
+      return shell ? { headless: true, executablePath } : { headless: true, executablePath, args: ["--headless=new"] };
+    }
     async function launchChromium(pw, codeRoot, cfg) {
       const f = findChromium(pw, codeRoot, cfg);
       try {
-        return { browser: await pw.chromium.launch(f.executablePath ? { executablePath: f.executablePath } : {}), found: f };
+        return { browser: await pw.chromium.launch(launchOptions(f.executablePath)), found: f };
       } catch (e) {
         const why = String(e.message).split("\n")[0];
         const err = new Error(f.mismatch ? `${why} (a different Chromium build is in ${f.mismatch}; this Playwright needs ${f.expected})` : why);
@@ -1679,6 +1697,7 @@ ${diff.map((x) => "      " + x).join("\n")}
       skippedStepsReport,
       AXE_TAGS,
       launchChromium,
+      launchOptions,
       resolveReferences,
       loadPlaywright,
       axeSource,

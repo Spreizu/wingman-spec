@@ -51,6 +51,9 @@ function resolveFrom(name, codeRoot) {
 /** Playwright from the code repo (playwright, @playwright/test or playwright-core). WINGMAN_SPEC_VISUAL_PLAYWRIGHT=<module path>
  *  uses that install instead; WINGMAN_SPEC_VISUAL_PLAYWRIGHT=none behaves as if none were installed (tests, or to force a skip). */
 function loadPlaywright(codeRoot) {
+  // PWDEBUG=1 makes Playwright open a visible browser even when launch() asks for headless; Playwright reads it when
+  // loaded, so it is dropped here, before the require. The check never shows a window or takes the focus.
+  delete process.env.PWDEBUG;
   const env = process.env.WINGMAN_SPEC_VISUAL_PLAYWRIGHT;
   if (env === 'none') return null;
   if (env) { const m = require(env); return m.chromium ? { chromium: m.chromium, from: require.resolve(env), name: env } : null; }
@@ -86,14 +89,32 @@ function findChromium(pw, codeRoot, cfg) {
   }
   for (const { d, src } of dirs) {
     if (!fs.existsSync(d)) continue;
-    if (rel) { const exe = path.join(d, rel); if (fs.existsSync(exe)) return { executablePath: exe, dir: d, source: src, searched: dirs.map((x) => x.d) }; }
+    if (rel) { const exe = path.join(d, rel); if (fs.existsSync(exe)) return { executablePath: headlessShell(d, rel) || exe, dir: d, source: src, searched: dirs.map((x) => x.d) }; }
   }
   const other = dirs.find(({ d }) => { try { return fs.readdirSync(d).some((x) => /^chromium/.test(x)); } catch (e) { return false; } });
   return { executablePath: null, dir: null, source: null, searched: dirs.map((x) => x.d), mismatch: other ? other.d : null, expected: want };
 }
+/** The headless shell of the same build next to a full Chromium (chromium_headless_shell-<rev>), or null. Playwright
+ *  itself runs the shell when headless; started by path, a full Chromium shows a Dock icon on macOS and can take the focus. */
+function headlessShell(dir, rel) {
+  const rev = rel.split(path.sep)[0].replace(/^chromium[a-z_-]*-/, '');
+  const root = path.join(dir, `chromium_headless_shell-${rev}`);
+  try {
+    for (const sub of fs.readdirSync(root)) for (const n of ['chrome-headless-shell', 'chrome-headless-shell.exe', 'headless_shell', 'headless_shell.exe']) {
+      const exe = path.join(root, sub, n); if (fs.existsSync(exe)) return exe;
+    }
+  } catch (e) { /* no shell installed there */ }
+  return null;
+}
+/** Launch options: always headless, never a window. A full Chromium started by path also gets --headless=new. */
+function launchOptions(executablePath) {
+  if (!executablePath) return { headless: true };
+  const shell = /headless[_-]shell(\.exe)?$/.test(path.basename(executablePath));
+  return shell ? { headless: true, executablePath } : { headless: true, executablePath, args: ['--headless=new'] };
+}
 async function launchChromium(pw, codeRoot, cfg) {
   const f = findChromium(pw, codeRoot, cfg);
-  try { return { browser: await pw.chromium.launch(f.executablePath ? { executablePath: f.executablePath } : {}), found: f }; }
+  try { return { browser: await pw.chromium.launch(launchOptions(f.executablePath)), found: f }; }
   catch (e) { const why = String(e.message).split('\n')[0]; const err = new Error(f.mismatch ? `${why} (a different Chromium build is in ${f.mismatch}; this Playwright needs ${f.expected})` : why); err.found = f; throw err; }
 }
 function axeSource(codeRoot, pwFrom) {
@@ -630,4 +651,4 @@ function summarize(defects) {
 }
 
 module.exports = {
-  baselineReport, consoleErrorSkipped, ignoreRules, ignoredReport, skippedStepsReport, AXE_TAGS, launchChromium, resolveReferences, loadPlaywright, axeSource, run, compare, summarize };
+  baselineReport, consoleErrorSkipped, ignoreRules, ignoredReport, skippedStepsReport, AXE_TAGS, launchChromium, launchOptions, resolveReferences, loadPlaywright, axeSource, run, compare, summarize };

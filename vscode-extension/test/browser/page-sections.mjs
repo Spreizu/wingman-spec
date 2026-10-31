@@ -33,7 +33,7 @@ const pages = {
   history: { page: 'history', root },
   archived: { page: 'archived', root, name: '2026-09-30-first-cut' },
 };
-const browser = await chromium.launch();
+const browser = await chromium.launch({ headless: true });
 let failures = 0;
 const fail = (m) => { failures++; console.log(`FAIL ${m}`); };
 for (const [name, r] of Object.entries(pages)) {

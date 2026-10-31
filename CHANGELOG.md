@@ -74,6 +74,8 @@ Upgrade an 0.11 project once with `wingman-spec import openspec` ([docs/install.
   Marketplace and Open VSX (Trusted Publishing or Entra ID, no stored PAT; the tag must match the `package.json` version).
 - **SVG icon.** `assets/icon.svg` is the icon source: the original artwork traced by colour, with a rounded-rect background and one linear gradient per shape (16 KB, no embedded images). The README shows it; `vscode-extension/images/icon.png` is rendered from it at 128 px.
 - **Publisher id `elmo-egers`.** The extension id is now `elmo-egers.wingman-spec` (was `elmoegers.wingman-spec`).
+- **Browsers stay headless.** The visual check and its bundled helper always start Chromium headless and never take
+  the focus. The `AGENTS.md` block tells agents to keep any browser they start headless too.
 
 ## 0.11.2
 

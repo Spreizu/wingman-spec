@@ -38,7 +38,7 @@ const runs = join(root, 'runs', 'demo'); mkdirSync(runs, { recursive: true });
 writeFileSync(join(runs, 'timeline.jsonl'), RUN.join(''));
 writeFileSync(join(root, 'archive', '2026-09-30-first-cut', 'timeline.jsonl'), RUN.join('') + L({ at: at(10, 2, 0), event: 'finish', ok: true, seconds: 61.2, summary: 'change verified' }) + L({ at: at(10, 3, 5), event: 'archive', ok: true, seconds: 0.8, summary: 'archived' }));
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ headless: true });
 let failures = 0;
 const fail = (m) => { failures++; console.log(`FAIL ${m}`); };
 async function show(route, name, width, expand, idles = 1) {

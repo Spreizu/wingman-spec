@@ -38,7 +38,7 @@ const THEMES = {
   light: '--vscode-foreground:#333333;--vscode-editor-background:#ffffff;--vscode-sideBar-background:#f3f3f3;--vscode-list-hoverBackground:#e8e8e8;--vscode-panel-border:#d4d4d4',
 };
 const html = await renderPage(await makeData(root, { page: 'change', root, name: 'rows' }), 'NONCE', 'vscode-resource:');
-const browser = await chromium.launch();
+const browser = await chromium.launch({ headless: true });
 let failures = 0;
 const fail = (m) => { failures++; console.log(`FAIL ${m}`); };
 const near = (a, b) => Math.abs(a - b) <= 1;

@@ -64,6 +64,8 @@ subagent, then `review <change> --reply <file>` (none available: `--reviewer non
 `/spec-apply` has the full loop and the other exit codes.
 
 UI work: scenarios carry a ```` ```visual ```` block and tasks a `Visual:` line; run `wingman-spec visual <change>` before ticking.
+Browsers run headless only, so the owner's screen stays free: never `--headed`, `--debug`, `PWDEBUG`, `open <url>`, or a browser tool
+or MCP that shows a window. The visual check is headless; a Playwright script of your own passes `headless: true`.
 A design to match: `/spec-explore` maps it to project tokens and components first (`wingman-spec design-system`); a Figma URL
 uses `figma-to-code`. HTTPS dev servers with self-signed certificates work. Nothing is stored in the repository (no baselines).
 A defect the change does not own (third-party widget, page chrome) may be skipped with `ignore:` / `ignore-http:` in the visual

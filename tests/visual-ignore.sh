@@ -148,6 +148,15 @@ else
   echo "  skip: no Playwright+axe-core in $PWM (set PLAYWRIGHT_NODE_MODULES); the browser part of visual-ignore is not tested"
 fi
 
+# the browser never shows a window: headless always, --headless=new for a full Chromium started by path, PWDEBUG dropped
+node -e '
+const VC = require(process.env.VCLIB); const a = (x, y) => JSON.stringify(x) === JSON.stringify(y) || process.exit(1);
+a(VC.launchOptions(null), { headless: true });
+a(VC.launchOptions("/c/chromium_headless_shell-1/chrome-headless-shell-mac-arm64/chrome-headless-shell"), { headless: true, executablePath: "/c/chromium_headless_shell-1/chrome-headless-shell-mac-arm64/chrome-headless-shell" });
+a(VC.launchOptions("/c/chromium-1/chrome-mac/Chromium.app/Contents/MacOS/Chromium").args, ["--headless=new"]);
+process.env.PWDEBUG = "1"; process.env.WINGMAN_SPEC_VISUAL_PLAYWRIGHT = "none"; VC.loadPlaywright("."); a(process.env.PWDEBUG, undefined);' && rc=0 || rc=$?
+expect "Chromium is always launched headless (no window, no focus), PWDEBUG is dropped" '[ $rc = 0 ]'
+
 echo
 echo "visual-ignore: passed=$PASS failed=$FAIL"
 [ "$FAIL" = 0 ]

@@ -32,7 +32,7 @@ const states = {
 };
 const cmd = (a) => `node openspec/scripts/verify-task.cjs ${a}`;
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ headless: true });
 let failures = 0;
 const fail = (m) => { failures++; console.log(`FAIL ${m}`); };
 for (const [name, change] of Object.entries(states)) {

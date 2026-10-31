@@ -24,7 +24,7 @@ const texts = { ...d.texts };
 for (const k of Object.keys(texts)) if (k.endsWith('BLOCKED.md')) texts[k] = LONG;
 const html = renderPage({ ...d, texts }, 'NONCE', 'vscode-resource:');
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ headless: true });
 let failures = 0;
 for (const width of [375, 900]) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
