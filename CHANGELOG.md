@@ -14,8 +14,7 @@ Upgrade an 0.11 project once with `wingman-spec import openspec` ([docs/install.
   the bundled skills and the visual check's helper are built in. `wingman-spec help reference` lists every exit code,
   check and setting on one page.
 - **Install.** Install the extension: each platform build bundles the CLI and always runs that copy. **Wingman Spec: Set
-  Up This Folder** runs `init` with it. For CI, releases also carry archives for Linux, macOS and Windows on x64 and arm64
-  (`install.sh` checks the checksum).
+  Up This Folder** runs `init` with it. There is no separate CLI install: `install.sh` and the release archives are gone.
 - **`wingman-spec init --harness all`** replaces `install.sh <project>`. It writes `.wingman-spec/` and the agent files for
   Cursor, Claude Code and Codex. It also writes the `AGENTS.md` block and the shim
   `.wingman-spec/bin/wingman-spec` that the agents call. `wingman-spec update` refreshes the generated files after an
@@ -71,7 +70,7 @@ Upgrade an 0.11 project once with `wingman-spec import openspec` ([docs/install.
   refuses (unknown codes, wildcards, texts such as `...`) with the same message.
 - **CI and releases.** `.github/workflows/ci.yml` runs Go vet and tests on Linux, macOS and Windows, gofmt,
   golangci-lint, the 6 cross builds, the extension tests and every shell suite. A `v*` tag runs `release.yml`
-  (was `extension.yml`). It runs GoReleaser for the CLI archives, packages 6 vsix files, and publishes them to the VS Code
+  (was `extension.yml`). It packages 6 vsix files, attaches them to the GitHub release, and publishes them to the VS Code
   Marketplace and Open VSX (Trusted Publishing or Entra ID, no stored PAT; the tag must match the `package.json` version).
 - **SVG icon.** `assets/icon.svg` is the icon source: the original artwork traced by colour, with a rounded-rect background and one linear gradient per shape (16 KB, no embedded images). The README shows it; `vscode-extension/images/icon.png` is rendered from it at 128 px.
 - **Publisher id `elmo-egers`.** The extension id is now `elmo-egers.wingman-spec` (was `elmoegers.wingman-spec`).

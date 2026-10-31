@@ -360,7 +360,6 @@ Requires Go (see `go.mod`) and Node 22. The shell suites run against the binary 
 | Suite | Covers |
 |---|---|
 | `tests/smoke.sh` | `init --harness all` (settings, shim, AGENTS block, commands, subagents, skills, no hook files), `update` idempotency, and one Size S change from `new` to `archive` and `drift` |
-| `tests/installer.sh` | `install.sh` against a local mirror: checksum, install folder, version pin, a bad checksum refused |
 | `tests/parallel-waves.sh` | parallel waves: lanes, `check --task`, file ownership, the wave's last check reopening a lane or the wave |
 | `tests/fastpath.sh`, `tests/runcache.sh` | the fast path and its upgrade; the result cache |
 | `tests/visual-steps.sh` | state steps: `click` / `hover` on a control hidden at one viewport is skipped with an info note (clicked where visible), a missing or covered control and the strict `click!` fail, `fill` is never skipped |

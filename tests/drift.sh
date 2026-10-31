@@ -89,7 +89,7 @@ for (const s of skills) {
   }
 }
 // The shipped text: what the installed project, the user and the extension read.
-const shipped = ls('harness', 'internal/artifacts', 'internal/scaffold', 'internal/cli/reference.md', 'skills/figma-to-code', 'skills/spec-writing', 'install.sh', 'README.md', 'docs',
+const shipped = ls('harness', 'internal/artifacts', 'internal/scaffold', 'internal/cli/reference.md', 'skills/figma-to-code', 'skills/spec-writing', 'README.md', 'docs',
   'vscode-extension/src', 'vscode-extension/README.md', 'vscode-extension/package.json').filter((f) => !/_test\.go$/.test(f));
 let scanned = 0;
 const each = (fn) => { for (const f of shipped) read(f).split('\n').forEach((l, i) => { scanned++; fn(f, i + 1, l); }); };

@@ -17,7 +17,7 @@ The release builds come from the repository root: `scripts/package-vsix.sh` buil
 
 `images/icon.png` is `assets/icon.svg` from the repository root rendered at 128 x 128 px. Edit the SVG, then render it again.
 
-CI (`.github/workflows/ci.yml`) runs the typecheck and the tests on every push. A `v*` tag runs `.github/workflows/release.yml`: GoReleaser builds the CLI archives, `scripts/package-vsix.sh` the 6 vsix files, and both are attached to the GitHub release.
+CI (`.github/workflows/ci.yml`) runs the typecheck and the tests on every push. A `v*` tag runs `.github/workflows/release.yml`: `scripts/package-vsix.sh` builds the 6 vsix files, which are attached to the GitHub release and published to the VS Code Marketplace and Open VSX.
 
 Install the `.vsix` for your platform with "Extensions: Install from VSIX..." in Cursor or VS Code, then reload the window.
 

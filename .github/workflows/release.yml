@@ -1,7 +1,7 @@
 name: Release
 
-# A v* tag: the CLI binaries (GoReleaser), one vsix per platform with the binary bundled,
-# all attached to the GitHub release; the vsix files are then published to the VS Code Marketplace and Open VSX.
+# A v* tag: one vsix per platform with the CLI bundled, attached to the GitHub release,
+# then published to the VS Code Marketplace and Open VSX.
 on:
   push:
     tags: ['v*']
@@ -28,6 +28,8 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: vscode-extension/pnpm-lock.yaml
+      - name: go.mod and go.sum are tidy
+        run: go mod tidy -diff
       - run: pnpm install --frozen-lockfile
         working-directory: vscode-extension
       - id: version
@@ -58,26 +60,21 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-      - uses: goreleaser/goreleaser-action@v7
-        with:
-          version: '~> v2'
-          args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
       - uses: actions/download-artifact@v8
         with:
           name: vsix
           path: vsix
-      - name: Attach the vsix files
+      - name: Create the release with the vsix files
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$GITHUB_REF_NAME" vsix/*.vsix --repo "$GITHUB_REPOSITORY"
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" vsix/*.vsix --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$GITHUB_REF_NAME" vsix/*.vsix --verify-tag --repo "$GITHUB_REPOSITORY" \
+              --title "Wingman Spec $VERSION" --notes "See [CHANGELOG.md](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_REF_NAME/CHANGELOG.md)."
+          fi
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
