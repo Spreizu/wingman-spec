@@ -34,9 +34,9 @@ const RUN = [
 const LIVE = L({ at: at(9, 47, 30), event: 'check-start', task: '1.2', summary: 'checking 1.2' });
 
 const root = makeFixture();
-const runs = join(root, 'openspec', '.apply-runs', 'demo'); mkdirSync(runs, { recursive: true });
+const runs = join(root, 'runs', 'demo'); mkdirSync(runs, { recursive: true });
 writeFileSync(join(runs, 'timeline.jsonl'), RUN.join(''));
-writeFileSync(join(root, 'openspec', 'changes', 'archive', '2026-09-30-first-cut', 'timeline.jsonl'), RUN.join('') + L({ at: at(10, 2, 0), event: 'finish', ok: true, seconds: 61.2, summary: 'change verified' }) + L({ at: at(10, 3, 5), event: 'archive', ok: true, seconds: 0.8, summary: 'archived' }));
+writeFileSync(join(root, 'archive', '2026-09-30-first-cut', 'timeline.jsonl'), RUN.join('') + L({ at: at(10, 2, 0), event: 'finish', ok: true, seconds: 61.2, summary: 'change verified' }) + L({ at: at(10, 3, 5), event: 'archive', ok: true, seconds: 0.8, summary: 'archived' }));
 
 const browser = await chromium.launch();
 let failures = 0;

@@ -7,9 +7,9 @@ export function workspaceRoots(store: ProjectStore): string[] {
 }
 
 /**
- * Hands a /spec-* prompt to the agent chat. The prompt is first checked with the spec-guard hook's own
- * rules. It is always copied to the clipboard; opening the chat with the text prefilled depends on the
- * host, so the fallback is to focus the chat and ask the user to paste.
+ * Hands a /spec-* prompt to the agent chat. The prompt is first checked (one line, a /spec-* command). It is
+ * always copied to the clipboard; opening the chat with the text prefilled depends on the host, so the fallback
+ * is to focus the chat and ask the user to paste.
  */
 export async function sendToAgent(store: ProjectStore, prompt: string): Promise<void> {
   const verdict = checkPrompt(prompt, workspaceRoots(store));

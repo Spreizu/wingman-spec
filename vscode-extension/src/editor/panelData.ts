@@ -1,11 +1,13 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { runsDir } from '../core/paths.ts';
 import * as vscode from 'vscode';
-import chrono from '../../../project-template/openspec/scripts/chronology.cjs';
+import chrono from '../core/chronology.ts';
 import { reviewBranch } from '../model/branchReview.ts';
 import type { ChangedFile } from '../model/branchReview.ts';
 import { summarizeRun } from '../model/changeDashboard.ts';
 import type { DashboardInputs } from '../model/changeDashboard.ts';
+import type { ActionResult, CliAction } from '../model/cliActions.ts';
 import { applyNumstat, chooseBase, parseNameStatus } from '../model/gitDiff.ts';
 import type { ProjectModel } from '../model/types.ts';
 import type { VerifierFinding } from '../model/verifier.ts';
@@ -28,9 +30,9 @@ const readIf = (f: string): string | undefined => {
   }
 };
 
-/** The run files `verify-task.cjs` keeps under `openspec/.apply-runs/<change>/` (read-only). */
+/** The run files the CLI keeps under `runs/<change>/` of the specs root (read-only). */
 export function readRunFiles(root: string, change: string): { runId?: string; state?: string; metrics?: string; ledger?: string } {
-  const base = join(root, 'openspec', '.apply-runs', change);
+  const base = runsDir(root, change);
   if (!existsSync(base)) return {};
   let id: string | undefined;
   try {
@@ -55,7 +57,7 @@ export function readRunFiles(root: string, change: string): { runId?: string; st
  */
 export class PanelData {
   private readonly cache = new Map<string, { at: number; value: unknown }>();
-  private readonly inflight = new Set<string>();
+  private readonly inflight = new Map<string, Promise<void>>();
   private readonly store: ProjectStore;
   private readonly trace: TraceCache;
   private readonly client: VerifierClient;
@@ -77,27 +79,33 @@ export class PanelData {
     const hit = this.cache.get(key);
     const fresh = hit && Date.now() - hit.at < TTL_MS;
     if (!fresh && !this.inflight.has(key)) {
-      this.inflight.add(key);
-      void load()
-        .then((value) => this.cache.set(key, { at: Date.now(), value }))
-        .catch(() => this.cache.delete(key))
+      const loading = load()
+        .then((value) => void this.cache.set(key, { at: Date.now(), value }))
+        .catch(() => void this.cache.delete(key))
         .finally(() => {
           this.inflight.delete(key);
           this.onReady();
         });
+      this.inflight.set(key, loading);
     }
     return hit?.value as T | undefined;
   }
 
+  /** Waits for the loads in flight, at most `ms`: the first render of a change page then has its sync state, so the
+   * next step (Sync or Archive) shows without a "Checking..." flash. */
+  async settled(ms: number): Promise<void> {
+    await Promise.race([Promise.allSettled([...this.inflight.values()]), new Promise((r) => setTimeout(r, ms).unref?.())]);
+  }
+
   branch(root: string | undefined): BranchState {
     const p = this.store.projects.find((x) => !x.error && (root === undefined || x.root === root));
-    if (!p) return { status: 'unavailable', reason: 'No OpenSpec project is open.' };
+    if (!p) return { status: 'unavailable', reason: 'No Wingman Spec project is open.' };
     return this.get(`branch\n${p.root}`, () => this.loadBranch(p)) ?? { status: 'loading' };
   }
 
   roadmap(root: string | undefined): RoadmapState {
     const p = this.store.projects.find((x) => !x.error && (root === undefined || x.root === root));
-    if (!p) return { status: 'unavailable', reason: 'No OpenSpec project is open.' };
+    if (!p) return { status: 'unavailable', reason: 'No Wingman Spec project is open.' };
     return this.get(`roadmap\n${p.root}`, async (): Promise<RoadmapState> => {
       const r = await this.client.roadmap(p);
       return r.ok ? { status: 'ready', roadmap: r.value } : { status: 'unavailable', reason: r.reason };
@@ -108,6 +116,14 @@ export class PanelData {
     const p = this.store.projects.find((x) => x.root === root);
     if (!p) return undefined;
     return this.get(`dash\n${root}\n${change}`, () => this.loadDashboard(p, change));
+  }
+
+  /** Runs a CLI action; the cached verifier answers are dropped, since sync and archive change them. */
+  async runAction(root: string, action: CliAction, change?: string): Promise<ActionResult> {
+    const p = this.store.projects.find((x) => x.root === root);
+    const r = p ? await this.client.action(p, action, change) : { ok: false as const, reason: 'the project is not open' };
+    this.invalidate();
+    return r.ok ? r.value : { action, ...(change ? { change } : {}), ok: false, summary: `Not run: ${r.reason}.`, lines: [] };
   }
 
   private async loadDashboard(p: ProjectModel, change: string): Promise<DashboardInputs> {
@@ -173,7 +189,7 @@ export class PanelData {
     const pr = await this.client.problems(p);
     if (pr.ok) findings = pr.value.findings;
     else notes.push(`Verifier findings are missing: ${pr.reason}.`);
-    const changes = [...new Set(withText.map((f) => /^openspec\/changes\/(?!archive\/)([^/]+)\//.exec(f.path)?.[1]).filter((x): x is string => !!x))].slice(0, 5);
+    const changes = [...new Set(withText.map((f) => /^(?:\.wingman-spec\/)?changes\/([^/]+)\//.exec(f.path)?.[1]).filter((x): x is string => !!x))].slice(0, 5);
     for (const c of changes) {
       const g = await this.client.guard(p, c, mergeBase);
       if (g.ok) findings.push(...g.value);

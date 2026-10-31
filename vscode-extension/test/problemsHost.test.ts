@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { before, test } from 'node:test';
 import './support/installStub.mjs';
 import { traceProject } from './trace-fixture.ts';
+import { fakeBundle } from './support/bundle.ts';
 
 const stub = await import('./support/vscodeStub.mjs');
 const { host } = stub;
@@ -18,10 +19,11 @@ const put = (f: string, text: string): void => {
   mkdirSync(dirname(join(dir, f)), { recursive: true });
   writeFileSync(join(dir, f), text);
 };
-put('openspec/scripts/verify-task.cjs', '// stand-in: the real script is never run in this test\n');
-put('openspec/changes/edit/proposal.md', '## Why\nEdit a todo.\n');
+delete process.env['WINGMAN_SPEC_BIN'];
+const bundled = fakeBundle();
+put('changes/edit/proposal.md', '## Why\nEdit a todo.\n');
 const SPEC = '## ADDED Requirements\n\n### Requirement: Edit a todo\nThe system SHALL let a user edit a todo.\n\n#### Scenario: Edited\n- **WHEN** a\n- **THEN** b\n';
-put('openspec/changes/edit/specs/todo/spec.md', SPEC);
+put('changes/edit/specs/todo.md', SPEC);
 
 const fixture = readFileSync(new URL('./fixtures/problems.json', import.meta.url), 'utf8').split('/proj').join(dir);
 const calls: { cmd: string; args: string[]; cwd: string; timeoutMs: number }[] = [];
@@ -32,7 +34,7 @@ const runner = async (cmd: string, args: string[], o: { cwd: string; timeoutMs: 
 };
 const store = { projects: [{ root: dir, workspaceFolder: dir, adrs: [], error: undefined }], onDidChange: () => new stub.Disposable() };
 const cache = new TraceCache(store as never);
-const { service } = registerProblems(store as never, cache, new VerifierClient(runner));
+const { service } = registerProblems(store as never, cache, new VerifierClient(runner, bundled));
 const diag = () => host.collections.get('wingman-spec-problems');
 const entries = () => [...diag().map.values()].flat() as { range: { start: { line: number; character: number }; end: { character: number } }; message: string; severity: number; source: string; code: string }[];
 
@@ -44,7 +46,8 @@ before(() => {
 test('refresh asks the verifier once per project with a timeout and the project root, and publishes by file', async () => {
   await service.refresh();
   assert.equal(calls.length, 1);
-  assert.deepEqual(calls[0]?.args, [join(dir, 'openspec/scripts/verify-task.cjs'), 'problems', '--json', '--root', dir]);
+  assert.equal(calls[0]?.cmd, join(bundled, 'wingman-spec'));
+  assert.deepEqual(calls[0]?.args, ['problems', '--json', '--root', dir]);
   assert.equal(calls[0]?.cwd, dir);
   assert.equal(calls[0]?.timeoutMs, 30000);
   // 8 findings; orphan anchor, misplaced marker and stale tag are the live anchor diagnostics' job while the code view is on
@@ -52,7 +55,7 @@ test('refresh asks the verifier once per project with a timeout and the project 
   assert.deepEqual([service.summary.error, service.summary.warning], [4, 1]);
   const orphan = entries().find((d) => d.code === 'missing-why');
   assert.deepEqual([orphan?.range.start.line, orphan?.range.start.character, orphan?.range.end.character, orphan?.severity, orphan?.source], [2, 0, 28, 0, 'Wingman Spec (verifier)']);
-  assert.ok(diag().get(stub.Uri.file(join(dir, 'openspec/specs/todo/spec.md'))).length === 2);
+  assert.ok(diag().get(stub.Uri.file(join(dir, 'specs/todo.md'))).length === 2);
 });
 
 test('with the code view off the verifier shows every finding', async () => {
@@ -65,7 +68,7 @@ test('with the code view off the verifier shows every finding', async () => {
 
 test('quick fix: an empty Why line, as an exact edit at the requirement', async () => {
   await service.refresh();
-  const file = join(dir, 'openspec/changes/edit/specs/todo/spec.md');
+  const file = join(dir, 'changes/edit/specs/todo.md');
   const doc = stub.makeDoc(file, SPEC);
   const d = diag().get(stub.Uri.file(file))[0];
   const actions = host.providers.codeAction.at(-1).provider.provideCodeActions(doc, d.range, { diagnostics: [d] }) as { title: string; isPreferred?: boolean; edit: { ops: { op: string; range: { start: { line: number; character: number } }; text: string }[] } }[];
@@ -78,7 +81,7 @@ test('quick fix: an empty Why line, as an exact edit at the requirement', async 
 
 test('accept gap: asks for a note, runs `drift decide` with it, then refreshes; an empty note does nothing', async () => {
   await service.refresh();
-  const file = join(dir, 'openspec/specs/todo/spec.md');
+  const file = join(dir, 'specs/todo.md');
   const d = diag().get(stub.Uri.file(file)).find((x: { code: string }) => x.code === 'unanchored-requirement');
   const action = host.providers.codeAction.at(-1).provider.provideCodeActions(stub.makeDoc(file, ''), d.range, { diagnostics: [d] })[0];
   assert.equal(action.command.command, 'wingmanSpec.acceptGap');
@@ -89,7 +92,7 @@ test('accept gap: asks for a note, runs `drift decide` with it, then refreshes; 
   host.inputAnswer = 'covered by the e2e suite';
   await host.commands.get('wingmanSpec.acceptGap')(...action.command.arguments);
   const decide = calls.find((c) => c.args.includes('decide'));
-  assert.deepEqual(decide?.args.slice(1), ['drift', 'decide', action.command.arguments[1], '--accept', '--note', 'covered by the e2e suite', '--root', dir]);
+  assert.deepEqual(decide?.args, ['drift', 'decide', action.command.arguments[1], '--accept', '--note', 'covered by the e2e suite', '--root', dir]);
   assert.ok(calls.length >= before + 2, 'a refresh follows the acceptance');
   assert.match(host.messages.at(-1) ?? '', /accepted /);
 });
@@ -98,7 +101,7 @@ test('a refused acceptance is reported, not swallowed', async () => {
   host.reset();
   reply = { code: 2, stdout: '', stderr: 'no such gap\n', timedOut: false };
   host.inputAnswer = 'x';
-  await host.commands.get('wingmanSpec.acceptGap')(join(dir, 'openspec/specs/todo/spec.md'), 'untested-requirement:a/b');
+  await host.commands.get('wingmanSpec.acceptGap')(join(dir, 'specs/todo.md'), 'untested-requirement:a/b');
   assert.match(host.messages.at(-1) ?? '', /was not accepted: no such gap/);
   reply = { code: 0, stdout: fixture, stderr: '', timedOut: false };
 });
@@ -108,7 +111,7 @@ test('tag a test: pick the test case, the edit appends the scenario tag to its t
   const key = 'billing/add-an-item';
   const testFile = join(dir, 'tests/add.test.ts');
   host.quickPickAnswer = (items: { line?: number; label: string }[]) => items.find((i) => i.line === 1) ?? items[0];
-  await host.commands.get('wingmanSpec.tagTest')(join(dir, 'openspec/specs/billing/spec.md'), key, [{ name: 'Add and see it', id: 'billing/add-and-see-it' }]);
+  await host.commands.get('wingmanSpec.tagTest')(join(dir, 'specs/billing.md'), key, [{ name: 'Add and see it', id: 'billing/add-and-see-it' }]);
   assert.equal(host.edits.length, 1);
   const op = host.edits[0].ops[0];
   assert.equal(op.uri.fsPath, testFile);
@@ -132,9 +135,9 @@ test('setting off clears everything and says so on a manual refresh; no trust me
 
 test('a verifier that cannot start or times out is a message, never a thrown error, and keeps the panel empty', async () => {
   host.reset();
-  reply = { code: null, stdout: '', stderr: '', timedOut: false, spawnError: 'spawn node ENOENT' };
+  reply = { code: null, stdout: '', stderr: '', timedOut: false, spawnError: 'spawn ENOENT' };
   await host.commands.get('wingmanSpec.refreshProblems')();
-  assert.match(host.messages.at(-1) ?? '', /could not start `node`/);
+  assert.match(host.messages.at(-1) ?? '', /could not start `.*wingman-spec`/);
   reply = { code: null, stdout: '', stderr: '', timedOut: true };
   await host.commands.get('wingmanSpec.refreshProblems')();
   assert.match(host.messages.at(-1) ?? '', /did not answer within 30s/);

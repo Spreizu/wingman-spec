@@ -1,33 +1,15 @@
-import { execFile } from 'node:child_process';
 import { basename } from 'node:path';
 import * as vscode from 'vscode';
 import { listBaseSpecNames } from './model/specFiles.ts';
 import { loadProjects } from './model/rootResolver.ts';
-import type { ExecFn } from './model/rootResolver.ts';
 import type { ProjectModel } from './model/types.ts';
 
-const CLI_TIMEOUT_MS = 10_000;
-
-/** Runs the configured `openspec` CLI. Rejects with the CLI's own message on failure. */
-export function cliExec(): ExecFn {
-  const bin = vscode.workspace.getConfiguration('wingmanSpec').get<string>('openspecPath', 'openspec') || 'openspec';
-  return (args, cwd) =>
-    new Promise((resolve, reject) => {
-      execFile(
-        bin,
-        args,
-        { cwd, timeout: CLI_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024, windowsHide: true, shell: process.platform === 'win32' },
-        (error, stdout, stderr) => (error ? reject(new Error(String(stderr || error.message).trim())) : resolve(stdout)),
-      );
-    });
-}
-
-/** Holds the scanned model of every workspace folder that contains `openspec/config.yaml`. */
+/** Holds the scanned model of every workspace folder with a Wingman Spec layout (core/paths.ts). */
 export class ProjectStore implements vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<void>();
   readonly onDidChange = this.emitter.event;
   projects: ProjectModel[] = [];
-  /** Promoted capability names (`openspec/specs/<name>/spec.md`), keyed by project root. */
+  /** Living spec capability names (`specs/<name>.md`), keyed by specs root. */
   baseSpecNames = new Map<string, string[]>();
   private running: Promise<void> | undefined;
   private queued = false;
@@ -48,9 +30,8 @@ export class ProjectStore implements vscode.Disposable {
   }
 
   private async scan(): Promise<void> {
-    const adrDirectory = vscode.workspace.getConfiguration('wingmanSpec').get<string>('adrDirectory', 'adr');
     const folders = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
-    const next = await loadProjects(folders, adrDirectory, cliExec());
+    const next = await loadProjects(folders);
     const names = new Map<string, string[]>();
     for (const p of next) names.set(p.root, await listBaseSpecNames(p.root));
     this.projects = next;
@@ -58,15 +39,14 @@ export class ProjectStore implements vscode.Disposable {
     this.emitter.fire();
   }
 
-  /** Top-level folder nodes are shown when they carry information: several roots, a store, or an error. */
+  /** Top-level folder nodes are shown when they carry information: several roots, a linked specs repo, or an error. */
   showFolders(): boolean {
     return this.projects.length > 1 || this.projects.some((p) => p.source !== 'local' || p.error !== undefined);
   }
 
-  /** Short label for the folder node description: the store id, or the error. */
+  /** Short label for the folder node description: the linked specs repo, or the error. */
   folderDescription(project: ProjectModel): string | undefined {
-    if (project.error) return project.source === 'store' ? 'cannot resolve store' : 'specs repo not found';
-    if (project.source === 'store') return `store: ${project.storeId ?? 'unknown'}`;
+    if (project.error) return 'specs repo not found';
     return project.source === 'linked' ? `specs repo: ${basename(project.root)}` : undefined;
   }
 

@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import './support/installStub.mjs';
+import { fakeBundle } from './support/bundle.ts';
 import { makeData, makeFixture } from './fixture.ts';
 import { git, repo } from './support/gitRepo.ts';
 
@@ -29,7 +30,7 @@ const attrs = (html: string, name: string): string[] => [...html.matchAll(new Re
 test('branch review page: summary, requirement rows route to the extension page, anchors open code, no raw HTML', async () => {
   const dir = repo();
   const store = { projects: [{ root: dir, workspaceFolder: dir, adrs: [], changes: [], error: undefined }], onDidChange: () => new stub.Disposable() };
-  const verifier = new VerifierClient(async () => ({ code: 0, stdout: JSON.stringify({ ok: false, findings: [{ source: 'drift', code: 'untested-requirement', severity: 'error', message: 'billing/rounding has no test <b>x</b>', file: join(dir, 'src/round.py'), line: 1, col: 1, length: 1 }] }), stderr: '', timedOut: false }));
+  const verifier = new VerifierClient(async () => ({ code: 0, stdout: JSON.stringify({ ok: false, findings: [{ source: 'drift', code: 'untested-requirement', severity: 'error', message: 'billing/rounding has no test <b>x</b>', file: join(dir, 'src/round.py'), line: 1, col: 1, length: 1 }] }), stderr: '', timedOut: false }), fakeBundle());
   const data = new PanelData(store as never, new TraceCache(store as never), verifier);
   const ready = new Promise<void>((r) => (data.onReady = r));
   data.branch(dir);
@@ -70,6 +71,6 @@ test('change dashboard with open tasks: the archive list is collapsed; terminal 
 });
 
 test('the terminal whitelist accepts verifier calls only', () => {
-  for (const ok of ['node openspec/scripts/verify-task.cjs sync-check demo', 'node openspec/scripts/verify-task.cjs drift decide a/b:c --accept --note x']) assert.match(ok, TERMINAL_COMMAND);
-  for (const bad of ['rm -rf /', 'node openspec/scripts/verify-task.cjs x; rm -rf /', 'node openspec/scripts/verify-task.cjs x && curl evil', 'node other.js', 'node openspec/scripts/verify-task.cjs `id`', 'node openspec/scripts/verify-task.cjs $(id)', 'node openspec/scripts/verify-task.cjs x\nls']) assert.doesNotMatch(bad, TERMINAL_COMMAND, bad);
+  for (const ok of ['.wingman-spec/bin/wingman-spec sync-check demo', '.wingman-spec/bin/wingman-spec drift decide a/b:c --accept --note x']) assert.match(ok, TERMINAL_COMMAND);
+  for (const bad of ['rm -rf /', '.wingman-spec/bin/wingman-spec x; rm -rf /', '.wingman-spec/bin/wingman-spec x && curl evil', 'node other.js', '.wingman-spec/bin/wingman-spec `id`', '.wingman-spec/bin/wingman-spec $(id)', '.wingman-spec/bin/wingman-spec x\nls']) assert.doesNotMatch(bad, TERMINAL_COMMAND, bad);
 });

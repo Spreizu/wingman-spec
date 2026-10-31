@@ -1,6 +1,6 @@
 # Dispatch scope, result cache and review rule
 
-Why `verify-task.cjs` hands out work the way it does. The commands only say what to do.
+Why `wingman-spec` hands out work the way it does. The commands only say what to do.
 
 ## One dispatch, one scope
 
@@ -20,7 +20,7 @@ A final review task is expected for Size M/L, a Risk kind, or UI. Fast changes c
 
 ## Result cache
 
-`check` and `finish` run the project's tests, typecheck and lint. A passing result is stored under `openspec/.apply-runs/<change>/cache/`, keyed on the git tree of the work (run state and the plan's ticks excluded), the working directory and the command. The same tree and command is not run twice: `finish` reuses what `check` just proved. Any edit, new untracked file or changed command changes the key; a failing result is never stored; `--no-cache` or `SPEC_NO_CACHE=1` turns it off. `Done when:` commands, `validate` and the visual check are never cached (the visual check compares against a capture taken before the task and starts a server). The independent steps of `finish` run in parallel.
+`check` and `finish` run the project's tests, typecheck and lint. A passing result is stored under `runs/<change>/cache/`, keyed on the git tree of the work (run state and the plan's ticks excluded), the working directory and the command. The same tree and command is not run twice: `finish` reuses what `check` just proved. Any edit, new untracked file or changed command changes the key; a failing result is never stored; `--no-cache` or `WINGMAN_SPEC_NO_CACHE=1` turns it off. `Done when:` commands, `validate` and the visual check are never cached (the visual check compares against a capture taken before the task and starts a server). The independent steps of `finish` run in parallel.
 
 ## Ask only what the repo cannot answer
 
@@ -28,4 +28,4 @@ A final review task is expected for Size M/L, a Risk kind, or UI. Fast changes c
 
 ## One statement per rule
 
-Placement rules and accessible-name rules live in the implementer agent (and the verifier enforces them); the AGENTS block, the commands and the schema point to it instead of repeating it.
+Placement rules and accessible-name rules live in the implementer agent (and the CLI enforces them); the AGENTS block, the commands and the artifact instructions point to it instead of repeating it.

@@ -22,7 +22,7 @@ test('the ids the manifest declares are the ones the code registers and reads', 
 
 test('every command the manifest declares is registered in the code, and every registered one is declared', () => {
   const declared = new Set<string>(pkg.contributes.commands.map((c: { command: string }) => c.command));
-  const files = ['extension.ts', 'commands/scaffold.ts', 'editor/anchorCommands.ts', 'editor/anchorCode.ts', 'editor/problems.ts', 'views/traceView.ts'];
+  const files = ['extension.ts', 'commands/scaffold.ts', 'editor/anchorCommands.ts', 'editor/anchorCode.ts', 'editor/problems.ts', 'editor/cliSetup.ts', 'views/traceView.ts'];
   const registered = new Set<string>();
   for (const f of files) for (const m of src(f).matchAll(/registerCommand\(\s*'(wingmanSpec\.[A-Za-z]+)'/g)) registered.add(m[1] ?? '');
   for (const d of declared) assert.ok(registered.has(d), `${d} is declared but not registered`);

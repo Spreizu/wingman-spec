@@ -2,13 +2,13 @@
  * The change dashboard: tasks and their verification status, checks passed/failed, review state, size, the requirements whose Why is rewritten or that are removed, and the
  * list of what still blocks the archive, each with what to do. Pure: the run files and the verifier answers come in as inputs.
  */
-import chrono from '../../../project-template/openspec/scripts/chronology.cjs';
-import quality from '../../../project-template/openspec/scripts/quality.cjs';
+import chrono from '../core/chronology.ts';
+import quality from '../core/plan.ts';
 import type { TraceChange, TraceGap } from './traceability.ts';
 import type { Change, Task } from './types.ts';
 import type { SyncCheckReport, VerifierFinding } from './verifier.ts';
 
-/** What `verify-task.cjs` wrote under `openspec/.apply-runs/<change>/`: the current run's state and metrics, and the ledger of verified tasks. */
+/** What `wingman-spec` wrote under `runs/<change>/` of the specs root: the current run's state and metrics, and the ledger of verified tasks. */
 export interface RunFiles {
   runId?: string;
   state?: string;
@@ -95,7 +95,7 @@ export function summarizeRun(files: RunFiles): RunSummary | undefined {
   };
 }
 
-/** `Size: S|M|L` and `Risk: ...` of proposal.md (`quality.cjs proposalSize`, the verifier's reading). */
+/** `Size: S|M|L` and `Risk: ...` of proposal.md (`plan.proposalSize`, the CLI's reading). */
 export function proposalSize(text: string | undefined): { size?: 'S' | 'M' | 'L'; risk?: string } {
   const p = quality.proposalSize(text ?? '');
   return { ...(p.size ? { size: p.size } : {}), ...(p.risk ? { risk: p.risk.length ? p.risk.join(', ') : 'none' } : {}) };
@@ -166,7 +166,7 @@ export interface DashboardArgs {
   /** Open drift gaps of the project from the extension's own trace model (used when the verifier did not answer). */
   gaps?: TraceGap[];
   inputs: DashboardInputs;
-  /** The command a person types for `verify-task.cjs <args>`. */
+  /** The command a person types for `wingman-spec <args>`. */
   cmd: (args: string) => string;
 }
 
@@ -191,7 +191,7 @@ export function buildDashboard(a: DashboardArgs): Dashboard {
   const run = inputs.run;
   const notes: string[] = [];
   if (inputs.unavailable) notes.push(`Not checked: ${inputs.unavailable}. Sync, check and drift items below may be missing.`);
-  if (!run && change.taskTotal > 0) notes.push('No verify-task run recorded for this change yet (it starts with `next`).');
+  if (!run && change.taskTotal > 0) notes.push('No run recorded for this change yet (it starts with `next`).');
 
   const rows = taskRows(change, run);
   const impl = change.groups.reduce((n, g) => n + g.tasks.filter((t) => quality.isImplementationTask(g.title, t.id, t.title)).length, 0);
@@ -244,7 +244,7 @@ export function buildDashboard(a: DashboardArgs): Dashboard {
       id: 'unsynced-specs',
       title: 'Specs or ADRs not synced',
       detail: inputs.sync.problems.slice(0, 6).concat(inputs.sync.problems.length > 6 ? [`and ${inputs.sync.problems.length - 6} more`] : []),
-      todo: [{ kind: 'terminal', text: a.cmd(`sync-check ${change.name}`) }],
+      todo: [],
     });
   } else if (!inputs.sync && !change.adrsSynced) {
     blocking.push({ id: 'unsynced-specs', title: 'ADRs not synced', detail: ['At least one ADR is not promoted or out of date.'], todo: [] });
@@ -263,18 +263,13 @@ export function buildDashboard(a: DashboardArgs): Dashboard {
       id: 'visual-review',
       title: 'Visual review pending',
       detail: [`task ${run.task ?? ''} passed its checks and waits for the visual review (screenshots are compared by the spec-visual-reviewer subagent)`],
-      todo: [{ kind: 'agent', text: `/spec-apply ${change.name}` }, { kind: 'terminal', text: a.cmd(`status ${change.name}`) }],
+      todo: [{ kind: 'agent', text: `/spec-apply ${change.name}` }],
     });
   }
 
-  // Not synced yet is not a reason to wait: /spec-archive syncs first and stops if the sync finds a problem. When nothing else blocks,
-  // archive is the one action; /spec-sync on its own is for inspecting or fixing a sync problem, never a step before archive.
+  // Sync and Archive are buttons that run the CLI (model/cliActions.ts); a sync conflict is handed to the agent from their answer.
   const unsynced = blocking.find((b) => b.id === 'unsynced-specs');
-  if (unsynced) {
-    const only = blocking.length === 1;
-    unsynced.detail = [...unsynced.detail, only ? '/spec-archive syncs first (specs, ADRs) and stops if the sync finds a problem.' : '/spec-archive syncs it once the other items are done.'];
-    if (only) unsynced.todo = [{ kind: 'agent', text: `/spec-archive ${change.name}` }, ...unsynced.todo];
-  }
+  if (unsynced) unsynced.detail = [...unsynced.detail, blocking.length === 1 ? 'Sync merges them; then Archive.' : 'Sync merges them once the other items are done.'];
 
   const reviewTasks = rows.filter((r) => r.isReview);
   return {

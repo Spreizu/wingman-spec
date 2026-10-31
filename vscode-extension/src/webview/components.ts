@@ -1,5 +1,6 @@
 import { join } from 'node:path';
-import chrono from '../../../project-template/openspec/scripts/chronology.cjs';
+import { livingSpec } from '../core/paths.ts';
+import chrono from '../core/chronology.ts';
 import { escapeHtml as esc, plain } from '../model/markdown.ts';
 import type { ProjectModel, TimeStamp } from '../model/types.ts';
 import type { Route } from './types.ts';
@@ -14,7 +15,6 @@ export const rich = (s: string): string => esc(s).replace(/`([^`\n]+)`/g, '<code
 const ICONS = {
   check: '<path d="M3 8.5l3.2 3L13 4.5"/>',
   circle: '<circle cx="8" cy="8" r="5.5"/>',
-  dash: '<path d="M4 8h8"/>',
   alert: '<path d="M8 2l6.5 11.5h-13z"/><path d="M8 6.5v3M8 11.5v.01"/>',
   block: '<circle cx="8" cy="8" r="5.5"/><path d="M4 12L12 4"/>',
   file: '<path d="M4 1.8h5l3 3v9.4H4z"/><path d="M9 1.8v3h3"/>',
@@ -24,6 +24,8 @@ const ICONS = {
   arrow: '<path d="M3 8h10M9 4l4 4-4 4"/>',
   back: '<path d="M13 8H3M7 4L3 8l4 4"/>',
   play: '<path d="M5 3l8 5-8 5z"/>',
+  chat: '<path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/>',
+  run: '<path d="M3 4.5l3.5 3.5L3 11.5M8 12h5"/>',
   copy: '<rect x="5" y="5" width="8" height="8.5" rx="1"/><path d="M3 10.5V3h7.5"/>',
   external: '<path d="M9 2.5h4.5V7M13.5 2.5L7.5 8.5M12 9v4.5H2.5V4H7"/>',
   search: '<circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2L14 14"/>',
@@ -102,12 +104,12 @@ export function copyAttr(text: string): string {
   return `data-copy="${esc(text)}"`;
 }
 
-/** Types a verify-task command into a new terminal without running it (the person presses Enter). */
+/** Types a wingman-spec command into a new terminal without running it (the person presses Enter). */
 export function termAttr(command: string): string {
   return `data-term="${esc(command)}"`;
 }
 
-/** Sends a /spec-* prompt to the agent chat (validated by the spec-guard rules in the extension host). */
+/** Sends a /spec-* prompt to the agent chat (validated in the extension host). */
 export function agentAttr(prompt: string): string {
   return `data-agent="${esc(prompt)}"`;
 }
@@ -118,7 +120,7 @@ export function cmdAttr(id: string, ...args: string[]): string {
 }
 
 export function agentButton(prompt: string, label: string, primary = false): string {
-  return `<button class="btn${primary ? ' primary' : ''}" ${agentAttr(prompt)} title="Send ${esc(prompt)} to the agent chat">${icon('play', 13)} ${esc(label)}</button>`;
+  return `<button class="btn agent${primary ? ' primary' : ''}" ${agentAttr(prompt)} title="Hand off to the agent: sends ${esc(prompt)} to the agent chat">${icon('chat', 13)} ${esc(label)}</button>`;
 }
 
 export function findProject(projects: ProjectModel[], root: string | undefined): ProjectModel | undefined {
@@ -126,7 +128,7 @@ export function findProject(projects: ProjectModel[], root: string | undefined):
 }
 
 export function baseSpecPath(root: string, name: string): string {
-  return join(root, 'openspec', 'specs', name, 'spec.md');
+  return livingSpec(root, name);
 }
 
 /** The none record of a change: one muted line, never a card, pill or count. */
@@ -136,8 +138,17 @@ export function noDecisionLine(items: { path: string; reason: string }[]): strin
     .join('');
 }
 
+/** A tab bar and its panes. The active pane is marked here too, so it shows before the script runs (it picks the
+ * saved tab); with no `active` (or one that is not a pane) the first pane is active. */
+export function tabbed(panes: [id: string, label: string, html: string, count?: number][], active?: string): string {
+  const on = panes.some(([id]) => id === active) ? active : panes[0]?.[0];
+  const cls = (id: string): string => (id === on ? ' active' : '');
+  const tabs = panes.map(([id, label, , n]) => `<button class="tab${cls(id)}" data-tab="${id}">${esc(label)}${n ? `<span class="badge tone-muted">${n}</span>` : ''}</button>`).join('');
+  return `<div class="tabs" role="tablist">${tabs}</div>${panes.map(([id, , html]) => `<div class="pane${cls(id)}" data-pane="${id}">${html}</div>`).join('')}`;
+}
+
 export function emptyState(title: string, hint: string): string {
-  return `<div class="empty">${icon('layers', 28)}<h3>${esc(title)}</h3><p>${hint}</p></div>`;
+  return `<div class="empty">${icon('layers', 28)}<h3>${esc(title)}</h3>${hint ? `<p>${hint}</p>` : ''}</div>`;
 }
 
 export function pageHeader(title: string, subtitle: string, aside = '', back = true): string {

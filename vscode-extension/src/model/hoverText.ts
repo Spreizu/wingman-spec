@@ -44,7 +44,7 @@ export function hoverInsight(i: ReqInsight, c: HoverContext): string {
     out.push('', ...i.pending.map((p) => `**Pending**: ${commandLink(p.change, 'wingmanSpec.openRoute', [{ page: 'change', root: c.root, name: p.change, tab: 'specs' } satisfies Route])} ${p.op === 'RENAMED' ? `renames it to "${md(p.to ?? '')}"` : p.op === 'REMOVED' ? 'removes it' : p.op === 'MODIFIED' ? 'amends it' : 'adds it'}`));
   }
   for (const w of i.warnings.filter((x) => x.code === 'sprawl' || x.code === 'none-tested')) out.push('', `Warning: ${md(w.text)}`);
-  const links = [commandLink('Open in Wingman Spec', 'wingmanSpec.revealRequirement', [c.root, i.key]), commandLink('Open spec.md', 'wingmanSpec.openFile', [i.file, i.line])];
+  const links = [commandLink('Open in Wingman Spec', 'wingmanSpec.revealRequirement', [c.root, i.key]), commandLink('Open spec', 'wingmanSpec.openFile', [i.file, i.line])];
   if (c.canRun) links.push(commandLink('Run tests', 'wingmanSpec.runTests', [c.root, i.key]));
   out.push('', links.join(' · '), '', `${i.code.length} code anchor${i.code.length === 1 ? '' : 's'}, ${i.tests.length} test anchor${i.tests.length === 1 ? '' : 's'}`);
   return out.join('\n');

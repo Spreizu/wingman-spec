@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { applyEdits } from '../src/model/markerFix.ts';
 import { addWhyEdit, coveredByLive, diagnosticOf, findingId, fixesFor, groupByFile, tagTitleEdit, testCases } from '../src/model/problems.ts';
-import { parseGuard, parseProblems, parseSyncCheck } from '../src/model/verifier.ts';
+import { findingOf, parseGuard, parseProblems, parseSyncCheck } from '../src/model/verifier.ts';
 import type { VerifierFinding } from '../src/model/verifier.ts';
 
 const real = parseProblems(readFileSync(new URL('./fixtures/problems.json', import.meta.url), 'utf8'));
@@ -39,7 +39,7 @@ test('diagnostic: 1-based finding -> zero-based range, severity kept, hint shown
   assert.match(d.message, /\nHint: add a Why$/);
   assert.equal(diagnosticOf(of('misplaced-marker')).severity, 'warning');
   const grouped = groupByFile(real!.findings);
-  assert.equal(grouped.get('/proj/openspec/changes/edit/proposal.md')?.length, 1);
+  assert.equal(grouped.get('/proj/changes/edit/proposal.md')?.length, 1);
   assert.equal(findingId(of('stale-test-tag')), '/proj/tests/todo.test.js:3:12:stale-test-tag');
 });
 
@@ -76,7 +76,7 @@ test('quick fix replace-key, move-marker and remove-duplicate produce the exact 
 
 test('quick fix accept and add-test-tag are commands (they need a prompt); a finding without a fix has none', () => {
   const d = fixesFor(of('unanchored-requirement'), { text: '', rel: '' });
-  assert.deepEqual(d[0]?.command, { id: 'wingmanSpec.acceptGap', args: ['/proj/openspec/specs/todo/spec.md', of('unanchored-requirement').key] });
+  assert.deepEqual(d[0]?.command, { id: 'wingmanSpec.acceptGap', args: ['/proj/specs/todo.md', of('unanchored-requirement').key] });
   const t = fixesFor(of('untested-requirement'), { text: '', rel: '' });
   assert.equal(t[0]?.command?.id, 'wingmanSpec.tagTest');
   assert.deepEqual(fixesFor(of('edge-cases'), { text: '', rel: '' }), []);
@@ -88,4 +88,19 @@ test('test titles: found in it/test calls, tagged once, never twice', () => {
   assert.equal(applyEdits(text, [tagTitleEdit(text, 2, 'todo/removed')!]).split('\n')[2], '  test.skip("removes it [todo/removed]", () => {});');
   assert.equal(tagTitleEdit(text, 1, 'todo/added'), undefined);
   assert.equal(tagTitleEdit(text, 0, 'a/b'), undefined);
+});
+
+// Over-anchored markers are found by the CLI (`wingman-spec problems`, covered by tests/anchorfit.sh); the editor shows the
+// finding in the Problems panel and offers its remove-marker fix.
+test('over-anchored: the CLI finding with fix remove-marker is accepted, shown once, and its quick fix removes the marker line only', () => {
+  const EN = "export const messages = {\n  'cart.title': 'Your cart',\n  // @spec auth/user-login\n  'login.error': 'Wrong email or password',\n};\n";
+  const f = findingOf({ source: 'drift', code: 'over-anchored', severity: 'warning', message: 'm', file: '/p/en.js', line: 3, col: 3, length: 20, fix: { kind: 'remove-marker', key: 'auth/user-login' } });
+  assert.ok(f);
+  assert.equal(f.fix?.kind, 'remove-marker');
+  assert.equal(coveredByLive(f, true), false, 'the code view no longer computes it, so the panel lists it');
+  const fx = fixesFor(f, { text: EN, rel: 'src/checkout/lang/en.js' });
+  assert.equal(fx.length, 1);
+  assert.equal(applyEdits(EN, fx[0]!.edits!), EN.replace('  // @spec auth/user-login\n', ''));
+  const multi = '// @spec auth/user-login, checkout/order-summary\nconst a = 1;\n';
+  assert.ok(fixesFor({ ...f, line: 1 }, { text: multi, rel: 'a.js' })[0]?.edits, 'a marker line with several keys still offers an edit');
 });

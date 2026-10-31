@@ -1,5 +1,5 @@
 import type { ApprovalRow, BlockingItem, Dashboard, TaskStatus, TodoStep } from '../model/changeDashboard.ts';
-import chrono from '../../../project-template/openspec/scripts/chronology.cjs';
+import chrono from '../core/chronology.ts';
 import { agentAttr, badge, bar, cmdAttr, copyAttr, esc, icon, openAttr, pillRow, rich, termAttr } from './components.ts';
 import type { Tone } from './components.ts';
 
@@ -20,7 +20,7 @@ const plural = (n: number, w: string): string => `${n} ${w}${n === 1 ? '' : 's'}
 
 function step(s: TodoStep): string {
   if (s.kind === 'open') return `<div class="todo"><button class="btn" ${openAttr(s.path ?? '')}>${icon('external', 13)} ${esc(s.text)}</button></div>`;
-  if (s.kind === 'agent') return `<div class="todo"><button class="btn" ${agentAttr(s.text)} title="Send ${esc(s.text)} to the agent chat">${icon('play', 13)} ${esc(s.text)}</button><button class="icon-btn" ${copyAttr(s.text)} title="Copy">${icon('copy', 13)}</button></div>`;
+  if (s.kind === 'agent') return `<div class="todo"><button class="btn agent" ${agentAttr(s.text)} title="Hand off to the agent: sends ${esc(s.text)} to the agent chat">${icon('chat', 13)} ${esc(s.text)}</button></div>`;
   return `<div class="todo"><code class="cmd">${esc(s.text)}</code><button class="icon-btn" ${copyAttr(s.text)} title="Copy the command">${icon('copy', 13)}</button><button class="btn" ${termAttr(s.text)} title="Types the command into a new terminal; you press Enter">${icon('play', 13)} Terminal</button></div>`;
 }
 

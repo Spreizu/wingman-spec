@@ -33,7 +33,7 @@ export interface FrontMatter {
   hasFrontMatter: boolean;
 }
 
-/** A change-local ADR: openspec/changes/<change>/adrs/<slug>.md */
+/** A change-local ADR: changes/<change>/adrs/<slug>.md */
 export interface SourceAdr {
   slug: string;
   path: string;
@@ -86,7 +86,7 @@ export type ArtifactState = 'done' | 'missing' | 'skipped';
 export interface Capability {
   name: string;
   path: string;
-  /** `new` when openspec/specs/<name> does not exist yet, otherwise a delta on an existing capability. */
+  /** `new` when specs/<name>.md does not exist yet, otherwise a delta on an existing capability. */
   kind: 'new' | 'delta';
 }
 
@@ -107,7 +107,7 @@ export interface NoDecision {
   reason: string;
 }
 
-/** A moment with where it came from (`chronology.cjs`): `file` = recorded by our archive step, `git`/`birth`/`mtime`/`name` = fallbacks for older folders. */
+/** A moment with where it came from (`core/chronology.ts`): `file` = recorded by our archive step, `git`/`birth`/`mtime`/`name` = fallbacks for older folders. */
 export interface TimeStamp {
   at: string;
   ms: number;
@@ -134,11 +134,11 @@ export interface Change {
   taskDone: number;
   blockedPath?: string;
   progressPath?: string;
-  /** When the change was created (`chronology.cjs`): the changes list is ordered by it, newest first. Absent in hand-built test data. */
+  /** When the change was created (`core/chronology.ts`): the changes list is ordered by it, newest first. Absent in hand-built test data. */
   created?: TimeStamp;
 }
 
-/** A change moved to `openspec/changes/archive/` (`YYYY-MM-DD-<name>`). */
+/** A change moved to `archive/` of the specs root (`YYYY-MM-DD-HHMM-<name>`). */
 export interface ArchivedChange {
   /** Directory name inside archive/, for example `2026-10-19-add-auth`. */
   dirName: string;
@@ -147,7 +147,7 @@ export interface ArchivedChange {
   name: string;
   /** `YYYY-MM-DD`, or empty when the folder has no date prefix. */
   date: string;
-  /** When it was archived, to the second (`archived.json`, else the commit time, the folder mtime, the date): see `chronology.cjs`. Absent in hand-built test data. */
+  /** When it was archived, to the second (`archived.json`, else the commit time, the folder mtime, the date): see `core/chronology.ts`. Absent in hand-built test data. */
   archived?: TimeStamp;
   taskTotal: number;
   taskDone: number;
@@ -160,16 +160,15 @@ export interface ArchivedChange {
 }
 
 export interface ProjectModel {
-  /** The OpenSpec root: the directory that contains `openspec/` (and the promoted ADR directory). */
+  /** The specs root: the directory with specs/, changes/, archive/ and adrs/ (core/paths.ts). */
   root: string;
-  /** The workspace folder that led here. Differs from `root` in workspace mode (shared OpenSpec store). */
+  /** The workspace folder that led here: the code root (its `.wingman-spec/bin/wingman-spec` runs the CLI). */
   workspaceFolder: string;
   /**
-   * `local`: openspec/ is next to the code. `linked`: a separate specs repo named by
-   * `openspec/workspace.yaml`. `store`: a registered OpenSpec store named by `store: <id>`.
+   * `local`: the specs are in `.wingman-spec/` next to the code. `linked`: a separate specs repo named by `specs:` in
+   * `.wingman-spec/wingman-spec.yaml`. `specs-repo`: the folder is a specs repository (no code).
    */
-  source: 'local' | 'linked' | 'store';
-  storeId?: string;
+  source: 'local' | 'linked' | 'specs-repo';
   /** Set when the root could not be resolved; `changes` and `adrs` are then empty. */
   error?: string;
   changes: Change[];

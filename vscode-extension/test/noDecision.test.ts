@@ -21,23 +21,22 @@ const NONE = '---\ntitle: No architectural decision\nstatus: none\ndate: 2026-10
 const REAL = (t: string): string => `---\ntitle: ${t}\nstatus: Accepted\ndate: 2026-10-20\nchange: x\n---\n\n# ${t}\n\n## Context\n\nc\n\n## Decision\n\nd\n\n## Consequences\n\n- e\n`;
 const TASKS = '## 1. Core\n\n- [x] 1.1 Done\n';
 
-put('openspec/config.yaml', 'schema: wingman-spec\n');
+put('wingman-spec.yaml', '');
 for (const n of ['only-none', 'mixed']) {
-  put(`openspec/changes/${n}/.openspec.yaml`, 'schema: wingman-spec\n');
-  put(`openspec/changes/${n}/tasks.md`, TASKS);
+  put(`changes/${n}/tasks.md`, TASKS);
 }
-put('openspec/changes/only-none/adrs/none.md', NONE);
-put('openspec/changes/mixed/adrs/none.md', NONE);
-put('openspec/changes/mixed/adrs/use-a-table.md', REAL('Use a table'));
+put('changes/only-none/adrs/none.md', NONE);
+put('changes/mixed/adrs/none.md', NONE);
+put('changes/mixed/adrs/use-a-table.md', REAL('Use a table'));
 // archived: a none-only change and a none + real change
 for (const n of ['2026-10-01-add-search', '2026-10-02-mixed-done']) {
-  put(`openspec/changes/archive/${n}/tasks.md`, TASKS);
+  put(`archive/${n}/tasks.md`, TASKS);
 }
-put('openspec/changes/archive/2026-10-01-add-search/adrs/none.md', NONE);
-put('openspec/changes/archive/2026-10-02-mixed-done/adrs/none.md', NONE);
-put('openspec/changes/archive/2026-10-02-mixed-done/adrs/use-a-table.md', REAL('Use a table'));
+put('archive/2026-10-01-add-search/adrs/none.md', NONE);
+put('archive/2026-10-02-mixed-done/adrs/none.md', NONE);
+put('archive/2026-10-02-mixed-done/adrs/use-a-table.md', REAL('Use a table'));
 // a record that says `status: None` in a file with another name is the same thing
-put('openspec/changes/mixed/adrs/skip-it.md', NONE.replace('status: none', 'status: None'));
+put('changes/mixed/adrs/skip-it.md', NONE.replace('status: none', 'status: None'));
 
 const body = (html: string): string => html.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '');
 async function page(route: Route): Promise<string> {

@@ -1,11 +1,13 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
+import { archiveDir } from '../core/paths.ts';
 import { countTasks, parseTasks } from './tasksParser.ts';
 import { noDecisionReason, parseSourceAdr } from './adrSync.ts';
-import chrono from '../../../project-template/openspec/scripts/chronology.cjs';
+import chrono from '../core/chronology.ts';
 import type { ArchivedChange, NoDecision } from './types.ts';
 
-const DATED_RE = /^(\d{4}-\d{2}-\d{2})-(.+)$/;
+/** `YYYY-MM-DD-HHMM-<name>` (the CLI's archive name); `YYYY-MM-DD-<name>` from an import is read too. */
+const DATED_RE = /^(\d{4}-\d{2}-\d{2})(?:-\d{4})?-(.+)$/;
 
 async function readText(path: string): Promise<string | undefined> {
   try {
@@ -33,7 +35,7 @@ async function scanOne(dir: string, dirName: string, archived: ArchivedChange['a
   const tasks = await readText(join(dir, 'tasks.md'));
   const { total, done } = countTasks(tasks === undefined ? [] : parseTasks(tasks));
 
-  const capabilities = (await listDir(join(dir, 'specs'))).filter((e) => e.isDirectory()).map((e) => e.name).sort();
+  const capabilities = (await listDir(join(dir, 'specs'))).filter((e) => e.isFile() && e.name.endsWith('.md')).map((e) => e.name.slice(0, -3)).sort();
 
   const adrs: ArchivedChange['adrs'] = [];
   const noDecisions: NoDecision[] = [];
@@ -68,9 +70,9 @@ async function scanOne(dir: string, dirName: string, archived: ArchivedChange['a
   };
 }
 
-/** Reads `openspec/changes/archive/*`, newest first by the time it was archived (`chronology.cjs`), not by folder name. */
+/** Reads `archive/*` of the specs root, newest first by the time it was archived (core/chronology.ts), not by folder name. */
 export async function scanArchive(root: string): Promise<ArchivedChange[]> {
-  const base = join(root, 'openspec', 'changes', 'archive');
+  const base = archiveDir(root);
   const entries = (await listDir(base)).filter((e) => e.isDirectory() && !e.name.startsWith('.'));
   const git = chrono.gitAdded(base);
   const all = await Promise.all(entries.map((e) => scanOne(join(base, e.name), e.name, chrono.archiveStamp(base, e.name, git))));

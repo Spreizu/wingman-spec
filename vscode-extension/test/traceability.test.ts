@@ -44,7 +44,7 @@ test('an Owner approval line in the proposal is read', async () => {
   const { readFileSync, writeFileSync } = await import('node:fs');
   const { join } = await import('node:path');
   const dir = traceProject();
-  const p = join(dir, 'openspec/changes/refunds/proposal.md');
+  const p = join(dir, 'changes/refunds/proposal.md');
   writeFileSync(p, readFileSync(p, 'utf8').replace('## What Changes', 'Owner approval: Maria, 2026-10-02\n\n## What Changes'));
   const c = buildTrace(dir, dir).changes.find((x) => x.name === 'refunds');
   assert.equal(c?.approval, 'Maria, 2026-10-02');
@@ -54,7 +54,7 @@ test('a MODIFIED requirement with the same Why needs no approval', async () => {
   const { readFileSync, writeFileSync } = await import('node:fs');
   const { join } = await import('node:path');
   const dir = traceProject();
-  const p = join(dir, 'openspec/changes/refunds/specs/billing/spec.md');
+  const p = join(dir, 'changes/refunds/specs/billing.md');
   writeFileSync(p, readFileSync(p, 'utf8').replace('Why: Users can remove a mistake until the order is paid.', 'Why: Users can remove a mistake before they pay.'));
   const c = buildTrace(dir, dir).changes.find((x) => x.name === 'refunds');
   assert.deepEqual(c?.approvals.map((x) => x.key), ['billing/legacy-thing']);

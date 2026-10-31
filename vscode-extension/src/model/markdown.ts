@@ -1,5 +1,5 @@
 /**
- * A small, safe Markdown-to-HTML renderer for OpenSpec documents. Every piece of text is HTML-escaped
+ * A small, safe Markdown-to-HTML renderer for spec documents. Every piece of text is HTML-escaped
  * before any tag is emitted, raw HTML is never passed through, and only http(s) links become anchors.
  */
 

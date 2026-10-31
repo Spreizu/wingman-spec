@@ -25,7 +25,7 @@ function navItem(route: Route, active: boolean, iconHtml: string, label: string,
   return `<button class="nav-item${active ? ' active' : ''}" ${routeAttr(route)}>${iconHtml}<span class="grow">${esc(label)}</span>${count ? `<span class="count">${esc(count)}</span>` : ''}</button>`;
 }
 
-function nav(d: ViewData, specCount: number): string {
+function nav(d: ViewData, specCount: number, logo: string | undefined): string {
   const archiveCount = d.projects.reduce((n, p) => n + p.archive.length, 0);
   const key = routeKey(d.route);
   const is = (r: Route): boolean => routeKey(r) === key;
@@ -52,7 +52,7 @@ function nav(d: ViewData, specCount: number): string {
     .join('');
 
   return `<nav class="nav">
-<div class="brand"><span class="brand-mark">${icon('layers', 15)}</span>Wingman Spec</div>
+<div class="brand">${logo ? `<img class="brand-mark" src="${esc(logo)}" alt="">` : ''}Wingman Spec</div>
 ${navItem({ page: 'overview' }, is({ page: 'overview' }), icon('home'), 'Overview')}
 ${navItem({ page: 'adrs' }, d.route.page === 'adrs' || d.route.page === 'adr', icon('adr'), 'ADRs', String(adrTotal))}
 ${navItem({ page: 'specs' }, d.route.page === 'specs' || d.route.page === 'spec', icon('file'), 'Specs', String(specCount))}
@@ -64,17 +64,18 @@ ${sections || '<div class="muted" style="padding:6px 8px">No active changes</div
 </nav>`;
 }
 
-export function layout(d: ViewData, content: string, nonce: string, cspSource: string): string {
+/** `logo`: the webview URI of images/icon.png (the extension icon); without it the header shows the name only. */
+export function layout(d: ViewData, content: string, nonce: string, cspSource: string, logo?: string): string {
   const specCount = d.projects.reduce((n, p) => n + (d.baseSpecs[p.root]?.length ?? 0), 0);
   const defaultTab = d.route.page === 'change' && d.route.tab ? d.route.tab : '';
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}' ${cspSource}; style-src-attr 'unsafe-inline'; script-src 'nonce-${nonce}';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource}; style-src 'nonce-${nonce}' ${cspSource}; style-src-attr 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Wingman Spec</title>
 <style nonce="${nonce}">${STYLES}</style></head>
 <body data-key="${esc(JSON.stringify(d.route))}" data-default-tab="${esc(defaultTab)}" data-reveal="${d.revealTick ?? 0}">
-<div class="shell">${nav(d, specCount)}<main class="main">${content}</main></div>
+<div class="shell">${nav(d, specCount, logo)}<main class="main">${content}</main></div>
 <script nonce="${nonce}">${SCRIPT}</script>
 </body></html>`;
 }

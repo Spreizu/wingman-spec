@@ -20,8 +20,7 @@ const { chromium } = createRequire(join(nm, 'x.js'))('playwright');
 
 const root = makeFixture();
 const put = (rel, text) => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), text); };
-put('openspec/changes/rows/.openspec.yaml', 'schema: wingman-spec\n');
-put('openspec/changes/rows/tasks.md', [
+put('changes/rows/tasks.md', [
   '## 1. Persist favourites (risky)', '',
   '- [x] 1.1 Add `FAVOURITE_QUERY` and a `Favourites_store` that saves `(USER_ID, ITEM_ID)` and resolves live stock availability',
   '- [ ] 1.R Request code review for group 1',

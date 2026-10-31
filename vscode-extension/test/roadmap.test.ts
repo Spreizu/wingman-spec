@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, rmSync } from 'node:fs';
 import { after, test } from 'node:test';
 import './support/installStub.mjs';
+import { fakeBundle } from './support/bundle.ts';
 import { makeData, makeFixture } from './fixture.ts';
 
 const stub = await import('./support/vscodeStub.mjs');
@@ -44,12 +45,11 @@ test('parseRoadmap is tolerant: junk, missing parts and unknown ids never throw'
 
 test('the client asks `roadmap --json --root`, reads the JSON of a plan with errors (exit 1) and reports a refusal (exit 6)', async () => {
   const calls: string[][] = [];
-  const mk = (stdout: string, code: number) => new VerifierClient(async (_c, args) => (calls.push(args), { code, stdout, stderr: '', timedOut: false }));
+  const bundled = fakeBundle();
+  const mk = (stdout: string, code: number) => new VerifierClient(async (c, args) => (calls.push([c, ...args]), { code, stdout, stderr: '', timedOut: false }), bundled);
   stub.host.reset();
-  const script = `${fx}/openspec/scripts/verify-task.cjs`;
-  const { mkdirSync, writeFileSync } = await import('node:fs');
-  mkdirSync(`${fx}/openspec/scripts`, { recursive: true });
-  writeFileSync(script, '// stand-in\n');
+  const script = `${bundled}/wingman-spec`;
+  delete process.env['WINGMAN_SPEC_BIN'];
   const good = await mk(JSON_OUT.replace('"ok": true', '"ok": false'), 1).roadmap(proj() as never);
   assert.equal(good.ok, true);
   assert.deepEqual(calls[0], [script, 'roadmap', '--json', '--root', fx]);
@@ -102,11 +102,11 @@ test('page: loading, unavailable and empty states; no roadmap link outside a new
 
 test('PanelData.roadmap loads in the background and re-renders when the verifier answered', async () => {
   const store = { projects: [proj()], onDidChange: () => new stub.Disposable() };
-  const data = new PanelData(store as never, new TraceCache(store as never), new VerifierClient(ok(JSON_OUT)));
+  const data = new PanelData(store as never, new TraceCache(store as never), new VerifierClient(ok(JSON_OUT), fakeBundle()));
   const ready = new Promise<void>((r) => (data.onReady = r));
   assert.deepEqual(data.roadmap(fx), { status: 'loading' });
   await ready;
   const st = data.roadmap(fx);
   assert.equal(st.status, 'ready');
-  assert.deepEqual(data.roadmap('/nowhere'), { status: 'unavailable', reason: 'No OpenSpec project is open.' });
+  assert.deepEqual(data.roadmap('/nowhere'), { status: 'unavailable', reason: 'No Wingman Spec project is open.' });
 });

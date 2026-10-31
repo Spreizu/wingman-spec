@@ -15,7 +15,7 @@ export interface TraceNode {
   /** Absolute file to open on click, with an optional zero-based line. */
   file?: string;
   line?: number;
-  /** Where a click goes: the Wingman Spec UI revealed on this item. Nodes without one open `file`. `file` is then the secondary "Open spec.md" action. */
+  /** Where a click goes: the Wingman Spec UI revealed on this item. Nodes without one open `file`. `file` is then the secondary "Open spec" action. */
   route?: Route;
   children: TraceNode[];
 }
@@ -76,7 +76,7 @@ export function requirementNode(model: TraceModel, r: TraceRequirement, prefix: 
 export function buildTraceNodes(model: TraceModel): TraceNode[] {
   const out: TraceNode[] = [];
   if (model.mode === 'off' && !model.hasLayer) {
-    return [{ id: 'off', label: 'Traceability is off', description: 'set `traceability: on` in openspec/config.yaml', icon: 'info', children: [] }];
+    return [{ id: 'off', label: 'Traceability is off', description: 'set `traceability: on` in wingman-spec.yaml', icon: 'info', children: [] }];
   }
 
   const reqs = [...model.requirements.values()];
@@ -87,7 +87,7 @@ export function buildTraceNodes(model: TraceModel): TraceNode[] {
     id: 'requirements',
     label: 'Requirements',
     description: `${reqs.length}${noWhy.length ? ` · ${noWhy.length} without a Why` : ''}`,
-    tooltip: 'openspec/specs/: each requirement with the one-line Why (who wants it, and why).',
+    tooltip: 'Living specs: each requirement with the one-line Why (who wants it, and why).',
     icon: noWhy.length ? 'warning' : 'target',
     children: [...byCap].map(([cap, rs]) => ({
       id: `cap/${cap}`,
@@ -139,7 +139,7 @@ export function buildTraceNodes(model: TraceModel): TraceNode[] {
     id: 'drift',
     label: 'Drift',
     description: open.length ? `${open.length} open${model.gaps.length > open.length ? ` · ${model.gaps.length - open.length} accepted` : ''}` : 'no open gaps',
-    tooltip: 'Same gaps as `node openspec/scripts/verify-task.cjs drift` (read from the files, nothing is run).',
+    tooltip: 'Same gaps as `wingman-spec drift` (read from the files, nothing is run).',
     icon: open.length ? 'warning' : 'pass',
     children: [...byType].map(([type, gs]) => ({
       id: `drift/${type}`,

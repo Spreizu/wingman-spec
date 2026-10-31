@@ -55,6 +55,8 @@ export const SCRIPT = `
     if (chip) { state.chip = chip.getAttribute('data-chip'); save(); applyFilter(); return; }
     var agent = t.closest('[data-agent]');
     if (agent) { e.stopPropagation(); post({ type: 'agent', prompt: agent.getAttribute('data-agent') }); return; }
+    var cli = t.closest('[data-cli]');
+    if (cli) { e.stopPropagation(); if (!cli.disabled) post({ type: 'cli', action: cli.getAttribute('data-cli'), root: cli.getAttribute('data-root'), change: cli.getAttribute('data-change') || undefined }); return; }
     var term = t.closest('[data-term]');
     if (term) { e.stopPropagation(); post({ type: 'terminal', text: term.getAttribute('data-term') }); return; }
     var cmd = t.closest('[data-cmd]');

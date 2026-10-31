@@ -1,17 +1,15 @@
 import { promises as fs } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
+import { CONFIG, DIR } from '../core/paths.ts';
 import { scanProject } from './changeScanner.ts';
 import { readYamlKey } from './frontMatter.ts';
 import type { ProjectModel } from './types.ts';
 
-/** Runs the `openspec` CLI with `args` in `cwd` and resolves with stdout. Injected so tests need no CLI. */
-export type ExecFn = (args: string[], cwd: string) => Promise<string>;
-
 export interface ResolvedRoot {
   workspaceFolder: string;
+  /** The specs root. */
   root: string;
-  source: 'local' | 'linked' | 'store';
-  storeId?: string;
+  source: ProjectModel['source'];
   error?: string;
 }
 
@@ -31,14 +29,6 @@ async function canonical(path: string): Promise<string> {
   }
 }
 
-function describeError(error: unknown): string {
-  const e = error as { code?: string; message?: string };
-  if (e?.code === 'ENOENT') {
-    return 'The openspec CLI was not found. Install it or set wingmanSpec.openspecPath.';
-  }
-  return (e?.message ?? String(error)).split('\n')[0] ?? 'Unknown error';
-}
-
 async function readOptional(path: string): Promise<string | undefined> {
   try {
     return await fs.readFile(path, 'utf8');
@@ -48,100 +38,56 @@ async function readOptional(path: string): Promise<string | undefined> {
 }
 
 /**
- * Finds the OpenSpec root for one workspace folder. The order matches the `/spec-*` commands and verify-task.cjs:
- * 1. `openspec/` with specs/ or changes/ is a real root (specs next to the code), and wins.
- * 2. `openspec/workspace.yaml` with `specs: <path>` links to a separate specs repository (the usual
- *    workspace layout: code and specs are separate git repos opened as folders of one workspace).
- * 3. A config-only `openspec/config.yaml` with `store: <id>` points at a registered OpenSpec store; the
- *    CLI (`openspec context --json`) is asked for its location, so the registry stays the CLI's business.
- * 4. A config-only `openspec/config.yaml` without a pointer is a fresh local root.
+ * Finds the specs root of one workspace folder, in the CLI's order (internal/layout):
+ * 1. `.wingman-spec/wingman-spec.yaml` without `specs:`: the specs live next to the code, in `.wingman-spec/`.
+ * 2. `.wingman-spec/wingman-spec.yaml` with `specs: <path>`: a code repo linked to a separate specs repository.
+ * 3. `wingman-spec.yaml` at the folder root: the folder is a specs repository.
  * Returns undefined when the folder has none of these.
  */
-export async function resolveRoot(folder: string, exec: ExecFn): Promise<ResolvedRoot | undefined> {
-  const config = await readOptional(join(folder, 'openspec', 'config.yaml'));
-  const linkFile = await readOptional(join(folder, 'openspec', 'workspace.yaml'));
-  const link = linkFile === undefined ? undefined : readYamlKey(linkFile, 'specs');
-
-  const hasPlanningShape =
-    (await isDir(join(folder, 'openspec', 'specs'))) || (await isDir(join(folder, 'openspec', 'changes')));
-  if (config !== undefined && hasPlanningShape) return { workspaceFolder: folder, root: folder, source: 'local' };
-
-  if (link) {
+export async function resolveRoot(folder: string): Promise<ResolvedRoot | undefined> {
+  const inner = await readOptional(join(folder, DIR, CONFIG));
+  if (inner !== undefined) {
+    const link = readYamlKey(inner, 'specs');
+    if (!link) return { workspaceFolder: folder, root: join(folder, DIR), source: 'local' };
     const root = isAbsolute(link) ? link : resolve(folder, link);
-    const found = await readOptional(join(root, 'openspec', 'config.yaml'));
     return {
       workspaceFolder: folder,
       root,
       source: 'linked',
-      ...(found === undefined
-        ? { error: `Specs repository not found at ${root} (from openspec/workspace.yaml). Clone it there or fix 'specs:'.` }
-        : {}),
+      ...((await isDir(root)) ? {} : { error: `Specs repository not found at ${root} (from ${DIR}/${CONFIG}). Clone it there or fix 'specs:'.` }),
     };
   }
-
-  if (config === undefined) return undefined;
-  const pointer = readYamlKey(config, 'store');
-  if (!pointer) return { workspaceFolder: folder, root: folder, source: 'local' };
-
-  try {
-    const out = await exec(['context', '--json'], folder);
-    const root = (JSON.parse(out.slice(out.indexOf('{'))) as { root?: { path?: string; store_id?: string } }).root;
-    if (!root?.path) throw new Error('openspec context returned no root path');
-    return { workspaceFolder: folder, root: root.path, source: 'store', storeId: root.store_id ?? pointer };
-  } catch (error) {
-    return {
-      workspaceFolder: folder,
-      root: folder,
-      source: 'store',
-      storeId: pointer,
-      error: `Cannot resolve store '${pointer}': ${describeError(error)}`,
-    };
-  }
+  if ((await readOptional(join(folder, CONFIG))) !== undefined) return { workspaceFolder: folder, root: folder, source: 'specs-repo' };
+  return undefined;
 }
 
 /**
- * Resolves and scans every workspace folder. Folders that resolve to the same OpenSpec root
- * (for example a code repo and its store both open in one multi-root workspace) appear once.
+ * Resolves and scans every workspace folder. Folders that resolve to the same specs root (a code repo that links to its specs
+ * repo, plus the specs repo folder itself) appear once, labelled by the code folder.
  */
-export async function loadProjects(
-  folders: string[],
-  adrDirectory: string,
-  exec: ExecFn,
-): Promise<ProjectModel[]> {
+export async function loadProjects(folders: string[]): Promise<ProjectModel[]> {
   const projects: ProjectModel[] = [];
   const seen = new Map<string, number>();
   for (const folder of folders) {
-    const resolved = await resolveRoot(folder, exec);
+    const resolved = await resolveRoot(folder);
     if (!resolved) continue;
     const key = await canonical(resolved.root);
     const existing = seen.get(key);
     if (existing !== undefined) {
-      // The same root reached twice (a code repo that links to its specs repo, plus the specs repo
-      // folder itself): list it once, labelled by the folder that really contains it.
-      if (resolved.source === 'local' && projects[existing]?.source !== 'local') {
-        const model = await scanProject(resolved.root, adrDirectory);
-        projects[existing] = { ...model, workspaceFolder: folder, source: 'local' };
+      // A code folder that links here wins over the specs repo folder: its CLI shim runs the commands.
+      if (resolved.source === 'linked' && projects[existing]?.source === 'specs-repo') {
+        const model = await scanProject(resolved.root);
+        projects[existing] = { ...model, workspaceFolder: folder, source: 'linked' };
       }
       continue;
     }
     seen.set(key, projects.length);
-
     if (resolved.error) {
-      projects.push({
-        root: resolved.root,
-        workspaceFolder: folder,
-        source: resolved.source,
-        storeId: resolved.storeId,
-        error: resolved.error,
-        changes: [],
-        archive: [],
-        adrs: [],
-        adrDir: '',
-      });
+      projects.push({ root: resolved.root, workspaceFolder: folder, source: resolved.source, error: resolved.error, changes: [], archive: [], adrs: [], adrDir: '' });
       continue;
     }
-    const model = await scanProject(resolved.root, adrDirectory);
-    projects.push({ ...model, workspaceFolder: folder, source: resolved.source, storeId: resolved.storeId });
+    const model = await scanProject(resolved.root);
+    projects.push({ ...model, workspaceFolder: folder, source: resolved.source });
   }
   return projects;
 }

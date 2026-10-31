@@ -5,7 +5,10 @@ import type { ArchivedChange, Change, ProjectModel } from '../model/types.ts';
 import { agentButton, attMain, badge, cmdAttr, emptyState, esc, icon, pageHeader, pillRow, ring, routeAttr, whenText, whenTitle } from './components.ts';
 import type { Tone } from './components.ts';
 import { STATE_LABEL, STATE_TONE } from './layout.ts';
+import { actionKey } from './types.ts';
 import type { ViewData } from './types.ts';
+import { actionBar } from './actionsView.ts';
+import { projectActions } from '../model/cliActions.ts';
 
 const LANES: { id: Change['state']; title: string }[] = [
   { id: 'planning', title: 'Planning' },
@@ -40,7 +43,7 @@ function changeCard(project: ProjectModel, c: Change, d: ViewData): string {
 ${c.state === 'blocked' || c.state === 'complete' ? badge(STATE_LABEL[c.state], STATE_TONE[c.state]) : ''}</div>
 ${why ? `<p class="snippet">${esc(why)}</p>` : ''}
 ${blocked ? `<p class="muted">${esc(blocked)}</p>` : ''}
-${pillRow(`${c.capabilities.map((cap) => badge(cap.name, 'info')).join('')}${c.state === 'blocked' ? agentButton(`/spec-fix ${c.name}`, 'Fix findings') : ''}`)}
+${pillRow(`${c.capabilities.map((cap) => badge(cap.name, 'info')).join('')}${c.state === 'blocked' ? agentButton(`/spec-explore ${c.name}`, 'Explore the blocker') : ''}`)}
 </article>`;
 }
 
@@ -60,7 +63,9 @@ function stat(tone: Tone, glyph: string, value: string, label: string): string {
 
 export function overviewPage(d: ViewData): string {
   if (d.projects.length === 0) {
-    return `${pageHeader('Overview', '', '', false)}${emptyState('No OpenSpec project found', 'Open a folder that contains <code>openspec/config.yaml</code>.')}`;
+    const a = d.actions;
+  const doctor = a ? d.projects.filter((p) => !p.error).map((p) => actionBar(projectActions({ trusted: a.trusted, running: !!a.running }), p.root, undefined, a.running, a.results[actionKey(p.root)])).join('') : '';
+  return `${pageHeader('Overview', '', '', false)}${emptyState('No Wingman Spec project found', 'Open a folder that contains <code>.wingman-spec/wingman-spec.yaml</code>, or run <code>wingman-spec init</code> in it.')}`;
   }
 
   const changes = d.projects.flatMap((p) => p.changes.map((c) => ({ p, c })));
@@ -79,7 +84,7 @@ export function overviewPage(d: ViewData): string {
   const setupBanner = d.setup.commands
     ? ''
     : `<div class="banner tone-warn">${icon('alert', 20)}<div class="body"><strong>Agent commands are not installed in this workspace</strong>
-<div class="muted">Missing: ${d.setup.missing.map((m) => `<code>${esc(m)}</code>`).join(', ')}. Run the package's <code>install.sh</code> so the agent buttons work.</div></div></div>`;
+<div class="muted">Missing: ${d.setup.missing.map((m) => `<code>${esc(m)}</code>`).join(', ')}. Run <code>.wingman-spec/bin/wingman-spec init --harness all</code> so the agent buttons work.</div></div></div>`;
   const newChange = `<button class="btn primary" ${cmdAttr('newChange', first?.root ?? '')}>${icon('plus', 13)} New change</button>`;
 
   const board = LANES.map((lane) => {
@@ -106,17 +111,18 @@ ${attMain(c.name, hint)}${icon('chevron', 14)}</div>`;
     .map(({ p, c }) => {
       const n = c.adrs.filter((a) => a.sync.state === 'not-promoted' || a.sync.state === 'out-of-date').length;
       return `<div class="att tone-warn" ${routeAttr({ page: 'change', root: p.root, name: c.name })}>${icon('alert')}
-${attMain(c.name, `${n} ADR${n === 1 ? '' : 's'} need syncing`)}
-${c.state === 'complete' ? agentButton(`/spec-archive ${c.name}`, 'Archive with agent') : agentButton(`/spec-sync ${c.name}`, 'Sync ADRs')}${icon('chevron', 14)}</div>`;
+${attMain(c.name, `${n} ADR${n === 1 ? '' : 's'} need syncing`)}${icon('chevron', 14)}</div>`;
     });
 
   const shipped =
     recent.length === 0
-      ? emptyState('Nothing archived yet', 'Shipped changes appear here after <code>/opsx:archive</code>.')
+      ? emptyState('Nothing archived yet', 'Shipped changes appear here after <code>/spec-archive</code>.')
       : `<div class="grid">${recent.map(({ p, c }) => archiveCard(p, c, d)).join('')}</div>`;
 
+  const a = d.actions;
+  const doctor = a ? d.projects.filter((p) => !p.error).map((p) => actionBar(projectActions({ trusted: a.trusted, running: !!a.running }), p.root, undefined, a.running, a.results[actionKey(p.root)])).join('') : '';
   return `${pageHeader('Overview', `${changes.length} active change${changes.length === 1 ? '' : 's'}`, newChange, false)}
-${setupBanner}<div class="stats">
+${setupBanner}${doctor}<div class="stats">
 ${stat('info', icon('play', 18), String(inFlight), 'In flight')}
 ${stat(blocked > 0 ? 'bad' : 'muted', icon('block', 18), String(blocked), 'Blocked')}
 ${stat('ok', icon('check', 18), String(ready), 'Ready to sync')}

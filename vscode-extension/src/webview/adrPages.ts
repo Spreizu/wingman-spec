@@ -100,7 +100,7 @@ ${edges}${nodes}</svg></div>
 
 export function adrsPage(d: ViewData): string {
   const project = findProject(d.projects, d.route.page === 'adrs' ? d.route.root : undefined);
-  if (!project) return `${pageHeader('ADRs', '', '', false)}${emptyState('No OpenSpec project found', '')}`;
+  if (!project) return `${pageHeader('ADRs', '', '', false)}${emptyState('No Wingman Spec project found', '')}`;
 
   const counts = statusCounts(project.adrs);
   const links = buildAdrLinks(project.adrs);
@@ -134,8 +134,8 @@ export function adrsPage(d: ViewData): string {
   const body =
     project.adrs.length === 0
       ? emptyState('No promoted ADRs yet', '<code>/spec-sync &lt;change&gt;</code> or the Promote button on a change ADR moves it to the adr directory.')
-      : `<div class="tabs" role="tablist"><button class="tab" data-tab="timeline">${icon('clock', 14)} Timeline</button><button class="tab" data-tab="graph">${icon('graph', 14)} Graph</button></div>
-<div class="pane" data-pane="timeline">${timeline}</div><div class="pane" data-pane="graph">${graphView(project)}</div>`;
+      : `<div class="tabs" role="tablist"><button class="tab active" data-tab="timeline">${icon('clock', 14)} Timeline</button><button class="tab" data-tab="graph">${icon('graph', 14)} Graph</button></div>
+<div class="pane active" data-pane="timeline">${timeline}</div><div class="pane" data-pane="graph">${graphView(project)}</div>`;
 
   const aside = `<button class="btn" ${cmdAttr('newAdr', project.root)}>${icon('plus', 13)} New ADR</button>`;
   return `${pageHeader('Architecture decisions', `${project.adrs.length} promoted in <code>${esc(project.adrDir.split(/[\\/]/).pop() ?? 'adr')}</code>`, aside, false)}${body}${pendingHtml}`;
@@ -188,7 +188,9 @@ export function adrPage(d: ViewData): string {
     meta.push(['Superseded by', `<button class="link" ${adrRoute(project, s)}>${esc(s.number)} ${rich(s.title)}</button>`]);
   }
 
-  const aside = `<button class="btn" ${cmdAttr('supersedeAdr', project.root, adr.number)} title="Draft a new ADR in an active change that supersedes this one">${icon('plus', 13)} Supersede</button><button class="btn" ${openAttr(adr.path)}>${icon('external', 14)} Open file</button>`;
+  // Supersede needs an active change to draft in, and an ADR that is not already superseded.
+  const supersede = project.changes.length > 0 && !link?.supersededBy?.length;
+  const aside = `${supersede ? `<button class="btn" ${cmdAttr('supersedeAdr', project.root, adr.number)} title="Draft a new ADR in an active change that supersedes this one">${icon('plus', 13)} Supersede</button>` : ''}<button class="btn" ${openAttr(adr.path)}>${icon('external', 14)} Open file</button>`;
   return `${pageHeader(`${adr.number} ${adr.title || adr.slug}`, '', aside)}
 ${lineage(project, adr, links)}
 <section class="card sect"><dl class="meta">${meta.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl></section>

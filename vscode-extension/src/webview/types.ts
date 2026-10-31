@@ -1,6 +1,7 @@
 import type { BranchReview } from '../model/branchReview.ts';
 import type { RoadmapReport } from '../model/roadmap.ts';
 import type { DashboardInputs } from '../model/changeDashboard.ts';
+import type { ActionResult } from '../model/cliActions.ts';
 import type { SetupStatus } from '../model/specGuard.ts';
 import type { TraceModel } from '../model/traceability.ts';
 import type { ProjectModel } from '../model/types.ts';
@@ -28,9 +29,9 @@ export interface ViewData {
   route: Route;
   /** File contents keyed by absolute path; only files the current route needs are loaded. */
   texts: Record<string, string>;
-  /** Capability names under `openspec/specs/`, keyed by project root. */
+  /** Capability names of the living specs (`specs/<cap>.md`), keyed by project root. */
   baseSpecs: Record<string, string[]>;
-  /** Whether the /spec-* commands and the spec-guard hook are installed in the workspace. */
+  /** Whether the /spec-* commands are installed in the workspace. */
   setup: SetupStatus;
   /** Traceability models (one per project): the spec pages show the Why, anchors, tested scenarios and pending changes from them. */
   trace?: TraceModel[];
@@ -38,10 +39,12 @@ export interface ViewData {
   branch?: BranchState;
   /** The roadmap view (route `roadmap`). */
   roadmap?: RoadmapState;
-  /** The project is a new product in the specification or build phase (`openspec/greenfield.yaml` exists): the roadmap link shows. */
+  /** The project is a new product in the specification or build phase (`greenfield.yaml` exists in the specs root): the roadmap link shows. */
   greenfield?: boolean;
   /** What the verifier and its run files say about the change shown (route `change`); undefined while it is being read. */
   dashboard?: DashboardInputs;
+  /** The CLI actions: whether they may run here, the one running, and the last answer per project root and change (`root` + newline + change). */
+  actions?: { trusted: boolean; running?: string; results: Record<string, ActionResult> };
   /** Counts up each time a lens, hover link or tree item asks to reveal something, so the page scrolls to it again even on the same route. */
   revealTick?: number;
 }
@@ -62,3 +65,6 @@ export function routeKey(route: Route): string {
   const { tab: _tab, ...rest } = route as Route & { tab?: string };
   return JSON.stringify(rest);
 }
+
+/** Key of a CLI action's answer in `ViewData.actions.results`: project actions use an empty change. */
+export const actionKey = (root: string, change = ''): string => `${root}\n${change}`;

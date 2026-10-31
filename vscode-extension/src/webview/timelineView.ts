@@ -1,6 +1,6 @@
-/** The Timeline tab of a change and of an archived change: one calm line per event, grouped by task, details collapsed. */
-import { duration, groupTimeline, parseTimeline } from '../model/timeline.ts';
-import type { TimelineEntry } from '../model/timeline.ts';
+/** The Timeline tab of a change and of an archived change: one calm line per event, grouped by phase and task, details collapsed. */
+import { duration, parseTimeline, phaseSections, verifyChain } from '../model/timeline.ts';
+import type { TimelineBlock, TimelineEntry, TimelineGroup } from '../model/timeline.ts';
 import { emptyState, esc, rich } from './components.ts';
 
 function detailsHtml(e: TimelineEntry): string {
@@ -17,14 +17,29 @@ function line(e: TimelineEntry): string {
     : `<li class="${cls}"><div class="tl-line">${cells}</div></li>`;
 }
 
-export function timelineTab(text: string | undefined): string {
+function list(g: TimelineGroup): string {
+  return `<ol class="tl-list">${g.entries
+    .map((e) => `${e.idle && e.gap !== undefined ? `<li class="tl-idle" aria-label="idle">Idle for ${esc(duration(e.gap))}</li>` : ''}${line(e)}`)
+    .join('')}</ol>`;
+}
+
+function block(b: TimelineBlock): string {
+  return b.kind === 'group'
+    ? `<section class="tl-group"><h4 class="tl-task">${b.group.task ? `Task ${esc(b.group.task)}` : 'Change'}</h4>${list(b.group)}</section>`
+    : `<section class="tl-group tl-wave" aria-label="Parallel wave ${b.wave}"><h4 class="tl-task">Parallel wave ${b.wave}: ${b.lanes.filter((l) => l.task).length} tasks at once</h4><div class="tl-lanes">${b.lanes
+        .map((l) => `<div class="tl-lane"><h5 class="tl-lane-task">${l.task ? `Task ${esc(l.task)}` : 'Wave'}</h5>${list(l)}</div>`)
+        .join('')}</div></section>`;
+}
+
+/** archivedJson: the archived change's archived.json, whose head hash anchors the chain. */
+export function timelineTab(text: string | undefined, archivedJson?: string): string {
   const entries = parseTimeline(text);
   if (entries.length === 0) return emptyState('No activity yet', 'Steps appear here as the change is built.');
-  return `<div class="timeline">${groupTimeline(entries)
-    .map(
-      (g) => `<section class="tl-group"><h3 class="tl-task">${g.task ? `Task ${esc(g.task)}` : 'Change'}</h3><ol class="tl-list">${g.entries
-        .map((e) => `${e.idle && e.gap !== undefined ? `<li class="tl-idle" aria-label="idle">Idle for ${esc(duration(e.gap))}</li>` : ''}${line(e)}`)
-        .join('')}</ol></section>`,
-    )
+  const br = verifyChain(text, archivedJson);
+  const note = br
+    ? `<p class="tl-chain" role="note">This timeline was changed after it was written: entry ${br.line}${br.event ? ` (${esc(br.event)}${br.at ? ` at ${esc(br.at)}` : ''})` : ''} ${esc(br.reason)}. The entries are shown as they are.</p>`
+    : '';
+  return `${note}<div class="timeline">${phaseSections(entries)
+    .map((p) => `<section class="tl-phase" aria-label="${esc(p.label)}"><h3 class="tl-phase-title">${esc(p.label)}</h3>${p.blocks.map(block).join('')}</section>`)
     .join('')}</div>`;
 }

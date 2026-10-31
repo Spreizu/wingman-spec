@@ -3,9 +3,10 @@ import type { RoadmapNote, RoadmapReport, RoadmapSlice, SliceStatus } from '../m
 import { badge, cmdAttr, copyAttr, emptyState, esc, icon, pageHeader, pillRow, rich, routeAttr } from './components.ts';
 import type { Tone } from './components.ts';
 import type { ViewData } from './types.ts';
+import { cli } from '../core/paths.ts';
 
 const STATUS_TONE: Record<SliceStatus, Tone> = { planned: 'muted', proposed: 'info', applying: 'accent', done: 'ok' };
-const NEXT = 'node openspec/scripts/verify-task.cjs roadmap --next';
+const NEXT = cli('roadmap --next');
 
 function note(n: RoadmapNote, tone: 'bad' | 'warn'): string {
   return `<div class="banner tone-${tone}">${icon('alert', 18)}<div class="body">${rich(n.text)}</div></div>`;
@@ -32,7 +33,7 @@ export function roadmapPage(d: ViewData): string {
   if (!st || st.status === 'loading') return `${head('Reading the roadmap...')}${emptyState('Asking the verifier', 'This takes a moment.')}`;
   if (st.status === 'unavailable') return `${head('')}${emptyState('No roadmap to show', rich(st.reason))}`;
   const r = st.roadmap;
-  if (!r.slices.length) return `${head('')}${emptyState('The roadmap has no slices yet', 'It is written by /spec-green-start once the specs are signed off (openspec/roadmap/).')}`;
+  if (!r.slices.length) return `${head('')}${emptyState('The roadmap has no slices yet', 'It is written by /spec-green-start once the specs are signed off (roadmap/ in the specs root).')}`;
   const total = r.slices.length;
   const sub = `${r.counts.done} of ${total} slices done${r.nextUp.length ? `, next up: ${r.nextUp.map((i) => `<code>${esc(i)}</code>`).join(', ')}` : ''}`;
   const summary = pillRow(

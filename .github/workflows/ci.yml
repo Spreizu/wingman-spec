@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    # The Windows build is checked by the cross builds; its test run is informational until it has passed once on a runner.
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./...
+      - name: gofmt
+        if: runner.os == 'Linux'
+        run: test -z "$(gofmt -l cmd internal)"
+      - name: golangci-lint
+        if: runner.os == 'Linux'
+        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run ./...
+      - name: Cross builds (the platforms of the release and the vsix files)
+        if: runner.os == 'Linux'
+        run: |
+          for p in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            GOOS=${p%/*} GOARCH=${p#*/} CGO_ENABLED=0 go build -o /dev/null ./cmd/wingman-spec
+          done
+
+  extension:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vscode-extension
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: vscode-extension/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: vscode-extension/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm test
+      - name: The committed visual helper bundle matches its sources
+        run: node ../scripts/build-visual.mjs --check
+
+  suites:
+    # The shell suites are the contract: every tests/*.sh against the built CLI, with Playwright Chromium for the visual ones.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Build the CLI
+        run: go build -o "$RUNNER_TEMP/wingman-spec" ./cmd/wingman-spec
+      - name: Playwright and axe-core for the visual suites
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
+          npm init -y >/dev/null && npm install --no-audit --no-fund playwright axe-core
+          npx playwright install --with-deps chromium
+      - name: Suites
+        env:
+          PLAYWRIGHT_NODE_MODULES: ${{ runner.temp }}/pw/node_modules
+        run: |
+          export WINGMAN_SPEC_BIN="$RUNNER_TEMP/wingman-spec"
+          fail=0
+          for s in tests/*.sh; do
+            echo "::group::$s"
+            if ! bash "$s"; then echo "::error::$s failed"; fail=1; fi
+            echo "::endgroup::"
+          done
+          exit $fail

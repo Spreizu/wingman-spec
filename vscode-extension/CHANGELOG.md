@@ -4,6 +4,11 @@
 
 - The icon is rendered from `assets/icon.svg` in the repository. CI builds and packages the extension on every push to `main`.
 - A `v*` tag publishes the extension to the VS Code Marketplace and Open VSX (used by Cursor). Marketplace metadata: categories, keywords, gallery banner, a shorter description.
+- The change page's step bar (circles and connector lines in a card) is now one quiet line of artifacts under the change name: done ones have a check, missing ones are muted, skipped ones are muted and struck through.
+- A change page waits up to 1.5 s for its first verifier answer, so Sync or Archive shows as the next step without a "Checking..." flash. A complete change without a proposal says "No proposal" without the `/spec-propose` hint.
+- Primary actions (Apply next task, Plan with agent, Explore the blocker; Sync or Archive on a complete change) use the VS Code primary button colours. Each page has at most one. Promote is a secondary button.
+- Buttons show only when they apply: Fix findings only with findings for the change; Validate once there is a proposal; Sync and Archive once every task is done (Sync not once synced); Supersede only on an ADR that is not superseded. The overview's blocked card offers Explore the blocker.
+- The schema name is no longer shown next to the change name. The header and the panel tab show the extension icon. The default tab is open before the script runs, and every empty tab says what is missing ("No proposal yet").
 - The publisher id is now `elmo-egers`, so the extension id is `elmo-egers.wingman-spec`. Uninstall a locally installed `elmoegers.wingman-spec` first.
 
 ## 0.11.2

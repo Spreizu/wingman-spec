@@ -1,0 +1,36 @@
+# GoReleaser: the wingman-spec binaries and checksums for a GitHub release (run by .github/workflows/release.yml on a v* tag).
+version: 2
+project_name: wingman-spec
+before:
+  hooks:
+    - go mod tidy -diff
+builds:
+  - id: wingman-spec
+    main: ./cmd/wingman-spec
+    binary: wingman-spec
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X github.com/Spreizu/wingman-spec/internal/cli.Version={{ .Version }}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+archives:
+  - id: wingman-spec
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    # install.sh downloads wingman-spec_<version>_<os>_<arch>.tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE, README.md]
+checksum:
+  name_template: checksums.txt
+changelog:
+  disable: true
+release:
+  github:
+    owner: Spreizu
+    name: wingman-spec
+  name_template: "Wingman Spec {{ .Version }}"
+  # The vsix files are attached by the release workflow after this step.
+  mode: keep-existing

@@ -8,3 +8,4 @@ export const Disposable: any;
 export function makeDoc(fsPath: string, text: string): any;
 export const Uri: any;
 export const RelativePattern: any;
+export const workspace: any;

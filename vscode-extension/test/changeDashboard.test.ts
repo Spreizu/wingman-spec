@@ -11,8 +11,8 @@ const files = (d: string): RunFiles => ({ runId: d, state: fx(d, 'state.json'), 
 
 const task = (id: string, title: string, checked: boolean, isReview = false): Task => ({ id, title, checked, line: 1, isReview, details: {} as Task['details'] });
 const changeOf = (tasks: Task[], extra: Partial<Change> = {}): Change =>
-  ({ name: 'add-discount-codes', dir: '/proj/openspec/changes/add-discount-codes', schema: 'wingman-spec', isWingmanSpec: true, skipSpecs: false, state: 'in-progress', artifacts: [], capabilities: [], adrs: [], adrsSynced: true, tasksPath: '/p/tasks.md', groups: [{ number: '1', title: 'Do', line: 0, isCloseOut: false, tasks }], taskTotal: tasks.length, taskDone: tasks.filter((t) => t.checked).length, ...extra }) as Change;
-const cmd = (a: string): string => `node openspec/scripts/verify-task.cjs ${a}`;
+  ({ name: 'add-discount-codes', dir: '/proj/changes/add-discount-codes', schema: 'wingman-spec', isWingmanSpec: true, skipSpecs: false, state: 'in-progress', artifacts: [], capabilities: [], adrs: [], adrsSynced: true, tasksPath: '/p/tasks.md', groups: [{ number: '1', title: 'Do', line: 0, isCloseOut: false, tasks }], taskTotal: tasks.length, taskDone: tasks.filter((t) => t.checked).length, ...extra }) as Change;
+const cmd = (a: string): string => `.wingman-spec/bin/wingman-spec ${a}`;
 
 test('run summary of a real finished run: three tasks verified, four checks passed, nothing pending', () => {
   const r = summarizeRun(files('run-complete'));
@@ -73,7 +73,7 @@ test('everything that blocks the archive is listed, each with what to do', () =>
   const d = buildDashboard({ change: changeOf(tasks), traceChange, inputs: { run, findings, sync: { ok: false, problems: ['specs: todo: requirement "X" is not in the living spec'], warnings: [] } }, cmd });
   assert.deepEqual(d.blocking.map((b) => b.id), ['open-tasks', 'failing-checks', 'owner-approval', 'unsynced-specs', 'drift-gaps', 'visual-review']);
   const by = (id: string) => d.blocking.find((b) => b.id === id)!;
-  assert.deepEqual(by('open-tasks').todo, [{ kind: 'agent', text: '/spec-apply add-discount-codes' }, { kind: 'terminal', text: 'node openspec/scripts/verify-task.cjs next add-discount-codes' }]);
+  assert.deepEqual(by('open-tasks').todo, [{ kind: 'agent', text: '/spec-apply add-discount-codes' }, { kind: 'terminal', text: '.wingman-spec/bin/wingman-spec next add-discount-codes' }]);
   assert.ok(by('failing-checks').detail.some((x) => /not ticked/.test(x)) && by('failing-checks').detail.some((x) => /edge-cases/.test(x)));
   assert.equal(by('owner-approval').todo[0]?.kind, 'open');
   assert.match(by('unsynced-specs').detail[0] ?? '', /not in the living spec/);
@@ -84,17 +84,18 @@ test('everything that blocks the archive is listed, each with what to do', () =>
   assert.equal(buildDashboard({ change: changeOf(tasks), traceChange: { ...traceChange, approval: 'Ann, 2026-10-01' } as TraceChange, inputs: {}, cmd }).approvals[0]?.approval, 'given');
 });
 
-test('not synced yet: when it is the only blocker the action is /spec-archive (it syncs first); /spec-sync is never offered as a step before it', () => {
+test('not synced yet: no agent step is offered (Sync and Archive are CLI buttons); the detail says what to run', () => {
   const tasks = [task('1.1', 'A', true)];
   const sync = { ok: false, problems: ['specs: todo: requirement "X" is not in the living spec'], warnings: [] };
   const only = buildDashboard({ change: changeOf(tasks), inputs: { sync }, cmd });
   assert.deepEqual(only.blocking.map((b) => b.id), ['unsynced-specs']);
-  assert.equal(only.blocking[0]!.todo[0]!.text, '/spec-archive add-discount-codes');
-  assert.match(only.blocking[0]!.detail.join(' '), /syncs first/);
+  assert.deepEqual(only.blocking[0]!.todo, []);
+  assert.match(only.blocking[0]!.detail.join(' '), /Sync merges them; then Archive/);
   const adrOnly = buildDashboard({ change: changeOf(tasks, { adrsSynced: false }), inputs: {}, cmd });
-  assert.equal(adrOnly.blocking[0]!.todo[0]!.text, '/spec-archive add-discount-codes');
+  assert.deepEqual(adrOnly.blocking[0]!.todo, []);
   const more = buildDashboard({ change: changeOf([task('1.1', 'A', false)]), inputs: { sync }, cmd });
-  for (const b of [only, adrOnly, more].flatMap((d) => d.blocking)) assert.ok(!b.todo.some((t) => t.kind === 'agent' && t.text.startsWith('/spec-sync')), `${b.id} offers /spec-sync`);
+  assert.match(more.blocking.find((b) => b.id === 'unsynced-specs')!.detail.join(' '), /once the other items are done/);
+  for (const b of [only, adrOnly, more].flatMap((d) => d.blocking)) assert.ok(!b.todo.some((t) => t.text.includes('sync') || t.text.includes('archive')), `${b.id} offers a sync or archive step`);
 });
 
 test('without the verifier the page says what it could not check and falls back to the extension model', () => {

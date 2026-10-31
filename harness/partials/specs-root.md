@@ -1,0 +1,4 @@
+**The CLI and the specs root.** Run every command as `.wingman-spec/bin/wingman-spec <command>` from the code repository (the shim points at the CLI bundled with the Wingman Spec extension). Run `.wingman-spec/bin/wingman-spec root --json` once to learn where the specs live: `specs` is the specs root. Paths below such as `specs/`, `changes/`, `observed/` and `adrs/` are relative to it.
+- Specs next to the code (the default): the root is `.wingman-spec/` of this repository.
+- A linked specs repository (`specs: <path>` in `.wingman-spec/wingman-spec.yaml`): the root is that folder, usually another folder of the multi-root workspace. Spec and ADR changes are committed there; code changes in the code repository.
+- If the command reports a missing specs folder, show its text to the user unchanged (it names the `git clone` step) and stop. Do not clone, create or guess a root yourself.

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
+import { capabilityOf } from '../core/paths.ts';
 import { lintAdr, lintSpec, lintTasks, proposalSize } from '../model/lint.ts';
 import type { Issue } from '../model/lint.ts';
 import type { Capability, Change, ChangeAdr, ProjectModel, RootAdr } from '../model/types.ts';
@@ -14,7 +15,7 @@ export type FileContext =
 
 const same = (a: string, b: string): boolean => resolve(a) === resolve(b);
 
-/** Works out which OpenSpec artifact a file is, if any. */
+/** Works out which Wingman Spec artifact a file is, if any. */
 export function classify(projects: ProjectModel[], fsPath: string): FileContext | undefined {
   for (const project of projects) {
     for (const change of project.changes) {
@@ -29,9 +30,8 @@ export function classify(projects: ProjectModel[], fsPath: string): FileContext 
     if (root) return { kind: 'rootAdr', project, adr: root };
 
     const rel = relative(project.root, resolve(fsPath)).split(sep);
-    if (rel.length === 4 && rel[0] === 'openspec' && rel[1] === 'specs' && rel[3] === 'spec.md' && rel[2]) {
-      return { kind: 'baseSpec', project, name: rel[2] };
-    }
+    const name = rel.length === 2 ? capabilityOf(rel) : undefined;
+    if (name) return { kind: 'baseSpec', project, name };
   }
   return undefined;
 }

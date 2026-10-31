@@ -3,11 +3,13 @@
 # Design-contract tests: design-system discovery, the design map lint (every referenced element mapped, with a
 # source; arbitrary values only as recorded gaps), expect: syntax and tokens, the token lint on changed UI code,
 # the deterministic expect: checks in the browser, and the reviewer's side-by-side with a cited rubric.
-# Usage: tests/design-contract.sh   (needs openspec, node, python3; the browser part needs Playwright, see below).
+# Usage: tests/design-contract.sh   (needs the wingman-spec binary (tests/lib/ws.sh), node, python3; the browser part needs Playwright, see below).
 set -uo pipefail
 PKG="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=lib/ws.sh
+. "$PKG/tests/lib/ws.sh"
 T="$(mktemp -d)"; trap '[ -n "${KEEP:-}" ] || rm -rf "$T"' EXIT
-export SPEC_TRACEABILITY=off OPENSPEC_TELEMETRY=0 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
+export WINGMAN_SPEC_TRACEABILITY=off GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
 PASS=0; FAIL=0; DCAUGHT=0; DTOTAL=0
 ok()  { PASS=$((PASS+1)); echo "  ok   $*"; }
 bad() { FAIL=$((FAIL+1)); echo "  FAIL $*"; }
@@ -15,11 +17,10 @@ expect() { if eval "$2"; then ok "$1"; else bad "$1  (rc=$rc)"; [ -z "${DEBUG:-}
 dfault() { DTOTAL=$((DTOTAL+1)); if eval "$2"; then DCAUGHT=$((DCAUGHT+1)); ok "design fault caught: $1"; else bad "design fault missed: $1  (rc=$rc)"; fi; }
 
 cd "$T" && mkdir p && cd p && git init -q
-openspec init --tools none >/dev/null 2>&1 || mkdir -p openspec/changes openspec/specs
-"$PKG/install.sh" . >/dev/null || { echo "install failed"; exit 1; }
-sed -i.b 's/Test command: <fill in>/Test command: none/' openspec/config.yaml && rm -f openspec/config.yaml.b
-V="node openspec/scripts/verify-task.cjs"
-C=openspec/changes/demo
+ws_init .
+ws_cmd test none && ws_set visual off
+V="$WS"
+C=.wingman-spec/changes/demo
 
 # The project's design system: semantic CSS tokens (different from stock values) and a small UI kit.
 mkdir -p site src/ui
@@ -47,13 +48,13 @@ git add -A && git commit -qm init
 echo "== design-system discovery"
 out="$($V design-system 2>&1)"; rc=$?
 expect "design-system lists the CSS tokens and the UI kit with its variants" '[ $rc = 0 ] && printf "%s" "$out" | grep -q -- "--color-primary" && printf "%s" "$out" | grep -q "UiButton (src/ui/UiButton.vue) \[shared\]  variant: primary|secondary"'
-out="$($V design-system --format json 2>&1)"; rc=$?
-expect "design-system --format json is machine-readable" '[ $rc = 0 ] && printf "%s" "$out" | node -e "const j=JSON.parse(require(\"fs\").readFileSync(0,\"utf8\"));process.exit(j.tokens.some(t=>t.name===\"spacing-gutter\"&&t.norm===\"32px\")?0:1)"'
+out="$($V design-system --json 2>&1)"; rc=$?
+expect "design-system --json is machine-readable" '[ $rc = 0 ] && printf "%s" "$out" | node -e "const j=JSON.parse(require(\"fs\").readFileSync(0,\"utf8\"));process.exit(j.tokens.some(t=>t.name===\"spacing-gutter\"&&t.norm===\"32px\")?0:1)"'
 
 DSPEC='## Purpose
 The app shows its page header exactly as the designer drew it.
 
-## ADDED Requirements
+## ADDED
 
 ### Requirement: Page header
 The system SHALL show the page header as designed.
@@ -100,9 +101,9 @@ DT='- [ ] 1.1 Page header
   - Visual: app/page-header
   - Done when: `true`'
 reset_design() { # reset_design [spec] [map|-] [tasks]
-  rm -rf "$C" openspec/.apply-runs; mkdir -p "$C/specs/app" "$C/design"
+  rm -rf "$C" .wingman-spec/runs; mkdir -p "$C/specs" "$C/design"
   printf 'Size: M\nRisk: none\n\n## Why\nDesign contract tests.\n\n## What Changes\n- Adds the page header from the design.\n\n## Edge cases\n- none named\n' > "$C/proposal.md"
-  printf '%s\n' "${1:-$DSPEC}" > "$C/specs/app/spec.md"; printf '%s\n' "${3:-$DT}" > "$C/tasks.md"
+  printf '%s\n' "${1:-$DSPEC}" > "$C/specs/app.md"; printf '%s\n' "${3:-$DT}" > "$C/tasks.md"
   [ "${2:-}" = - ] || printf '%s\n' "${2:-$DMAP}" > "$C/design-map.md"
   png "$C/design/page-1280.png" 320 200; png "$C/design/page-375.png" 120 200
   printf '## Capability inventory\n- app\n' > "$C/app-map.md"; printf '## Decisions\nOne.\n\n## Implementation guide\nOne function.\n' > "$C/design.md"
@@ -113,7 +114,7 @@ lint() { rc=0; $V lint demo > "$T/l.json" 2>&1 || rc=$?; }
 echo "== design map lint"
 reset_design; lint
 expect "a complete design map passes lint" '[ $rc = 0 ]'
-expect "openspec validate --strict ignores design-map.md in the change" 'openspec validate demo --strict >/dev/null 2>&1'
+expect "validate ignores design-map.md in the change" '$WS validate demo >/dev/null 2>&1'
 reset_design "$DSPEC" -; lint
 dfault "a referenced scenario without design-map.md fails lint" '[ $rc = 1 ] && grep -q "design-map.md is missing" "$T/l.json"'
 reset_design "$DSPEC" "$(printf '%s\n' "$DMAP" | grep -v 'data-testid=\\"cta\\"\|Call to action')"; lint
@@ -148,6 +149,7 @@ TICK1='n=$(grep -nE "^[-*] \[ \]" "$F" | head -1 | cut -d: -f1); sed -i.b "${n}s
 orch() { # orch <stub>: next -> stub implementer -> check; sets rc, out
   $V next demo >/dev/null 2>&1 || { rc=$?; out="next exited $rc"; return; }
   F="$C/tasks.md" bash -c "$1"; out="$($V check demo --reported done 2>&1)"; rc=$?
+  [ -z "${DEBUG:-}" ] || printf "%s\n" "$out" | head -c 1500 >&2
 }
 good_page() { cat > site/index.html <<'HTML'
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Plans</title>
@@ -186,7 +188,7 @@ if [ -d "$PWM/playwright" ] && [ -d "$PWM/axe-core" ] && command -v python3 >/de
   PORT=$(( 4700 + $$ % 200 ))
   node -e '
     const fs = require("fs"), [f, port] = process.argv.slice(1);
-    fs.writeFileSync(f, fs.readFileSync(f, "utf8").replace(/^visual: off.*$/m, `visual:\n  command: python3 -m http.server ${port} --bind 127.0.0.1 --directory site\n  url: http://127.0.0.1:${port}/\n  ready_timeout: 20\n  screenshots: off`));' openspec/config.yaml "$PORT"
+    fs.writeFileSync(f, fs.readFileSync(f, "utf8").replace(/^visual: off.*$/m, `visual:\n  command: python3 -m http.server ${port} --bind 127.0.0.1 --directory site\n  url: http://127.0.0.1:${port}/\n  ready_timeout: 20\n  screenshots: off`));' .wingman-spec/wingman-spec.yaml "$PORT"
   ln -s "$PWM" node_modules; printf 'node_modules\n' >> .gitignore; git add -A; git commit -qm visual >/dev/null
   reset_design; orch "$TICK1"
   expect "control: the page matches every expect: line at 375 and 1280 (exit 0)" '[ $rc = 0 ]'
@@ -223,7 +225,7 @@ HTML
   SSPEC='## Purpose
 The app shows its page header and lets the visitor hide the offer.
 
-## ADDED Requirements
+## ADDED
 
 ### Requirement: Page header
 The system SHALL show the page header and hide the offer on request.
@@ -272,7 +274,7 @@ STATE2
   git checkout -q site/
 
   echo "== reviewer: side by side with the design, cited rubric"
-  sed -i.b 's/^  screenshots: off$/  review: subagent/' openspec/config.yaml && rm -f openspec/config.yaml.b; git add -A; git commit -qm shots >/dev/null
+  sed -i.b 's/^  screenshots: off$/  review: subagent/' .wingman-spec/wingman-spec.yaml && rm -f .wingman-spec/wingman-spec.yaml.b; git add -A; git commit -qm shots >/dev/null
   reset_design; orch "$TICK1"
   rp="$(printf "%s" "$out" | sed -n -E 's/^ *"review_prompt": "(.*)",?$/\1/p')"
   expect "clean design task: deterministic checks pass, review pending (exit 5)" '[ $rc = 5 ] && [ -f "$rp" ]'
@@ -294,8 +296,8 @@ STATE2
   expect "a cited rubric fail with its DEFECT rejects the task like a failing test (exit 1)" '[ $rc = 1 ] && grep -q "the button is green" "$T/rev.out" && grep -q "^- \[ \] 1.1" "$C/tasks.md"'
   orch "$TICK1"; sed -i 's/colour: fail/colour: pass/; /^DEFECT/d; s/^STATUS: fail/STATUS: pass/' "$T/rev.txt"
   rc=0; $V review demo --reply "$T/rev.txt" > "$T/rev.out" 2>&1 || rc=$?
-  expect "a complete cited rubric passes the task and is logged per item" '[ $rc = 0 ] && grep -q "\"rubric\":\[\"app/page-header layout:pass\"" openspec/.apply-runs/demo/*/metrics.jsonl'
-  reset_design "$DSPEC" "" "$DT"; sed -i '/^reference:/d' "$C/specs/app/spec.md"; orch "$TICK1"
+  expect "a complete cited rubric passes the task and is logged per item" '[ $rc = 0 ] && grep -q "\"rubric\":\[\"app/page-header layout:pass\"" .wingman-spec/runs/demo/*/metrics.jsonl'
+  reset_design "$DSPEC" "" "$DT"; sed -i '/^reference:/d' "$C/specs/app.md"; orch "$TICK1"
   rp="$(printf "%s" "$out" | sed -n -E 's/^ *"review_prompt": "(.*)",?$/\1/p')"
   echo "STATUS: pass" > "$T/rev.txt"; rc2=0; $V review demo --reply "$T/rev.txt" > "$T/rev.out" 2>&1 || rc2=$?
   expect "without a design reference: no side-by-side, no design rubric, plain review as before" '[ $rc = 5 ] && ! find "$(dirname "$rp")" -name "*.vs-design.png" | grep -q . && ! grep -q "Design rubric" "$rp" && [ $rc2 = 0 ]'

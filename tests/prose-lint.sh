@@ -53,11 +53,14 @@ expect "--metrics prints one row per area" 'grep -q "^area | sentences" "$T/o"'
 lint --json "$T/v.md"
 expect "--json is valid JSON with findings" 'node -e "const j=JSON.parse(require(\"fs\").readFileSync(process.argv[1]));process.exit(j.findings.length?0:1)" "$T/o"'
 
-# The optional user-side check: verify-task lint reports a vague THEN as info (quality.cjs thenLint).
-mkdir -p "$T/ch/specs/billing"
-printf '## ADDED Requirements\n\n### Requirement: Invoices\nThe system SHALL list invoices.\n\n#### Scenario: Overdue\n- **WHEN** an invoice is overdue\n- **THEN** it is handled gracefully\n- **AND** the list works as expected\n- **THEN** the row shows "Overdue"\n- **THEN** the total is 3 rows\n- **THEN** the grid is shown\n<!-- - **THEN** it works -->\n' > "$T/ch/specs/billing/spec.md"
-node -e 'const r=require(process.argv[1]+"/project-template/openspec/scripts/quality.cjs").thenLint(process.argv[2]);console.log(JSON.stringify(r))' "$PKG" "$T/ch" > "$T/o"
-expect "vague THEN/AND lines are info findings with the fix; quoted values, numbers, plain results and comments pass" 'node -e "const r=JSON.parse(require(\"fs\").readFileSync(process.argv[1]));process.exit(r.length===2&&r.every((x)=>x.severity===\"info\"&&x.kind===\"vague-then\")&&r[0].line===8&&r[1].line===9&&/Name the result/.test(r[0].text)?0:1)" "$T/o"'
+# The optional user-side check: `wingman-spec lint` reports a vague THEN as info (quality.ThenLint).
+V="${WINGMAN_SPEC_BIN:-wingman-spec}"
+mkdir -p "$T/sr/changes/ch/specs" "$T/sr/specs"
+: > "$T/sr/wingman-spec.yaml"
+printf 'Size: S\n\n## Why\nInvoices.\n' > "$T/sr/changes/ch/proposal.md"
+printf '## ADDED\n\n### Requirement: Invoices\nThe system SHALL list invoices.\n\n#### Scenario: Overdue\n- **WHEN** an invoice is overdue\n- **THEN** it is handled gracefully\n- **AND** the list works as expected\n- **THEN** the row shows "Overdue"\n- **THEN** the total is 3 rows\n- **THEN** the grid is shown\n<!-- - **THEN** it works -->\n' > "$T/sr/changes/ch/specs/billing.md"
+"$V" problems --json --root "$T/sr" > "$T/o" 2>/dev/null || true
+expect "vague THEN/AND lines are info findings with the fix; quoted values, numbers, plain results and comments pass" 'node -e "const j=JSON.parse(require(\"fs\").readFileSync(process.argv[1]));const r=j.findings.filter((x)=>x.code===\"vague-then\");process.exit(r.length===2&&r.every((x)=>x.severity===\"info\")&&r[0].line===8&&r[1].line===9&&/Name the result/.test(r[0].message)?0:1)" "$T/o"'
 
 lint --strict
 expect "the shipped prose has no sentence above 60 words" '[ $rc = 0 ]'

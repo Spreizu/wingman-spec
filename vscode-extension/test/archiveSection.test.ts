@@ -6,7 +6,7 @@ import type { BlockingItem, Dashboard } from '../src/model/changeDashboard.ts';
 
 const { archiveFocus, dashboardCard } = await import('../src/webview/dashboardView.ts');
 
-const drift: BlockingItem = { id: 'drift-gaps', title: '1 drift gap', detail: ['auth/login has no test'], todo: [{ kind: 'agent', text: '/spec-fix demo' }, { kind: 'terminal', text: 'node openspec/scripts/verify-task.cjs drift demo' }] };
+const drift: BlockingItem = { id: 'drift-gaps', title: '1 drift gap', detail: ['auth/login has no test'], todo: [{ kind: 'agent', text: '/spec-fix demo' }, { kind: 'terminal', text: '.wingman-spec/bin/wingman-spec drift demo' }] };
 const sync: BlockingItem = { id: 'unsynced-specs', title: 'Specs not synced', detail: [], todo: [{ kind: 'agent', text: '/spec-sync demo' }] };
 function dash(done: number, total: number, known: boolean, blocking: BlockingItem[]): Dashboard {
   return {
@@ -42,7 +42,7 @@ test('every task ticked and something blocks: expanded warning; the header comma
   const html = dashboardCard(dash(3, 3, true, [drift]), false, ['/spec-apply demo', '/spec-fix demo']);
   assert.match(html, /Blocking archive <span class="badge tone-warn/);
   assert.doesNotMatch(html, /pre-archive/);
-  assert.match(html, /data-term="node openspec\/scripts\/verify-task.cjs drift demo"/);
+  assert.match(html, /data-term="\.wingman-spec\/bin\/wingman-spec drift demo"/);
   assert.doesNotMatch(html, /data-agent="\/spec-fix demo"/);
 });
 

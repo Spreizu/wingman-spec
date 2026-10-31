@@ -1,21 +1,25 @@
 import { join } from 'node:path';
+import { cli } from '../core/paths.ts';
 import { parseFrontMatter } from '../model/frontMatter.ts';
 import { renderMarkdown } from '../model/markdown.ts';
 import { countScenarios, parseSpec } from '../model/specParser.ts';
 import { firstUnchecked } from '../model/tasksParser.ts';
 import type { Change, ChangeAdr, ProjectModel, Task, TaskGroup } from '../model/types.ts';
 import { ADR_SYNC_LABEL } from '../views/adrLabels.ts';
-import { agentButton, badge, noDecisionLine, baseSpecPath, bar, cmdAttr, emptyState, esc, findProject, icon, openAttr, pageHeader, rich, ring, routeAttr } from './components.ts';
+import { agentButton, badge, noDecisionLine, baseSpecPath, bar, cmdAttr, emptyState, esc, findProject, icon, openAttr, pageHeader, rich, ring, routeAttr, tabbed } from './components.ts';
 import type { Tone } from './components.ts';
 import { STATE_LABEL, STATE_TONE } from './layout.ts';
 import type { TraceChange } from '../model/traceability.ts';
 import { buildDashboard } from '../model/changeDashboard.ts';
 import { dashboardCard, TASK_STATUS } from './dashboardView.ts';
-import { pipeline } from './pipeline.ts';
+import { artifactLine } from './artifactLine.ts';
 import { diffBlock, requirementCard } from './requirementView.ts';
 import { timelineTab } from './timelineView.ts';
 import { timelinePath } from '../model/timeline.ts';
+import { actionKey } from './types.ts';
 import type { ViewData } from './types.ts';
+import { actionBar } from './actionsView.ts';
+import { changeActions } from '../model/cliActions.ts';
 
 const SYNC_TONE: Record<string, Tone> = {
   'up-to-date': 'ok',
@@ -72,16 +76,16 @@ function tasksTab(project: ProjectModel, change: Change, d: ViewData, marks: Map
   return change.groups.map((g) => taskGroup(project, change, g, next, d, marks)).join('');
 }
 
-function docTab(d: ViewData, path: string, missingHint: string): string {
+function docTab(d: ViewData, path: string, missingTitle: string, missingHint: string): string {
   const text = d.texts[path];
-  if (text === undefined) return emptyState('Not created yet', missingHint);
+  if (text === undefined || !text.trim()) return emptyState(missingTitle, missingHint);
   return `<div class="md">${renderMarkdown(text)}</div>
 <p><button class="link" ${openAttr(path)}>${icon('external', 13)} Open file</button></p>`;
 }
 
 function specsTab(project: ProjectModel, change: Change, d: ViewData): string {
   if (change.capabilities.length === 0) {
-    return emptyState(change.skipSpecs ? 'Specs skipped' : 'No specs yet', change.skipSpecs ? 'This change sets <code>skip_specs</code>.' : 'Spec deltas live in <code>specs/&lt;capability&gt;/spec.md</code>.');
+    return emptyState(change.skipSpecs ? 'Specs skipped' : 'No specs yet', change.skipSpecs ? 'proposal.md says <code>Specs: none</code>.' : 'Spec deltas live in <code>specs/&lt;capability&gt;.md</code> of the change.');
   }
   return change.capabilities
     .map((cap) => {
@@ -105,7 +109,7 @@ function adrCard(project: ProjectModel, change: Change, adr: ChangeAdr, d: ViewD
   const tone = SYNC_TONE[sync.state] ?? 'muted';
   const actions: string[] = [];
   if (sync.state === 'not-promoted' || sync.state === 'out-of-date') {
-    actions.push(`<button class="btn primary" ${cmdAttr('promoteAdr', project.root, change.name, adr.slug)} title="Write this ADR to the root adr directory, as /spec-sync would">${icon('arrow', 13)} Promote</button>`);
+    actions.push(`<button class="btn" ${cmdAttr('promoteAdr', project.root, change.name, adr.slug)} title="Write this ADR to the root adr directory, as /spec-sync would">${icon('arrow', 13)} Promote</button>`);
   }
   if (sync.target) {
     actions.push(`<button class="btn" ${routeAttr({ page: 'adr', root: project.root, number: sync.target.number })}>Promoted ${esc(sync.target.number)}</button>`);
@@ -130,16 +134,14 @@ function adrsTab(project: ProjectModel, change: Change, d: ViewData): string {
   const toolbar = `<div class="toolbar">
 <button class="btn" ${cmdAttr('newAdr', project.root, change.name)}>${icon('plus', 13)} New ADR</button>
 ${pending > 1 ? `<button class="btn" ${cmdAttr('promoteChange', project.root, change.name)}>Promote all (${pending})</button>` : ''}
-${agentButton(`/spec-sync ${change.name} --check`, 'Check sync with agent')}
-${pending > 0 ? agentButton(`/spec-sync ${change.name}`, 'Run /spec-sync') : ''}</div>`;
+</div>`;
   const none = noDecisionLine(change.noDecisions);
   if (change.adrs.length === 0) return `${toolbar}${none || emptyState('No ADRs yet', 'Decisions are recorded in <code>adrs/&lt;slug&gt;.md</code>.')}`;
   return `${toolbar}${change.adrs.map((a) => adrCard(project, change, a, d)).join('')}${none}`;
 }
 
-/** The one agent action that moves a change forward from its current state. */
-/** The page header's main agent action for the change's state: [command, label]. */
-function agentAction(change: Change): [string, string] {
+/** The page header's agent hand-off for the change's state: [command, label]. A complete change has none: Sync and Archive run the CLI. */
+function agentAction(change: Change): [string, string] | undefined {
   const n = change.name;
   switch (change.state) {
     case 'planning':
@@ -147,14 +149,10 @@ function agentAction(change: Change): [string, string] {
     case 'blocked':
       return [`/spec-explore ${n}`, 'Explore the blocker'];
     case 'complete':
-      return [`/spec-archive ${n}`, 'Archive with agent']; // it syncs first and stops on a sync problem
+      return undefined;
     default:
       return [`/spec-apply ${n}`, 'Apply next task'];
   }
-}
-
-function tab(id: string, label: string, count?: number): string {
-  return `<button class="tab" data-tab="${id}">${esc(label)}${count ? `<span class="badge tone-muted">${count}</span>` : ''}</button>`;
 }
 
 function traceChangeOf(d: ViewData, root: string, name: string): TraceChange | undefined {
@@ -170,13 +168,16 @@ export function changePage(d: ViewData): string {
     return `${pageHeader('Change not found', '')}${emptyState('This change no longer exists', 'It may have been archived or renamed.')}`;
   }
 
-  const sub = [badge(STATE_LABEL[change.state], STATE_TONE[change.state]), `<span>${esc(change.schema)}</span>`];
+  const sub = [badge(STATE_LABEL[change.state], STATE_TONE[change.state])];
   if (change.isWingmanSpec) {
     if (!change.adrsSynced) sub.push(badge('ADRs need sync', 'warn'));
+    sub.push(artifactLine(change));
   }
-  const [mainCmd, mainLabel] = agentAction(change);
-  const headerCmds = [mainCmd, `/spec-fix ${change.name}`];
-  const aside = `${agentButton(mainCmd, mainLabel, true)}${agentButton(`/spec-fix ${change.name}`, 'Fix findings')}${ring(change.taskDone, change.taskTotal, 56)}
+  const main = agentAction(change);
+  // Fix findings only when the verifier reported findings for this change.
+  const fix = (d.dashboard?.findings ?? []).some((f) => f.change === change.name) ? `/spec-fix ${change.name}` : undefined;
+  const headerCmds = [...(main ? [main[0]] : []), ...(fix ? [fix] : [])];
+  const aside = `${main ? agentButton(main[0], main[1], true) : ''}${fix ? agentButton(fix, 'Fix findings') : ''}${ring(change.taskDone, change.taskTotal, 56)}
 <button class="icon-btn" ${openAttr(change.dir)} title="Reveal change folder">${icon('file')}</button>`;
 
   const blocked = change.blockedPath
@@ -192,7 +193,7 @@ export function changePage(d: ViewData): string {
         ...(traceChangeOf(d, project.root, change.name) ? { traceChange: traceChangeOf(d, project.root, change.name) } : {}),
         gaps: d.trace?.find((t) => t.root === project.root)?.gaps ?? [],
         inputs: d.dashboard ?? {},
-        cmd: (a) => `node openspec/scripts/verify-task.cjs ${a}`,
+        cmd: (a) => cli(a),
       })
     : undefined;
   const marks = new Map<string, string>();
@@ -205,25 +206,23 @@ export function changePage(d: ViewData): string {
     ['tasks', 'Tasks', tasksTab(project, change, d, marks), change.taskTotal],
   ];
   if (change.isWingmanSpec) {
-    panes.unshift(['proposal', 'Proposal', docTab(d, dir('proposal.md'), 'Run <code>/spec-propose</code> to create it.')]);
+    panes.unshift(['proposal', 'Proposal', change.state === 'complete' ? docTab(d, dir('proposal.md'), 'No proposal', '') : docTab(d, dir('proposal.md'), 'No proposal yet', 'Run <code>/spec-propose</code> to create it.')]);
     panes.push(
       ['specs', 'Specs', specsTab(project, change, d), change.capabilities.length],
-      ['design', 'Design', docTab(d, dir('design.md'), 'The design is written after the specs.')],
+      ['design', 'Design', docTab(d, dir('design.md'), 'No design yet', 'The design is written after the specs.')],
       ['adrs', 'ADRs', adrsTab(project, change, d), change.adrs.length],
-      ['app-map', 'App map', docTab(d, dir('app-map.md'), 'The app map is the first artifact of a wingman-spec change.')],
+      ['app-map', 'App map', docTab(d, dir('app-map.md'), 'No app map yet', 'The app map is the first artifact of a wingman-spec change.')],
     );
   }
   if (change.progressPath) {
-    panes.push(['progress', 'Progress', docTab(d, change.progressPath, '')]);
+    panes.push(['progress', 'Progress', docTab(d, change.progressPath, 'No progress notes yet', 'The implementer writes them while it works.')]);
   }
   if (change.isWingmanSpec) panes.push(['timeline', 'Timeline', timelineTab(d.texts[timelinePath(project.root, change.name)])]);
 
-  const tabs = panes.map(([id, label, , count]) => tab(id, label, count)).join('');
-  const bodies = panes.map(([id, , html]) => `<div class="pane" data-pane="${id}">${html}</div>`).join('');
 
   return `${pageHeader(change.name, sub.join(' '), aside)}
 ${blocked}
-${change.isWingmanSpec ? `<div class="card">${pipeline(change)}</div>` : ''}
+${change.isWingmanSpec && d.actions ? actionBar(changeActions({ change, ...(dashboard ? { dashboard } : {}), ...(d.dashboard ? { inputs: d.dashboard } : {}), trusted: d.actions.trusted, running: !!d.actions.running }), project.root, change.name, d.actions.running, d.actions.results[actionKey(project.root, change.name)]) : ''}
 ${dashboard ? dashboardCard(dashboard, d.dashboard === undefined, headerCmds) : ''}
-<div class="tabs" role="tablist">${tabs}</div>${bodies}`;
+${tabbed(panes, route.tab)}`;
 }

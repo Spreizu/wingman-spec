@@ -1,0 +1,225 @@
+{
+  "specs": [
+    {
+      "name": "why",
+      "text": "## ADDED\n\n### Requirement: A\nThe A SHALL x.\n\n- **Why**: The **owner** wants x, because y.\n\n#### Scenario: One\nWhy: ignored\n",
+      "reqs": [
+        {
+          "name": "A",
+          "op": "ADDED",
+          "why": "The owner wants x, because y.",
+          "scenarios": [
+            "One"
+          ]
+        }
+      ],
+      "renames": []
+    },
+    {
+      "name": "living",
+      "text": "## Purpose\nWhat it is for.\n\n## Requirements\n\n### Requirement: B\nB MUST y.\n\n#### Scenario: S\n\n## Notes\n\n### Requirement: C\nC SHALL z\n#### Scenario: T\n",
+      "reqs": [
+        {
+          "name": "B",
+          "op": "LIVING",
+          "why": null,
+          "scenarios": [
+            "S"
+          ]
+        },
+        {
+          "name": "C",
+          "op": "LIVING",
+          "why": null,
+          "scenarios": [
+            "T"
+          ]
+        }
+      ],
+      "renames": []
+    },
+    {
+      "name": "removed and renamed",
+      "text": "## REMOVED\n\n### Requirement: Gone\n**Reason**: x\n\n## RENAMED\n\n- Old -\u003e New\n",
+      "reqs": [
+        {
+          "name": "Gone",
+          "op": "REMOVED",
+          "why": null,
+          "scenarios": []
+        }
+      ],
+      "renames": [
+        [
+          "Old",
+          "New"
+        ]
+      ]
+    },
+    {
+      "name": "modified",
+      "text": "## MODIFIED\n\n### Requirement: M\nM SHALL z.\n\n#### Scenario: One\n#### Scenario: Two\n",
+      "reqs": [
+        {
+          "name": "M",
+          "op": "MODIFIED",
+          "why": null,
+          "scenarios": [
+            "One",
+            "Two"
+          ]
+        }
+      ],
+      "renames": []
+    },
+    {
+      "name": "fenced headings",
+      "text": "## ADDED\n\n### Requirement: F\nF SHALL a.\n\n```md\n### Requirement: Not one\n#### Scenario: Not one\n```\n\n#### Scenario: Real\n",
+      "reqs": [
+        {
+          "name": "F",
+          "op": "ADDED",
+          "why": null,
+          "scenarios": [
+            "Real"
+          ]
+        }
+      ],
+      "renames": []
+    }
+  ],
+  "markers": [
+    {
+      "file": "src/a.ts",
+      "text": "// @spec cap-a/one\nexport const a = 1;\n",
+      "markers": [
+        {
+          "key": "cap-a/one",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "file": "src/b.py",
+      "text": "# @spec cap-a/one, cap-b/two-x\nx = 1\n",
+      "markers": [
+        {
+          "key": "cap-a/one",
+          "line": 1
+        },
+        {
+          "key": "cap-b/two-x",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "file": "src/c.go",
+      "text": "/* @spec cap-a/three */\npackage c\n// not a marker: @spec nothing\n",
+      "markers": [
+        {
+          "key": "cap-a/three",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "file": "src/d.sql",
+      "text": "-- @spec cap-d/four\nselect 1;\n",
+      "markers": [
+        {
+          "key": "cap-d/four",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "file": "src/e.rb",
+      "text": "x = 1 # @spec cap-e/five\n",
+      "markers": [
+        {
+          "key": "cap-e/five",
+          "line": 1
+        }
+      ]
+    }
+  ],
+  "approvals": [
+    {
+      "text": "## Why\nx\nOwner approval: Maria, 2026-10-01\n",
+      "approval": "Maria, 2026-10-01"
+    },
+    {
+      "text": "Owner approval:\n",
+      "approval": ""
+    },
+    {
+      "text": "```\nOwner approval: Fenced, 2026-10-01\n```\n",
+      "approval": ""
+    },
+    {
+      "text": "\u003c!-- Owner approval: Hidden, 2026-10-01 --\u003e\n",
+      "approval": ""
+    },
+    {
+      "text": "- **Owner approval**: Jo, 2026-10-02\r\n",
+      "approval": "Jo, 2026-10-02"
+    },
+    {
+      "text": "nothing here\n",
+      "approval": ""
+    }
+  ],
+  "adrs": [
+    {
+      "file": "none.md",
+      "text": "",
+      "none": true
+    },
+    {
+      "file": "None.md",
+      "text": "---\ntitle: T\nstatus: Accepted\ndate: 2026-10-20\n---\n\nbody\n",
+      "none": true
+    },
+    {
+      "file": "x.md",
+      "text": "---\nstatus: none\n---\n",
+      "none": true
+    },
+    {
+      "file": "x.md",
+      "text": "---\nstatus: None\n---\n",
+      "none": true
+    },
+    {
+      "file": "x.md",
+      "text": "---\nstatus: \"none\"\n---\n",
+      "none": true
+    },
+    {
+      "file": "x.md",
+      "text": "---\ntitle: T\nstatus: Accepted\ndate: 2026-10-20\n---\n\nbody\n",
+      "none": false
+    },
+    {
+      "file": "x.md",
+      "text": "---\ntitle: T\nstatus: Accepted\ndate: 2026-10-20\n---\n\nbody\nstatus: none\n",
+      "none": false
+    },
+    {
+      "file": "x.md",
+      "text": "status: none\n",
+      "none": false
+    },
+    {
+      "file": "none.md",
+      "text": "---\nstatus: Accepted\n---\n",
+      "none": true
+    },
+    {
+      "file": "x.md",
+      "text": "---\nstatus: nonexistent\n---\n",
+      "none": false
+    }
+  ]
+}

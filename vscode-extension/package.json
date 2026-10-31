@@ -1,8 +1,8 @@
 {
   "name": "wingman-spec",
   "displayName": "Wingman Spec",
-  "description": "See and steer OpenSpec changes that use the Wingman Spec schema: tasks, specs, ADRs, verifier results, build timeline and requirement-to-code traceability.",
-  "version": "0.11.2",
+  "description": "See and steer Wingman Spec changes: tasks, specs, ADRs, verifier results, build timeline and requirement-to-code traceability. Bundles the wingman-spec CLI.",
+  "version": "0.12.0",
   "author": "Elmo Egers",
   "publisher": "elmo-egers",
   "icon": "images/icon.png",
@@ -26,7 +26,6 @@
     "Visualization"
   ],
   "keywords": [
-    "openspec",
     "spec-driven",
     "specification",
     "requirements",
@@ -39,8 +38,8 @@
     "codex"
   ],
   "activationEvents": [
-    "workspaceContains:openspec/config.yaml",
-    "workspaceContains:openspec/workspace.yaml"
+    "workspaceContains:.wingman-spec/wingman-spec.yaml",
+    "workspaceContains:wingman-spec.yaml"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -80,6 +79,10 @@
       {
         "command": "wingmanSpec.promoteAdr",
         "title": "Wingman Spec: Promote ADR"
+      },
+      {
+        "command": "wingmanSpec.init",
+        "title": "Wingman Spec: Set Up This Folder"
       },
       {
         "command": "wingmanSpec.refresh",
@@ -236,16 +239,6 @@
     "configuration": {
       "title": "Wingman Spec",
       "properties": {
-        "wingmanSpec.adrDirectory": {
-          "type": "string",
-          "default": "adr",
-          "description": "Directory (relative to the OpenSpec root, next to openspec/) that holds promoted ADRs."
-        },
-        "wingmanSpec.openspecPath": {
-          "type": "string",
-          "default": "openspec",
-          "description": "Path to the openspec CLI. Only used to locate a registered OpenSpec store when a folder's openspec/config.yaml contains 'store: <id>'."
-        },
         "wingmanSpec.diagnostics": {
           "type": "boolean",
           "default": true,
@@ -264,28 +257,23 @@
         "wingmanSpec.runTestsLens": {
           "type": "boolean",
           "default": true,
-          "description": "On the @spec CodeLens and hover: offer \"Run tests\", which runs the project test command (the \"Test command:\" line of the OpenSpec config) in a terminal, narrowed to the requirement's scenario tags when the runner is known. Off when no test command is set or the workspace is not trusted."
+          "description": "On the @spec CodeLens and hover: offer \"Run tests\", which runs the project test command (`commands.test` of wingman-spec.yaml) in a terminal, narrowed to the requirement's scenario tags when the runner is known. Off when no test command is set or the workspace is not trusted."
         },
         "wingmanSpec.problemsPanel": {
           "type": "boolean",
           "default": true,
-          "description": "Publish the verifier's findings (lint, placement, drift gaps, stale and changed anchors, the Why line) in the Problems panel, with quick fixes. Runs `node openspec/scripts/verify-task.cjs problems --json` after saves; off in an untrusted workspace."
+          "description": "Publish the verifier's findings (lint, placement, drift gaps, stale and changed anchors, the Why line) in the Problems panel, with quick fixes. Runs `wingman-spec problems --json` after saves; off in an untrusted workspace."
         },
         "wingmanSpec.verifierTimeoutSeconds": {
           "type": "number",
           "default": 30,
           "minimum": 1,
-          "description": "How long the extension waits for the verifier script or git before it gives up (Problems panel, change dashboard, branch review)."
-        },
-        "wingmanSpec.verifierNode": {
-          "type": "string",
-          "default": "node",
-          "description": "The node executable used to run openspec/scripts/verify-task.cjs."
+          "description": "How long the extension waits for the wingman-spec CLI or git before it gives up (Problems panel, change dashboard, branch review)."
         },
         "wingmanSpec.dashboardChecks": {
           "type": "boolean",
           "default": true,
-          "description": "The change dashboard asks the verifier (read-only `problems` and `sync-check`) what blocks the archive. Off: it shows only what the files say."
+          "description": "The change dashboard asks the verifier (read-only `problems` and `sync --check`) what blocks the archive. Off: it shows only what the files say."
         },
         "wingmanSpec.branchReviewBase": {
           "type": "string",

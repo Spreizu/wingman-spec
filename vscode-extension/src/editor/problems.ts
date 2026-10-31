@@ -31,7 +31,7 @@ const readIf = (f: string): string | undefined => {
 };
 
 /**
- * Publishes what `verify-task.cjs problems --json` finds (lint, placement, drift gaps, stale and changed anchors, the Why line) as
+ * Publishes what `wingman-spec problems --json` finds (lint, placement, drift gaps, stale and changed anchors, the Why line) as
  * diagnostics at the right file and line, and offers the mechanical quick fixes. The verifier decides; this only displays and applies edits.
  */
 export class ProblemsService implements vscode.CodeActionProvider, vscode.Disposable {

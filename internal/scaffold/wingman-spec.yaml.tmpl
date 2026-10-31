@@ -1,0 +1,76 @@
+# Wingman Spec project settings. Unknown keys are errors, so a typo never turns into a silent default.
+{{- if .Specs}}
+
+# Where this code repository's specs live, relative to this repository's root.
+specs: {{.Specs}}
+{{- if .SpecsRemote}}
+specs_remote: {{.SpecsRemote}}   # `wingman-spec doctor` prints the git clone line when the folder is missing
+{{- end}}
+{{- end}}
+{{- if not .Linked}}
+
+# Free text for the planner: tech stack, conventions, domain words.
+context: |
+  <fill in>
+{{- end}}
+
+# The project's own commands. `none` disables one. `next` refuses to start while test is still <fill in>.
+commands:
+  test: {{q .Test}}
+  typecheck: {{q .Typecheck}}
+  lint: {{q .Lint}}
+  # targeted: <runner> {files}   # how to run some test files ({files}: the paths, {dirs}: their folders); derived for common runners
+  # test_run: finish             # the project tests run once, at `finish`; typecheck and lint keep the check level
+  # check_level: targeted        # targeted (default) | group | task | finish: when the project commands run during apply
+{{- if not .Linked}}
+
+# Requirement Why lines and `@spec` anchors: on (finish and archive fail on gaps) | warn | off.
+traceability: on
+# anchor_placement: warn   # where markers sit: warn | error | off
+# anchor_guard: warn       # an anchored unit changed without its requirement: warn | error | off
+# anchor_fit: warn         # an anchor on code that does not implement its requirement: warn | error | off
+# anchor_max: 6            # anchors per requirement before the count is reported
+# anchor_many: []          # capability/requirement-slug ids that are cross-cutting
+# test_evidence: warn      # tagged tests must show up as passing at finish: warn | strict | off
+# anchor_stale: info       # a unit changed later than its requirement: info | warn | error | off
+
+# Tasks of one group that touch different files run in parallel waves of up to this many subagents.
+parallel: 3
+{{- end}}
+
+# Visual check of the ```visual scenarios in Playwright Chromium. `visual: off` for a project without UI.
+{{- if eq .Visual "off"}}
+visual: off                   # no UI detected; replace with command:/url: when the project gets one
+{{- else}}
+visual:
+{{- if .Visual}}
+  command: {{q .Visual}}
+  url: {{.URL}}
+{{- else}}
+  command: <fill in>          # starts the app in the foreground, e.g. npm run preview -- --port 4173 --strictPort
+  url: <fill in>              # where it answers, e.g. http://127.0.0.1:4173/
+{{- end}}
+  # ready_timeout: 120        # seconds to wait for url
+  # page_timeout: 5           # seconds for a page load or a step
+  # request_timeout: 3        # seconds before a request counts as failed; 0 = no limit
+  # contexts: 4               # scenarios captured side by side in one browser
+  # review: off               # subagent: an independent reviewer compares before/after clips after the checks pass
+  # screenshots: affected     # affected | off
+  # require_playwright: false # true: a missing Chromium fails the check instead of skipping it
+  # ignore_https_errors: true
+  # baseline: off             # on: a defect the page had before the task is listed once and does not fail it
+  # scope: task               # task | all
+  # changed_only: on          # a passed run is not repeated while nothing it depends on changed
+  # ignore: [a11y:color-contrast]   # skip a defect outside what you build: a11y:*, runtime:*, content:*, layout:horizontal-overflow
+  # ignore_http: [/ads/]
+  # roles:                    # gated features; credentials come from env vars or .wingman-spec/local/roles.yaml
+  #   admin:
+  #     login: /login
+  #     success: /dashboard
+{{- end}}
+{{- if .SpecsRepo}}
+
+# Code repositories of this specs repo: name -> path relative to this folder.
+# repos:
+#   web: ../web
+{{- end}}

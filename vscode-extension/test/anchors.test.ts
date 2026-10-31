@@ -45,7 +45,7 @@ test('test paths and scannable paths follow the verifier', () => {
   for (const f of ['tests/a.js', 'src/__tests__/a.ts', 'a.test.ts', 'a.spec.mjs', 'test_a.py', 'a_test.go', 'x/spec/y.rb']) assert.ok(isTestPath(f), f);
   for (const f of ['src/a.ts', 'src/contest.ts', 'a.ts']) assert.ok(!isTestPath(f), f);
   for (const f of ['src/a.ts', 'lib/x.py']) assert.ok(isScannable(f), f);
-  for (const f of ['README.md', 'node_modules/x/a.js', 'openspec/specs/a/spec.md', 'dist/a.js', 'logo.png', 'a.min.js', '.claude/commands/x.sh']) assert.ok(!isScannable(f), f);
+  for (const f of ['README.md', 'node_modules/x/a.js', 'specs/a.md', 'dist/a.js', 'logo.png', 'a.min.js', '.claude/commands/x.sh']) assert.ok(!isScannable(f), f);
 });
 
 test('nearest suggests a requirement of the same capability by word overlap', () => {
@@ -76,7 +76,7 @@ test('scanCode walks the tree with the verifier skip rules', () => {
   put('tests/a.test.ts', "// @spec billing/add-item\nit('x [billing/add-item]', () => {})\n");
   put('node_modules/x/i.js', '// @spec billing/add-item\n');
   put('docs/a.md', '<!-- @spec billing/add-item -->\n');
-  put('openspec/specs/billing/spec.md', '// @spec billing/add-item\n');
+  put('specs/billing.md', '// @spec billing/add-item\n');
   put('src/bin.dat', '// @spec billing/add-item\0');
   put('src/plain.ts', 'nothing here\n');
   const files = scanCode(dir).sort((a, b) => a.file.localeCompare(b.file));

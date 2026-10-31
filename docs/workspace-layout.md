@@ -1,152 +1,119 @@
-# Workspace layout: several git repos with one store
+# Workspace layout: one specs repository for several code repositories
 
-The table in the [reference](reference.md#two-layouts-one-repo-or-a-workspace-with-several-repos) picks the layout. This page has the folder layout, the per-repo commands, the install steps, the teammate steps and the error messages.
+The [reference](reference.md#layouts-next-to-the-code-or-a-specs-repository) picks the layout. A single git repository
+keeps its specs next to the code in `.wingman-spec/` and needs nothing on this page. This page is for a project with
+2 or more code repositories (web, api, mobile, ...) that share one set of specs, changes and ADRs.
 
-## Where everything goes (workspace with a store)
+## Where everything goes
 
 ```
 ~/work/acme/                      the workspace folder (not a git repo itself)
-  acme.code-workspace             optional, written by --workspace-file; open this in VS Code / Cursor
-  specs/                          THE STORE: its own git repo, OUTSIDE every code repo
-    openspec/schemas/wingman-spec/     the schema (installed once, shared)
-    openspec/config.yaml               shared config: context, rules, and DEFAULT commands (see below)
-    openspec/specs/  openspec/changes/  adr/    specs, changes and ADRs of ALL repos
+  acme.code-workspace             optional, written by --workspace-file; open this in VS Code or Cursor
+  specs/                          THE SPECS REPOSITORY: its own git repo, outside every code repo
+    wingman-spec.yaml             shared settings: context, rules, defaults for the commands
+    specs/ changes/ archive/ adrs/    specs, changes, archive and ADRs of ALL code repos
+    runs/                         run state of the apply loop (ignores itself, never committed)
   web/  api/  mobile/             the code repos (separate git repos)
-    openspec/config.yaml               pointer `store: acme` + THIS repo's own commands (see below)
-    openspec/scripts/                  verify-task.cjs and friends (run from here, inside the code repo)
-    AGENTS.md                          the managed block
-    .cursor/ .claude/ .agents/ .codex/ the /spec-* commands, subagents, skills and prompt-guard hook, per --harness
+    .wingman-spec/wingman-spec.yaml   the link `specs: ../specs` + THIS repo's own commands
+    .wingman-spec/bin/wingman-spec    the shim the agents call (gitignored)
+    AGENTS.md                         the managed block
+    .cursor/ .claude/ .agents/ .codex/    the /spec-* commands, subagents and skills, per --harness
 ```
 
-The installer is run from the **unpacked schema folder** (anywhere, e.g. `~/tools/wingman-spec`); it is not copied
-into the projects. Install the store once, then run `install.sh` for each code repo.
+The link is a relative path, so teammates who clone the repositories side by side share it. Several code repos can link
+to one specs repository. Never create a `.wingman-spec/specs/` folder inside a linked code repo: it would become its own
+root.
 
-**Per-repo commands.** Each code repo has its own test, typecheck and lint commands and its own app for the visual check.
-In a workspace layout the installer detects them from the repo being installed and writes them into **that repo's**
-`openspec/config.yaml` (the `workspace.yaml` for `--specs`), next to the pointer:
+## Per-repo commands
+
+Each code repo has its own test, typecheck and lint commands and its own app for the visual check. `init` detects them
+in the repo being set up and writes them into **that repo's** `.wingman-spec/wingman-spec.yaml`, next to the link:
 
 ```yaml
-store: acme
-store_remote: https://git.example.com/acme/specs.git   # only a hint for the teammate error below; no credentials
-verify: |
-  - Test command: `npm test`
-  - Typecheck command: `npm run typecheck`
-  - Lint command: none
+specs: ../specs
+specs_remote: https://git.example.com/acme/specs.git   # only a hint for the clone message below; no credentials
+commands:
+  test: npm test
+  typecheck: npm run typecheck
+  lint: none
 visual:
   command: "npm run build && npm run preview -- --port 4173 --strictPort --host 127.0.0.1"
   url: http://127.0.0.1:4173/
 ```
 
-`verify-task.cjs` reads each key from the code repo's file first and falls back to the store's `openspec/config.yaml`.
-Order per key: **`--test-cmd` / `SPEC_TEST_CMD` / `SPEC_TYPECHECK_CMD` / `SPEC_LINT_CMD` > the code repo's file > the
-store's config**. The `visual:` block is merged per key too (a repo that only sets `command:` and `url:` keeps the
-store's `review:`, `ready_timeout:`, ...; `visual: off` in the repo turns it off for that repo only). A `<fill in>` in the
-repo's own file stops the lookup, so a repo never runs another repo's command: edit it (or write `none`). The installer
-never overwrites a key that is already in the file; re-running it adds only what is missing. The store's own
-`openspec/config.yaml` gets test/lint/visual defaults only while it has none (taken from the first repo installed) and is
-never changed by later installs. `node openspec/scripts/verify-task.cjs doctor` (run inside a code repo) prints the
-**source file of every command**. The `openspec` CLI accepts the extra keys (`verify:`, `visual:`) next to `store:`.
+Lookup order per key: **a flag or environment variable (`WINGMAN_SPEC_TEST_CMD`, ...) > the code repo's file > the
+specs repository's `wingman-spec.yaml`**. The `visual:` block is merged per key too: a repo that sets only `command:` and
+`url:` keeps the shared `review:`, `ready_timeout:` and so on, and `visual: off` in a repo turns the check off for that
+repo only. A `<fill in>` in the repo's own file stops the lookup, so a repo never runs another repo's command: edit it, or
+write `none`. `wingman-spec config` prints the merged settings and `wingman-spec root` both roots.
 
-## Step by step: a workspace with several git repos
+## Step by step
 
-Needs `git`, Node.js and the `openspec` CLI on PATH. Below, `~/work/acme` holds the repos `web`, `api` and `mobile`
-and the store will be `~/work/acme/specs` with the id `acme`.
+Needs `git` and the `wingman-spec` CLI ([install](install.md)). Below, `~/work/acme` holds the repos `web`, `api` and
+`mobile`, and the specs repository will be `~/work/acme/specs`.
 
-1. **Get the schema** (from the delivered bundle, or unzip `wingman-spec.zip`; the zip needs no git):
+1. **Create the specs repository**, outside every code repo:
    ```bash
-   git clone wingman-spec.bundle -b main wingman-spec
-   cd wingman-spec
+   mkdir -p ~/work/acme/specs && cd ~/work/acme/specs && git init
+   wingman-spec init --layout specs --harness all
    ```
-   (The zip unpacks to a `wingman-spec/` folder.) Keep this folder: every `install.sh` run below starts from it.
-2. **Git identity** (`openspec store setup` makes the first commit and fails without one):
-   ```bash
-   git config --global user.name "Your Name"
-   git config --global user.email "you@example.com"
-   ```
-3. **Create and register the store**, outside every code repo. `--remote` records where teammates clone it from (optional):
-   ```bash
-   openspec store setup acme --path ~/work/acme/specs --remote git@github.com:acme/specs.git
-   openspec store list          # acme -> ~/work/acme/specs
-   ```
-4. **Install into every code repo**, from the schema folder, with the same `--store` and one shared workspace file:
+   `--harness` here lets you plan from inside the specs repository too; leave it out if you plan only from the code repos.
+2. **Link every code repo**, with one shared workspace file:
    ```bash
    for r in web api mobile; do
-     ./install.sh ~/work/acme/$r --store acme --harness all --workspace-file ~/work/acme/acme.code-workspace
+     (cd ~/work/acme/$r && wingman-spec init --layout link --specs ../specs --harness all \
+        --workspace-file ../acme.code-workspace)
    done
    ```
-   `--harness` is `cursor` (default), `claude`, `codex`, or a list / `all`. The first run writes the store's schema and
-   shared config; each run writes that repo's pointer, commands, scripts, `AGENTS.md` block and harness files, and adds the
-   repo (and the store) to the workspace file. Read its output: it says which test/typecheck/lint/visual commands it
-   found for the repo; a command it could not detect is written as `<fill in>` (set it, or `none`).
-5. **Check each repo**: `cd ~/work/acme/api && openspec doctor && node openspec/scripts/verify-task.cjs doctor`.
-   The first confirms the store pointer resolves, the second lists each command with its source file.
-6. **Open the workspace** as one multi-root workspace: `code ~/work/acme/acme.code-workspace` (or `cursor ...`;
-   or File > Open Workspace from File). Run `/spec-explore` / `/spec-propose` from any code repo's folder: the change is
-   created in the store.
-7. **Commit in the right repo.** They stay separate git repositories:
-   - the **store** gets specs, ADRs and changes (`/spec-sync`, `/spec-archive`) and the installed schema/config:
-     `cd ~/work/acme/specs && git add -A && git commit -m "..."`;
-   - each **code repo** gets the code and what the installer put in it (the pointer file, `openspec/scripts/`,
-     `AGENTS.md`, the harness folders): `cd ~/work/acme/api && git add -A && git commit -m "Add OpenSpec"`.
-   Never create `openspec/specs` or `openspec/changes` inside a code repo: it would become its own root, and the
-   installer refuses to link such a repo.
+   Each run writes that repo's settings (the link and its detected commands), the shim, the `AGENTS.md` block and the
+   agent files, and adds the repo and the specs repository to the workspace file. Read its output: a command it could not
+   detect stays `<fill in>` (set it, or `none`). `--specs-remote <url>` records the clone URL; by default it is the
+   specs repository's `origin`.
+3. **Check each repo**: `cd ~/work/acme/api && wingman-spec doctor` lists what is still missing.
+4. **Open the workspace** as one multi-root workspace: `code ~/work/acme/acme.code-workspace` (or `cursor ...`). Run
+   `/spec-explore` and `/spec-propose` from any code repo's folder: the change is created in the specs repository.
+5. **Commit in the right repo.** They stay separate git repositories:
+   - the **specs repository** gets the specs, ADRs, changes and archive: `cd ~/work/acme/specs && git add -A && git commit`;
+   - each **code repo** gets the code and the files `init` wrote (`.wingman-spec/wingman-spec.yaml`, `.wingman-spec/.gitignore`,
+     `AGENTS.md`, the agent folders).
 
-**A new code repo later**: run step 4's `./install.sh <repo> --store acme ...` for it (the `--workspace-file` adds the folder).
+**A new code repo later**: run step 2 for it.
 
-**Update the schema or re-install**: get the new version into the schema folder (`cd wingman-spec && git pull
-<new bundle> main`, or unzip the new zip over a fresh folder) and run the step 4 loop again. It is idempotent: the schema,
-scripts, skills and generated harness files are always overwritten (keep local changes in git), keys already in a
-repo's file or in the store config are left alone, and a `.suggested` file is written instead of touching a config that
-is not ours. Commit the resulting changes in the store and in each code repo.
+**After a CLI upgrade**: run `wingman-spec update` in each repo that has agent files. It rewrites the generated files and
+the shim and leaves the settings and specs alone. Commit the result.
 
-**Teammates**: share the store by pushing it (`cd ~/work/acme/specs && git remote add origin <url> && git push -u origin
-main`; use the same URL as `--remote`) and push each code repo (it carries the pointer, commands and scripts). A teammate
-needs no installer: `git clone <store url> ~/work/acme/specs`, `openspec store register ~/work/acme/specs` (the id `acme`
-comes from the store's metadata; skipping this gives the "not registered" error below, which repeats these two commands
-with the real URL), clone the code repos next to it, and open a workspace file with those folders (each person can write theirs with `--workspace-file`, or you commit one). Run `install.sh` only to pick up a newer schema, or to
-add a harness they use.
+**Teammates**: push the specs repository and each code repo. A teammate installs the CLI, clones the specs repository and
+the code repos side by side (the same relative paths as the links), and opens a workspace file with those folders (each
+person can write one with `--workspace-file`, or you commit one). The shim is gitignored, so they run `wingman-spec update`
+once in each code repo to write theirs.
 
-**Troubleshooting**
-- `install: store 'nope' is not registered.` / `Unknown store 'acme'. No stores are registered.`: the store id in the
-  pointer is not registered on this machine. `openspec store list` shows what is; create it with
-  `openspec store setup <id> --path <dir>` or register an existing clone with `openspec store register <dir>`.
-- `No usable Git commit identity is configured, so setup cannot create the initial store commit.`: step 2.
-- `verify-task: OpenSpec store 'acme' is not registered on this machine.` (and `openspec`'s own `Unknown store 'acme'`):
-  you are on a machine, usually a teammate's, where the code repo's `store: acme` pointer has no store behind it. The id
-  is a pointer to a folder registered on this machine, not a URL, and nothing is cloned for you. The message lists the
-  steps: `git clone <store url> <dir>`, then `openspec store register <dir>`, then run the command again. The URL in
-  the message comes from `store_remote:` in the repo's `openspec/config.yaml` (the installer records it, without
-  credentials, when the store has a `--remote` or an `origin`); without it the message says `<store repo url>`: ask
-  whoever set the store up. For a single run you can also pass `--root <dir>` of a clone you already have.
-  The same text is printed by every `verify-task.cjs` command (`doctor`, `next`, `check`, `status`, `lint`, ...), and
-  the `/spec-*` commands show it to you and stop instead of guessing a root.
-- `... store 'acme' is registered on this machine (<path>), but that folder is missing or is not a usable OpenSpec
-  store`: the registration points at a folder that was moved, deleted or never had its `.openspec-store/store.yaml`.
-  Run `openspec store doctor acme`; to start over, clone the store again, `openspec store unregister acme` (forgets
-  the registration only), `openspec store register <dir>`.
-- `verify-task: the specs repo is missing: <path>` (`--specs` layout): clone the specs repo to that path, which is
-  relative to the code repo (`specs: ../specs` in `openspec/workspace.yaml`); `specs_remote:` there holds the URL.
-- `verify-task: cannot find the OpenSpec root ...` (no pointer at all): run it from inside a code repo that has the
-  pointer, or pass `--store <id>` / `--root <dir>`.
-- `the project test command in <file> is still the <fill in> placeholder`: the installer could not detect that repo's
-  test command; edit the file it names (the repo's own `openspec/config.yaml`), or write `none`.
-- A repo runs the wrong command: `verify-task.cjs doctor` shows the source file; edit the key in that file (an
-  environment variable or CLI flag wins over both files).
+## Troubleshooting
 
-## The same with a plain specs repo (no registry)
-
-`./install.sh <code-repo> --specs <specs-repo> [--workspace-file proj.code-workspace]`: the specs repo (a directory you
-created and `git init`ed) holds the schema, config, specs, changes and ADRs; each code repo gets `openspec/workspace.yaml`
-(`specs: ../specs-repo`, relative so teammates with the same sibling layout share it) with the same per-repo commands
-and `visual:` block, plus the scripts, `AGENTS.md` block, skills and `/spec-*` commands. Several code repos can link to
-one specs repo. Everything above about where files go, per-repo commands, precedence and commits applies; there is no
-`store setup` or `register` step, teammates just clone the specs repo to the same relative place.
+- `the specs repo is missing: <path>`: the code repo's `specs: ../specs` points at a folder that does not exist on this
+  machine, usually a teammate's. Nothing is cloned for you. The message prints the `git clone` line; its URL comes from
+  `specs_remote:` (without it, ask whoever set the project up). For a single run you can also pass `--root <dir>` of a
+  clone you already have. Every `wingman-spec` command prints the same text, and the `/spec-*` commands show it to you
+  and stop instead of guessing a root.
+- `has no wingman-spec.yaml: run wingman-spec init --layout specs there first`: `init --layout link` was pointed at a
+  folder that is not a specs repository yet.
+- `the project test command in <file> is still the <fill in> placeholder` (or `commands.lint is still <fill in>`):
+  `init` could not detect that repo's command; edit the file it names (the repo's own `.wingman-spec/wingman-spec.yaml`),
+  or write `none`.
+- A repo runs the wrong command: `wingman-spec config` shows the merged value; edit the key in the code repo's file (an
+  environment variable or flag wins over both files).
 
 ## How the pieces adapt
 
-The root is found in this order: specs next to the code, `workspace.yaml` link, `store:` pointer. The `/spec-*` commands
-run `openspec` from the root (`cd <root> && openspec ...`) and read and write `openspec/...` and `adr/` there. With no
-link, they look for the one other workspace folder that has an OpenSpec root. `openspec/scripts/verify-task.cjs`
-runs in the code repo, finds `tasks.md` and `BLOCKED.md` in the store and ticks `tasks.md` there. `--root <dir>` or
-`--store <id>` overrides the lookup. The VS Code extension follows the same link. To plan from inside the store too, run `./install.sh <store-dir>` (a plain install there adds
-commands, skills and `AGENTS.md`).
+The root is found from the current directory: `.wingman-spec/` with its own `specs/` (next to the code), a
+`wingman-spec.yaml` at a repository root (a specs repository), or `.wingman-spec/wingman-spec.yaml` with `specs:` (a
+linked code repo). `--root <dir>` or `WINGMAN_SPEC_ROOT` overrides the lookup. The CLI runs in the code repo, reads and
+ticks `tasks.md` in the specs repository, and keeps the run state in `runs/<change>/` of the specs repository, so separate
+worktrees of one code repo share it. The shim, the visual helper and the cache stay in the code repo's `.wingman-spec/`.
+The VS Code extension follows the same link. Drift is computed per code repo against the shared specs: a requirement
+implemented in another repo shows as unanchored there (accept it with `drift decide`).
+
+## Coming from an OpenSpec project
+
+The 0.11 release kept shared specs in a registered store (`store: <id>`). Convert the store folder once with
+`wingman-spec import openspec --to .` (it becomes a specs repository), then run step 2 in each code repo. The old
+`openspec/` folders in the code repos can then be deleted.

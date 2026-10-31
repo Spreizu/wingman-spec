@@ -4,7 +4,7 @@ import { renderMarkdown } from '../model/markdown.ts';
 import { parseSpec } from '../model/specParser.ts';
 import { parseTasks } from '../model/tasksParser.ts';
 import type { ArchivedChange, ProjectModel } from '../model/types.ts';
-import { badge, emptyState, plain, rich, noDecisionLine, esc, findProject, icon, openAttr, pageHeader, pillRow, ring, routeAttr, whenText, whenTitle } from './components.ts';
+import { badge, emptyState, plain, rich, noDecisionLine, esc, findProject, icon, openAttr, pageHeader, pillRow, ring, routeAttr, tabbed, whenText, whenTitle } from './components.ts';
 import { linkBadge } from './insightView.ts';
 import { requirementCard } from './requirementView.ts';
 import { timelineTab } from './timelineView.ts';
@@ -38,7 +38,7 @@ ${pillRow(`${c.capabilities.map((cap) => badge(cap, 'info')).join('')}${produced
 
 export function historyPage(d: ViewData): string {
   const project = findProject(d.projects, d.route.page === 'history' ? d.route.root : undefined);
-  if (!project) return `${pageHeader('History', '', '', false)}${emptyState('No OpenSpec project found', '')}`;
+  if (!project) return `${pageHeader('History', '', '', false)}${emptyState('No Wingman Spec project found', '')}`;
   const archive = project.archive;
   if (archive.length === 0) {
     return `${pageHeader('History', 'Archived changes', '', false)}${emptyState('Nothing archived yet', 'Archived changes appear here after <code>/spec-archive</code>, with the specs and ADRs they produced.')}`;
@@ -88,7 +88,7 @@ export function archivedPage(d: ViewData): string {
       ? emptyState('No specs', 'This change did not carry delta specs.')
       : c.capabilities
           .map((cap) => {
-            const path = join(c.dir, 'specs', cap, 'spec.md');
+            const path = join(c.dir, 'specs', `${cap}.md`);
             const spec = parseSpec(d.texts[path] ?? '');
             return `<h2 class="section-title">${icon('file')} ${esc(cap)} ${d.baseSpecs[project.root]?.includes(cap) ? `<button class="link" ${routeAttr({ page: 'spec', root: project.root, name: cap })}>current spec ${icon('arrow', 13)}</button>` : ''}</h2>
 ${spec.requirements.map((r) => requirementCard(r, { path })).join('') || '<p class="muted">No requirements found.</p>'}`;
@@ -117,11 +117,9 @@ ${text ? `<div class="md" style="margin-top:10px">${renderMarkdown(parseFrontMat
     ['design', 'Design', doc('design.md', 'No design was archived.')],
     ['adrs', 'ADRs', adrs],
     ['tasks', 'Tasks', readOnlyTasks(d.texts[join(c.dir, 'tasks.md')])],
-    ['timeline', 'Timeline', timelineTab(d.texts[join(c.dir, 'timeline.jsonl')])],
+    ['timeline', 'Timeline', timelineTab(d.texts[join(c.dir, 'timeline.jsonl')], d.texts[join(c.dir, 'archived.json')])],
   ];
-  const tabs = panes.map(([id, label]) => `<button class="tab" data-tab="${id}">${esc(label)}</button>`).join('');
-  const bodies = panes.map(([id, , html]) => `<div class="pane" data-pane="${id}">${html}</div>`).join('');
   const sub = `<span title="${esc(whenTitle(c.archived, 'Archived'))}">${esc(whenText(c.date, c.archived))}</span>`;
   const aside = `${ring(c.taskDone, c.taskTotal, 56)}<button class="icon-btn" ${openAttr(c.dir)} title="Reveal folder">${icon('file')}</button>`;
-  return `${pageHeader(c.name, sub, aside)}<div class="tabs" role="tablist">${tabs}</div>${bodies}`;
+  return `${pageHeader(c.name, sub, aside)}${tabbed(panes)}`;
 }

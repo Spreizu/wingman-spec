@@ -1,6 +1,6 @@
 # Recipe: Figma node to design-map rows
 
-How to turn what the source returned into the rows, Expect facts and tasks of the OpenSpec design map. The map format and the checks are the ones of the `design-map` partial of `/spec-explore`; this file only says how to read Figma into them.
+How to turn what the source returned into the rows, Expect facts and tasks of the design map. The map format and the checks are the ones of the `design-map` partial of `/spec-explore`; this file only says how to read Figma into them.
 
 ## Value to implementation (per fact)
 
@@ -20,7 +20,7 @@ A value within the visual check's tolerance of a token is that token (1px off a 
 
 ## Components and variants
 
-- Figma instance to the project component: `Button` + `Variant=secondary, Size=md` to `UiButton variant="secondary"`. Use Code Connect when there is some; otherwise name, then the variant property names/values, then the design-system listing (`verify-task.cjs design-system`) for props.
+- Figma instance to the project component: `Button` + `Variant=secondary, Size=md` to `UiButton variant="secondary"`. Use Code Connect when there is some; otherwise name, then the variant property names/values, then the design-system listing (`wingman-spec design-system`) for props.
 - A variant the component lacks (a new `danger` look) is a Gap: propose the variant on the component, do not restyle one instance with raw classes.
 - Do not rebuild a component from its Figma layers. Its internals are the component's job; the map row is the component with its props, and facts only for what the instance changes (width, margin).
 - A repeated structure (cards, list rows) becomes one component/loop fed by data, not N copies; take texts from the project's data/content layer when it exists.

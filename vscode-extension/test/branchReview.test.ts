@@ -62,7 +62,7 @@ test('review: touched requirements by code, test tag, spec change and removal; u
     files: [
       file('src/add.ts', 'M', fn('billing/add-an-item', 'add', 'return a;'), fn('billing/add-an-item', 'add', 'return a + 1;')),
       file('tests/add.test.ts', 'M', "it('refuses [billing/reject-empty]', () => {});\n", "it('refuses [billing/reject-empty]', () => {});\nit('x [billing/remove-it]', () => {});\n"),
-      file('openspec/specs/billing/spec.md', 'M', livingBefore, livingNow),
+      file('specs/billing.md', 'M', livingBefore, livingNow),
       file('README.md', 'M', specBefore, 'x\n'),
     ],
   });
@@ -79,14 +79,14 @@ test('review: findings are filtered to the diff', () => {
   const findings: VerifierFinding[] = [
     { source: 'drift', code: 'orphan-anchor', severity: 'error', message: 'in diff', file: `${dir}/src/add.ts`, line: 1, col: 1, length: 1 },
     { source: 'drift', code: 'orphan-anchor', severity: 'error', message: 'elsewhere', file: `${dir}/src/other.ts`, line: 1, col: 1, length: 1 },
-    { source: 'lint', code: 'x', severity: 'warning', message: 'change in diff', file: `${dir}/openspec/changes/refunds/tasks.md`, line: 2, col: 1, length: 1, change: 'refunds' },
+    { source: 'lint', code: 'x', severity: 'warning', message: 'change in diff', file: `${dir}/changes/refunds/tasks.md`, line: 2, col: 1, length: 1, change: 'refunds' },
   ];
   const r = reviewBranch({
     ...base,
     findings,
     files: [
       file('src/add.ts', 'M', 'a\n', 'b\n'),
-      file('openspec/changes/refunds/proposal.md', 'M', 'a\n', 'b\n'),
+      file('changes/refunds/proposal.md', 'M', 'a\n', 'b\n'),
     ],
   });
   assert.deepEqual(r.findings.map((f) => f.message), ['in diff', 'change in diff']);

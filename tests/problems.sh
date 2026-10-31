@@ -2,12 +2,14 @@
 # shellcheck disable=SC2016 # expectations are single-quoted on purpose (run later by eval)
 # `verify-task.cjs problems`: every verifier finding as one located list (file, line, column, severity, repair), the input of the
 # editor's Problems panel. Seeded project with one of each finding, exact positions asserted, plus a clean project that must give none.
-# Usage: tests/problems.sh (needs openspec, git and node). Exit 0 when all pass.
+# Usage: tests/problems.sh (needs the wingman-spec binary, see tests/lib/ws.sh, git and node). Exit 0 when all pass.
 set -uo pipefail
 PKG="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=lib/ws.sh
+. "$PKG/tests/lib/ws.sh"
 T="$(mktemp -d)"; [ -n "${KEEP:-}" ] || trap 'rm -rf "$T"' EXIT; [ -z "${KEEP:-}" ] || echo "kept: $T"
-unset SPEC_TRACEABILITY SPEC_ANCHOR_GUARD SPEC_ANCHOR_STALE SPEC_ANCHOR_PLACEMENT SPEC_TEST_EVIDENCE
-export OPENSPEC_TELEMETRY=0 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
+unset WINGMAN_SPEC_TRACEABILITY WINGMAN_SPEC_ANCHOR_GUARD WINGMAN_SPEC_ANCHOR_STALE WINGMAN_SPEC_ANCHOR_PLACEMENT WINGMAN_SPEC_TEST_EVIDENCE
+export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
 PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); echo "  ok   $*"; }
 bad() { FAIL=$((FAIL+1)); echo "  FAIL $*"; }
@@ -18,16 +20,15 @@ N() { node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"ut
 
 setup() {
   mkdir -p "$1" && cd "$1" && git init -q
-  openspec init --tools none >/dev/null 2>&1 || mkdir -p openspec/changes openspec/specs
-  "$PKG/install.sh" . --harness all >/dev/null || { echo "install failed"; exit 1; }
-  sed -i 's/Test command: <fill in>/Test command: none/;s/Typecheck command: <fill in>/Typecheck command: none/;s/Lint command: <fill in>/Lint command: none/;s/^visual:.*/visual: off/;/^  command: <fill in>/d;/^  url: <fill in>/d;s/^traceability:.*/traceability: on/' openspec/config.yaml
-  mkdir -p openspec/specs/todo src tests
+  "$WS" init >/dev/null
+  ws_cmd test none && ws_cmd typecheck none && ws_cmd lint none && ws_set visual off && ws_set traceability on
+  mkdir -p .wingman-spec/specs src tests
 }
-V="node openspec/scripts/verify-task.cjs"
+V="$WS"
 
 echo "== clean project: nothing to report"
 setup "$T/clean"
-cat > openspec/specs/todo/spec.md <<'SPEC'
+cat > .wingman-spec/specs/todo.md <<'SPEC'
 ## Purpose
 Keeps a list of things to do.
 
@@ -59,7 +60,7 @@ expect "exit 0 and ok:true with no findings" '[ $rc = 0 ] && [ "$(N)" = 0 ] && g
 
 echo "== seeded project: one of each finding, exact positions"
 setup "$T/seed"
-cat > openspec/specs/todo/spec.md <<'SPEC'
+cat > .wingman-spec/specs/todo.md <<'SPEC'
 ## Purpose
 Keeps a list of things to do.
 
@@ -112,19 +113,19 @@ it('stale [todo/nothing-here]', () => {});
 JS
 git add -A >/dev/null && git commit -qm init
 sed -i 's/\[\.\.\.list, text.trim()\]/[...list, String(text).trim()]/' src/todo.js && git commit -qam "addTodo coerces text"
-mkdir -p openspec/changes/edit/specs/todo
-printf 'Size: S\nRisk: none\n\n## Why\nx\n\n## What Changes\n- x\n' > openspec/changes/edit/proposal.md
-printf '## ADDED Requirements\n\n### Requirement: Edit a todo\nThe system SHALL edit a todo.\n\n#### Scenario: Edited\n- **WHEN** a\n- **THEN** b\n' > openspec/changes/edit/specs/todo/spec.md
-printf '## 1. Work\n- [ ] 1.1 Do it\n  Done when: `true`\n' > openspec/changes/edit/tasks.md
+mkdir -p .wingman-spec/changes/edit/specs
+printf 'Size: S\nRisk: none\n\n## Why\nx\n\n## What Changes\n- x\n' > .wingman-spec/changes/edit/proposal.md
+printf '## ADDED\n\n### Requirement: Edit a todo\nThe system SHALL edit a todo.\n\n#### Scenario: Edited\n- **WHEN** a\n- **THEN** b\n' > .wingman-spec/changes/edit/specs/todo.md
+printf '## 1. Work\n- [ ] 1.1 Do it\n  Done when: `true`\n' > .wingman-spec/changes/edit/tasks.md
 $V problems > "$T/p.json"; rc=$?
 expect "exit 0 even with errors (it reports, the gates decide)" '[ $rc = 0 ] && grep -q "\"ok\": false" "$T/p.json"'
-expect "unanchored requirement -> its heading in the living spec (Clear all, line 22)" '[ "$(F unanchored-requirement file)" = "$T/seed/openspec/specs/todo/spec.md" ] && [ "$(F unanchored-requirement line)" = 22 ] && [ "$(F unanchored-requirement severity)" = error ]'
+expect "unanchored requirement -> its heading in the living spec (Clear all, line 22)" '[ "$(F unanchored-requirement file)" = "$T/seed/.wingman-spec/specs/todo.md" ] && [ "$(F unanchored-requirement line)" = 22 ] && [ "$(F unanchored-requirement severity)" = error ]'
 expect "untested requirement -> its heading (Remove a todo, line 14) with the scenario ids to tag" '[ "$(F untested-requirement line)" = 14 ] && [ "$(F untested-requirement fix.kind)" = add-test-tag ] && [ "$(F untested-requirement fix.scenarios)" = "[{\"name\":\"Removed\",\"id\":\"todo/removed\"}]" ]'
 expect "orphan anchor -> the key inside the marker (line 13, column 10), with the nearest requirement as a repair" '[ "$(F orphan-anchor file)" = "$T/seed/src/todo.js" ] && [ "$(F orphan-anchor line)" = 13 ] && [ "$(F orphan-anchor col)" = 10 ] && [ "$(F orphan-anchor length)" = 13 ] && [ "$(F orphan-anchor fix.to)" = todo/add-a-todo ]'
 expect "stale test tag -> the tag in the test (line 3), column after the bracket" '[ "$(F stale-test-tag file)" = "$T/seed/tests/todo.test.js" ] && [ "$(F stale-test-tag line)" = 3 ] && [ "$(F stale-test-tag col)" = 12 ] && [ "$(F stale-test-tag length)" = 17 ]'
 expect "misplaced marker -> its line (10), a warning with the move-marker repair" '[ "$(F misplaced-marker line)" = 10 ] && [ "$(F misplaced-marker severity)" = warning ] && [ "$(F misplaced-marker fix.kind)" = move-marker ]'
 expect "stale anchor (code changed after the requirement) -> the marker line, info, with the accept repair" '[ "$(F stale-anchor file)" = "$T/seed/src/todo.js" ] && [ "$(F stale-anchor severity)" = info ] && [ "$(F stale-anchor fix.kind)" = accept ] && [ "$(F stale-anchor line)" = 3 ]'
-expect "change lint: a requirement without a Why -> its heading in the delta, with the add-why repair" '[ "$(F missing-why file)" = "$T/seed/openspec/changes/edit/specs/todo/spec.md" ] && [ "$(F missing-why line)" = 3 ] && [ "$(F missing-why fix.kind)" = add-why ] && [ "$(F missing-why change)" = edit ]'
+expect "change lint: a requirement without a Why -> its heading in the delta, with the add-why repair" '[ "$(F missing-why file)" = "$T/seed/.wingman-spec/changes/edit/specs/todo.md" ] && [ "$(F missing-why line)" = 3 ] && [ "$(F missing-why fix.kind)" = add-why ] && [ "$(F missing-why change)" = edit ]'
 expect "every finding has a source, code, severity, absolute file, line >= 1, column >= 1" 'node -e '"'"'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(j.findings.every(f=>f.source&&f.code&&["error","warning","info"].includes(f.severity)&&require("path").isAbsolute(f.file)&&f.line>=1&&f.col>=1&&f.length>=1)?0:1)'"'"' "$T/p.json"'
 expect "counts add up to the findings" 'node -e '"'"'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(j.counts.error+j.counts.warning+j.counts.info===j.findings.length?0:1)'"'"' "$T/p.json"'
 expect "a change name limits the lint to that change, drift still reported" '$V problems edit > "$T/p2.json" && grep -q "\"change\": \"edit\"" "$T/p2.json" && grep -q unanchored-requirement "$T/p2.json"'
@@ -138,13 +139,13 @@ expect "  and stays a problem" '[ -n "$(F stale-test-tag line)" ]'
 $V drift decide unanchored-requirement:todo/clear-all --accept --note "built later" >/dev/null
 $V problems > "$T/p.json"
 expect "an accepted requirement gap is no longer a problem" '[ -z "$(F unanchored-requirement line)" ]'
-expect "  and the repair offered for the gap is accept (the editor writes the Accepted line)" 'git checkout -q openspec/specs && $V problems > "$T/p.json" && [ "$(F unanchored-requirement fix.kind)" = accept ]'
+expect "  and the repair offered for the gap is accept (the editor writes the Accepted line)" 'git checkout -q .wingman-spec/specs && $V problems > "$T/p.json" && [ "$(F unanchored-requirement fix.kind)" = accept ]'
 
 echo "== a change in progress: markers and tags for what it adds are not orphans, a typo still is"
 setup "$T/pend"
-printf '## Purpose\nKeeps a list of things to do.\n\n## Requirements\n\n### Requirement: Add a todo\nThe system SHALL append a todo with the given text to the list.\nWhy: The owner wants it to work, so that people can rely on it.\n\n#### Scenario: Added\n- **WHEN** x\n- **THEN** y\n' > openspec/specs/todo/spec.md
-mkdir -p openspec/changes/clear-all/specs/todo
-printf '## ADDED Requirements\n\n### Requirement: Clear all\nThe system SHALL empty the list.\nWhy: The owner wants it to work, so that people can rely on it.\n\n#### Scenario: Cleared\n- **WHEN** x\n- **THEN** y\n' > openspec/changes/clear-all/specs/todo/spec.md
+printf '## Purpose\nKeeps a list of things to do.\n\n## Requirements\n\n### Requirement: Add a todo\nThe system SHALL append a todo with the given text to the list.\nWhy: The owner wants it to work, so that people can rely on it.\n\n#### Scenario: Added\n- **WHEN** x\n- **THEN** y\n' > .wingman-spec/specs/todo.md
+mkdir -p .wingman-spec/changes/clear-all/specs/todo
+printf '## ADDED\n\n### Requirement: Clear all\nThe system SHALL empty the list.\nWhy: The owner wants it to work, so that people can rely on it.\n\n#### Scenario: Cleared\n- **WHEN** x\n- **THEN** y\n' > .wingman-spec/changes/clear-all/specs/todo.md
 printf '/**\n * Empties.\n * @spec todo/clear-all\n */\nexport function clearAll() {\n  return [];\n}\n' > src/clear.js
 printf "// @spec todo/clear-all\nit('empties [todo/cleared]', () => {});\n" > tests/clear.test.js
 git add -A; git commit -qm seed
@@ -156,7 +157,7 @@ expect "a marker that matches neither the specs nor a pending change is still an
 cd "$T/seed" || exit 1
 
 echo "== traceability off: only lint of the changes, no drift"
-sed -i 's/^traceability:.*/traceability: off/' openspec/config.yaml
+sed -i 's/^traceability:.*/traceability: off/' .wingman-spec/wingman-spec.yaml
 $V problems > "$T/p.json"
 expect "no drift findings when traceability is off" '[ -z "$(F orphan-anchor line)" ] && [ -z "$(F untested-requirement line)" ]'
 

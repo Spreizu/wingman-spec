@@ -28,8 +28,8 @@ function areaOf(f) {
 function defaultFiles() {
   const out = [], walk = (d, re) => { for (const e of fs.readdirSync(path.join(ROOT, d), { withFileTypes: true })) {
     const p = path.posix.join(d, e.name); if (e.isDirectory()) walk(p, re); else if (re.test(e.name)) out.push(p); } };
-  out.push('schemas/wingman-spec/schema.yaml'); walk('schemas/wingman-spec/templates', /\.md$/); walk('project-template/harness', /\.md$/);
-  out.push('project-template/config.yaml.tmpl', 'project-template/AGENTS.block.md', 'README.md');
+  out.push('internal/artifacts/artifacts.yaml'); walk('internal/artifacts/templates', /\.md$/); walk('harness', /\.md$/);
+  out.push('internal/scaffold/wingman-spec.yaml.tmpl', 'README.md');
   for (const f of fs.readdirSync(path.join(ROOT, 'docs'))) if (f.endsWith('.md')) out.push('docs/' + f);
   const vendored = fs.readFileSync(path.join(ROOT, 'skills/VENDORED.md'), 'utf8');
   for (const s of fs.readdirSync(path.join(ROOT, 'skills'), { withFileTypes: true }))

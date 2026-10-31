@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { livingSpec } from '../core/paths.ts';
 import * as vscode from 'vscode';
 import { plain } from '../model/markdown.ts';
 import { isPlaceholder } from '../model/frontMatter.ts';
@@ -33,7 +34,7 @@ export class SpecHoverProvider implements vscode.HoverProvider {
       const [cap, req] = (m[2] ?? '').split('>').map((s) => s.trim());
       if (!cap) return undefined;
       const delta = ctx.change.capabilities.find((c) => c.name === cap);
-      const path = delta?.path ?? join(ctx.project.root, 'openspec', 'specs', cap, 'spec.md');
+      const path = delta?.path ?? livingSpec(ctx.project.root, cap);
       const text = await readTextSafe(path);
       if (text === undefined) return undefined;
       const spec = parseSpec(text);

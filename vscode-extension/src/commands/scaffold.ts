@@ -6,7 +6,7 @@ import { planPromote } from '../model/adrPromote.ts';
 import { parseSourceAdr } from '../model/adrSync.ts';
 import { adrTemplate, slugify, today, validateAdrSlug, validateChangeName } from '../model/scaffold.ts';
 import type { Change, ProjectModel } from '../model/types.ts';
-import { cliExec } from '../store.ts';
+import type { VerifierClient } from '../editor/verifier.ts';
 import type { ProjectStore } from '../store.ts';
 import type { SpecPanel } from '../webview/panel.ts';
 
@@ -15,12 +15,12 @@ async function pickProject(store: ProjectStore, root?: string): Promise<ProjectM
   const named = usable.find((p) => p.root === root);
   if (named) return named;
   if (usable.length <= 1) {
-    if (usable.length === 0) void vscode.window.showWarningMessage('No OpenSpec project found in this workspace.');
+    if (usable.length === 0) void vscode.window.showWarningMessage('No Wingman Spec project found in this workspace.');
     return usable[0];
   }
   const pick = await vscode.window.showQuickPick(
     usable.map((p) => ({ label: p.workspaceFolder.split(/[\\/]/).pop() ?? p.root, description: p.root, project: p })),
-    { title: 'Which OpenSpec project?' },
+    { title: 'Which Wingman Spec project?' },
   );
   return pick?.project;
 }
@@ -118,7 +118,7 @@ async function promote(store: ProjectStore, panel: SpecPanel, rootArg: string | 
   panel.show({ page: 'change', root: project.root, name: change.name, tab: 'adrs' });
 }
 
-export function registerScaffoldCommands(store: ProjectStore, panel: SpecPanel): vscode.Disposable {
+export function registerScaffoldCommands(store: ProjectStore, panel: SpecPanel, verifier: VerifierClient): vscode.Disposable {
   return vscode.Disposable.from(
     vscode.commands.registerCommand('wingmanSpec.newChange', async (root?: string) => {
       const project = await pickProject(store, root || undefined);
@@ -129,12 +129,9 @@ export function registerScaffoldCommands(store: ProjectStore, panel: SpecPanel):
         validateInput: (v) => validateChangeName(v.trim(), project.changes.map((c) => c.name)),
       });
       if (!name) return;
-      try {
-        await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Creating change ${name}` }, () =>
-          cliExec()(['new', 'change', name.trim()], project.root),
-        );
-      } catch (error) {
-        void vscode.window.showErrorMessage(`openspec could not create the change: ${(error as Error).message}`);
+      const made = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Creating change ${name}` }, () => verifier.newChange(project, name.trim()));
+      if (!made.ok) {
+        void vscode.window.showErrorMessage(`wingman-spec could not create the change: ${made.reason}`);
         return;
       }
       await store.refresh();

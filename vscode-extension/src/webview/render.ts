@@ -43,7 +43,7 @@ function content(d: ViewData): string {
 }
 
 /** Renders the whole webview document for a route. Pure: all file contents come in through `data.texts`. */
-export function renderPage(input: ViewData, nonce: string, cspSource: string): string {
+export function renderPage(input: ViewData, nonce: string, cspSource: string, logo?: string): string {
   const data = withDefaultTab(input);
-  return layout(data, content(data), nonce, cspSource);
+  return layout(data, content(data), nonce, cspSource, logo);
 }

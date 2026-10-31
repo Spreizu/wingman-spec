@@ -1,10 +1,12 @@
 import { statSync } from 'node:fs';
+import { join } from 'node:path';
 import * as vscode from 'vscode';
 import { registerScaffoldCommands } from './commands/scaffold.ts';
 import { TraceCache, registerAnchorCode } from './editor/anchorCode.ts';
 import { PanelData } from './editor/panelData.ts';
 import { registerProblems } from './editor/problems.ts';
-import { VerifierClient } from './editor/verifier.ts';
+import { VerifierClient, execRunner } from './editor/verifier.ts';
+import { registerCliSetup } from './editor/cliSetup.ts';
 import { SpecCodeLensProvider } from './editor/codeLens.ts';
 import { registerDiagnostics } from './editor/diagnostics.ts';
 import { SpecHoverProvider } from './editor/hover.ts';
@@ -32,29 +34,27 @@ async function openFile(path: string, line?: number): Promise<void> {
 export function activate(context: vscode.ExtensionContext): void {
   const store = new ProjectStore();
   const traceCache = new TraceCache(store);
-  const verifier = new VerifierClient();
+  const verifier = new VerifierClient(execRunner, join(context.extensionPath, 'bin'));
   const data = new PanelData(store, traceCache, verifier);
-  const panel = new SpecPanel(store, () => traceCache.all(), data);
+  const panel = new SpecPanel(store, () => traceCache.all(), data, vscode.Uri.joinPath(context.extensionUri, 'images', 'icon.png'));
   data.onReady = () => panel.refresh();
   const problems = registerProblems(store, traceCache, verifier);
   const codeLens = new SpecCodeLensProvider(store);
   const markdownFiles: vscode.DocumentSelector = { language: 'markdown', scheme: 'file' };
   const refresh = (): Promise<void> => store.refresh();
 
-  // Watch every workspace folder plus every resolved OpenSpec root (a shared store can live outside
+  // Watch every workspace folder plus every resolved specs root (a shared store can live outside
   // the workspace). The watcher is rebuilt when that set changes, or when the ADR setting changes.
   let watcher: vscode.Disposable | undefined;
   let watched = '';
   const rewatch = (force = false): void => {
-    const roots = [
-      ...(vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath),
-      ...store.projects.map((p) => p.root),
-    ];
-    const signature = [...new Set(roots)].sort().join('\n');
+    const codeRoots = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+    const specsRoots = store.projects.map((p) => p.root);
+    const signature = `${[...new Set(codeRoots)].sort().join('\n')}\n--\n${[...new Set(specsRoots)].sort().join('\n')}`;
     if (!force && signature === watched) return;
     watched = signature;
     watcher?.dispose();
-    watcher = watchRoots(roots, () => void refresh());
+    watcher = watchRoots(codeRoots, specsRoots, () => void refresh());
   };
   rewatch(true);
 
@@ -70,7 +70,7 @@ export function activate(context: vscode.ExtensionContext): void {
     traceCache,
     registerAnchorCode(traceCache, panel),
     registerTraceView(store, traceCache),
-    registerScaffoldCommands(store, panel),
+    registerScaffoldCommands(store, panel, verifier),
     problems.disposable,
     vscode.languages.registerCodeLensProvider(markdownFiles, codeLens),
     vscode.languages.registerHoverProvider(markdownFiles, new SpecHoverProvider(store)),
@@ -79,12 +79,7 @@ export function activate(context: vscode.ExtensionContext): void {
       rewatch(true);
       void refresh();
     }),
-    vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('wingmanSpec.adrDirectory') || e.affectsConfiguration('wingmanSpec.openspecPath')) {
-        rewatch(true);
-        void refresh();
-      }
-    }),
+    registerCliSetup(verifier),
     vscode.commands.registerCommand('wingmanSpec.refresh', refresh),
     vscode.commands.registerCommand('wingmanSpec.openFile', openFile),
     vscode.commands.registerCommand('wingmanSpec.openDashboard', show({ page: 'overview' })),

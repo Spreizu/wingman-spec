@@ -3,7 +3,7 @@
  * that sits in the wrong place into the doc comment of the function it belongs to. Pure: edits are returned as
  * zero-based ranges, `applyEdits` applies them to a string (the editor applies the same ranges through a WorkspaceEdit).
  */
-import placement from '../../../project-template/openspec/scripts/placement.cjs';
+import placement from '../core/placement.ts';
 import { markersIn } from './anchors.ts';
 
 export interface TextEdit {

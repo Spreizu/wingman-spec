@@ -109,7 +109,7 @@ export function registerAnchorCommands(cache: TraceCache, panel: RevealPanel): v
       if (!t) return;
       const cfg = cache.testCommand(t.model);
       if (!cfg || !vscode.workspace.isTrusted) {
-        void vscode.window.showInformationMessage('No project test command is set (the "Test command:" line in the OpenSpec config), or the workspace is not trusted.');
+        void vscode.window.showInformationMessage('No project test command is set (commands.test in wingman-spec.yaml), or the workspace is not trusted.');
         return;
       }
       const { command, filtered } = filteredTestCommand(cfg.command, t.ins.scenarios.map((s) => `${t.ins.cap}/${s.slug}`), cfg.script);

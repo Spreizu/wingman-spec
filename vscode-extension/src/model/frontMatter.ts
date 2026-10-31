@@ -32,7 +32,7 @@ export function parseFrontMatter(text: string): FrontMatter {
   return { fields, body: normalized.slice(match[0].length), hasFrontMatter: true };
 }
 
-/** Reads one flat key from a YAML-ish file such as `.openspec.yaml` or `config.yaml`. */
+/** Reads one flat key from a YAML-ish file such as `wingman-spec.yaml`. */
 export function readYamlKey(text: string, key: string): string | undefined {
   const re = new RegExp(`^${key}\\s*:\\s*(.*?)\\s*(?:#.*)?$`, 'm');
   const m = re.exec(text.replace(/\r\n/g, '\n'));

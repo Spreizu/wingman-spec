@@ -1,5 +1,5 @@
 import { isPlaceholder, parseFrontMatter } from './frontMatter.ts';
-import quality from '../../../project-template/openspec/scripts/quality.cjs';
+import quality from '../core/plan.ts';
 import type { AdrSyncResult, RootAdr, SourceAdr } from './types.ts';
 
 const ROOT_NAME_RE = /^(\d{4})-(.+)\.md$/;

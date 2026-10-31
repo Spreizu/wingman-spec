@@ -11,20 +11,19 @@ import { makeData, makeFixture } from './fixture.ts';
 // backtick (not in text and not in an attribute such as a tooltip); tree labels and hover text drop them as plain text.
 const root = makeFixture();
 const put = (rel: string, text: string): void => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), text); };
-put('openspec/changes/ticks/.openspec.yaml', 'schema: wingman-spec\n');
-put('openspec/changes/ticks/proposal.md', '# Proposal\n\n## Why\n\nReaders need `LIST_QUERY` to stay fast.\n\n## What Changes\n\nAdd a `Cache_layer`.\n');
-put('openspec/changes/ticks/tasks.md', [
+put('changes/ticks/proposal.md', '# Proposal\n\n## Why\n\nReaders need `LIST_QUERY` to stay fast.\n\n## What Changes\n\nAdd a `Cache_layer`.\n');
+put('changes/ticks/tasks.md', [
   '## 1. Cache the `LIST_QUERY` result', '',
   '- [x] 1.1 Add a `Cache_layer` for `(USER_ID, ITEM_ID)`', '  - Spec: cache > Reads use the `Cache_layer`', '  - Test first: a `miss` then a `hit`', '  - Done when: `LIST_QUERY` runs once',
   '- [ ] 1.2 Drop the `legacy` path', '  - Files: `src/cache.ts`',
   '- [ ] 1.R Request code review for group 1', '  - Done when: findings fixed and `re-verified`', '',
 ].join('\n'));
-put('openspec/changes/ticks/specs/cache/spec.md', [
+put('changes/ticks/specs/cache.md', [
   '## ADDED Requirements', '', '### Requirement: Reads use the `Cache_layer`', '', 'Reads SHALL go through the `Cache_layer` when `LIST_QUERY` repeats.', '',
   '#### Scenario: Second read', '', '- **WHEN** `LIST_QUERY` runs twice', '- **THEN** the `Cache_layer` answers the second', '',
 ].join('\n'));
-put('openspec/changes/ticks/adrs/use-cache.md', '---\ntitle: Use the `Cache_layer`\nstatus: Proposed\ndate: 2026-10-19\nchange: ticks\n---\n\n# Use the `Cache_layer`\n\n## Context\n\nThe `LIST_QUERY` is slow.\n\n## Decision\n\nWe add the `Cache_layer`.\n\n## Consequences\n\n- **Positive**: fast\n');
-put('adr/0004-cache.md', '---\ntitle: Cache the `LIST_QUERY`\nstatus: Accepted\ndate: 2026-10-19\n---\n\n# Cache the `LIST_QUERY`\n\n## Context\n\nSlow `LIST_QUERY`.\n\n## Decision\n\nAdd it.\n\n## Consequences\n\n- **Positive**: fast\n');
+put('changes/ticks/adrs/use-cache.md', '---\ntitle: Use the `Cache_layer`\nstatus: Proposed\ndate: 2026-10-19\nchange: ticks\n---\n\n# Use the `Cache_layer`\n\n## Context\n\nThe `LIST_QUERY` is slow.\n\n## Decision\n\nWe add the `Cache_layer`.\n\n## Consequences\n\n- **Positive**: fast\n');
+put('adrs/0004-cache.md', '---\ntitle: Cache the `LIST_QUERY`\nstatus: Accepted\ndate: 2026-10-19\n---\n\n# Cache the `LIST_QUERY`\n\n## Context\n\nSlow `LIST_QUERY`.\n\n## Decision\n\nAdd it.\n\n## Consequences\n\n- **Positive**: fast\n');
 
 const routes: Route[] = [
   { page: 'overview' },

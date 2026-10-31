@@ -16,8 +16,8 @@ const put = (f: string, text: string): void => {
   writeFileSync(join(dir, f), text);
 };
 // a pending change that amends one requirement, one that removes another, one that renames a third
-put('openspec/changes/tweak/proposal.md', '## Why\nx\n\n## What Changes\n- x\n');
-put('openspec/changes/tweak/specs/billing/spec.md', '## MODIFIED Requirements\n\n### Requirement: Remove an item\nThe system SHALL remove an item, with an undo.\nWhy: Users can remove a mistake before they pay.\n\n#### Scenario: Remove it\n- **WHEN** a\n- **THEN** b\n\n## REMOVED Requirements\n\n### Requirement: Legacy thing\n\n## RENAMED Requirements\n\n- FROM: `### Requirement: Rounding`\n- TO: `### Requirement: Round to cents`\n');
+put('changes/tweak/proposal.md', '## Why\nx\n\n## What Changes\n- x\n');
+put('changes/tweak/specs/billing.md', '## MODIFIED Requirements\n\n### Requirement: Remove an item\nThe system SHALL remove an item, with an undo.\nWhy: Users can remove a mistake before they pay.\n\n#### Scenario: Remove it\n- **WHEN** a\n- **THEN** b\n\n## REMOVED Requirements\n\n### Requirement: Legacy thing\n\n## RENAMED Requirements\n\n- Rounding -> Round to cents\n');
 const adr = (number: string, title: string, body: string): RootAdr => ({ number, slug: title, path: join(dir, 'adr', `${number}-x.md`), title, status: 'accepted', date: '', change: '', source: '', supersedes: '', body, fields: {} });
 
 const model = buildTrace(dir, dir);
@@ -58,7 +58,7 @@ test('warnings: amended, removed and renamed by pending changes; no Why; nothing
   const few = { ...spread, code: spread.code.slice(0, 4) };
   assert.ok(!insightOf({ ...model, requirements: new Map(model.requirements).set('billing/rounding', few) }, 'billing/rounding')?.warnings.some((w) => w.code === 'sprawl'));
   assert.ok(!insightOf({ ...m2, requirements: new Map(m2.requirements).set('billing/rounding', { ...spread, block: `${spread.block}\nAnchors: many` }) }, 'billing/rounding')?.warnings.some((w) => w.code === 'sprawl'), '`Anchors: many` silences the sprawl warning');
-  assert.ok(!insightOf({ ...m2, fit: { ...m2.fit, many: new Set(['billing/rounding']) } }, 'billing/rounding')?.warnings.some((w) => w.code === 'sprawl'), '`anchor_many` silences it too');
+  assert.ok(!insightOf({ ...m2, many: new Set(['billing/rounding']) }, 'billing/rounding')?.warnings.some((w) => w.code === 'sprawl'), '`anchor_many` silences it too');
   assert.equal(insightOf(model, 'billing/nope'), undefined);
 });
 
@@ -122,11 +122,13 @@ test('test stubs carry the scenario tag in the language of the file', () => {
   assert.match(testStub(i, 'reject-empty', 'x_test.go'), /func TestRejectEmpty\(t \*testing\.T\)/);
 });
 
-test('test command: read from the config context, placeholders and none mean off', () => {
-  assert.equal(readTestCommand('  - Test command: `npm test`\n  - Lint command: x'), 'npm test');
-  assert.equal(readTestCommand('- Test command: pytest -q  # fast'), 'pytest -q');
-  assert.equal(readTestCommand('- Test command: <fill in>'), undefined);
-  assert.equal(readTestCommand('- Test command: none'), undefined);
+test('test command: commands.test of the config, placeholders and none mean off', () => {
+  assert.equal(readTestCommand('commands:\n  test: npm test\n  lint: x\n'), 'npm test');
+  assert.equal(readTestCommand('traceability: on\ncommands:\n  lint: x\n  test: pytest -q  # fast\n'), 'pytest -q');
+  assert.equal(readTestCommand('commands:\n  test: "go test ./..."\n'), 'go test ./...');
+  assert.equal(readTestCommand('commands:\n  test: <fill in>\n'), undefined);
+  assert.equal(readTestCommand('commands:\n  test: none\n'), undefined);
+  assert.equal(readTestCommand('test: npm test\n'), undefined, 'only commands.test counts');
   assert.equal(readTestCommand('schema: x'), undefined);
 });
 
@@ -162,7 +164,7 @@ test('hover: the Why in words, scenarios with tested status and links, ADRs, pen
   assert.match(md, /WHEN a user adds an item/);
   assert.match(md, /\*\*Related ADRs\*\*: \[0003 Cents only\]\(command:wingmanSpec\.openRoute\?/);
   assert.match(md, /\[Open in Wingman Spec\]\(command:wingmanSpec\.revealRequirement\?/);
-  assert.match(md, /\[Open spec\.md\]\(command:wingmanSpec\.openFile\?/);
+  assert.match(md, /\[Open spec\]\(command:wingmanSpec\.openFile\?/);
   assert.match(md, /\[Run tests\]\(command:wingmanSpec\.runTests\?/);
   assert.doesNotMatch(hoverInsight(i, { root: dir, codeRoot: dir, canRun: false }), /Run tests/);
   const amended = hoverInsight(insightOf(model, 'billing/remove-an-item')!, { root: dir, codeRoot: dir, canRun: false });

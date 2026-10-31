@@ -1,6 +1,6 @@
 /** The pure part of the code view: what a marker or tag resolves to, its CodeLens title, hover text and diagnostics. */
 import { isScannable, isTestFile, isTestPath, markersIn, tagsIn } from './anchors.ts';
-import placement from '../../../project-template/openspec/scripts/placement.cjs';
+import placement from '../core/placement.ts';
 import { unresolvedInfo } from './reqInsight.ts';
 import type { TraceModel, TraceRequirement } from './traceability.ts';
 
@@ -35,12 +35,10 @@ export interface AnchorProblem {
   col: number;
   length: number;
   message: string;
-  /** `unresolved-marker`, `unresolved-tag`, `marker-placement` or `over-anchored`. */
+  /** `unresolved-marker`, `unresolved-tag` or `marker-placement` (`over-anchored` comes from `wingman-spec problems`). */
   code: string;
   /** `anchor_placement: error` raises placement findings to errors. */
   severity?: 'error';
-  /** `over-anchored`: deleting the marker is the suggested fix. */
-  removable?: true;
 }
 
 /**
@@ -54,7 +52,7 @@ export function anchorProblems(model: TraceModel, rel: string, text: string): An
     for (const m of markersIn(text)) {
       if (model.requirements.has(m.key)) continue;
       const info = unresolvedInfo(model, m.key);
-      out.push({ line: m.line, col: m.col, length: m.length, code: 'unresolved-marker', message: `\`@spec ${m.key}\` does not match a requirement in openspec/specs: ${info.text}` });
+      out.push({ line: m.line, col: m.col, length: m.length, code: 'unresolved-marker', message: `\`@spec ${m.key}\` does not match a requirement in the living specs: ${info.text}` });
     }
   }
   if (model.placement !== 'off' && text.includes('@spec')) {
@@ -63,15 +61,6 @@ export function anchorProblems(model: TraceModel, rel: string, text: string): An
       const l = lines[f.line - 1] ?? '';
       const col = l.length - l.trimStart().length;
       out.push({ line: f.line - 1, col, length: Math.max(1, l.trim().length), code: 'marker-placement', message: `${f.kind}: ${f.text}`, ...(model.placement === 'error' ? { severity: 'error' as const } : {}) });
-    }
-  }
-  if (model.fit.level !== 'off' && text.includes('@spec')) {
-    const lines = text.split('\n');
-    for (const f of model.fitFindings.get(rel) ?? []) {
-      const l = lines[f.line - 1] ?? '';
-      if (!l.includes('@spec')) continue; // the model is from the last save: the line moved or the marker is gone
-      const col = l.length - l.trimStart().length;
-      out.push({ line: f.line - 1, col, length: Math.max(1, l.trim().length), code: 'over-anchored', message: `${f.kind}: ${f.text}`, ...(model.fit.level === 'error' && !f.info ? { severity: 'error' as const } : {}), ...(f.remove ? { removable: true } : {}) });
     }
   }
   if (isTestFile(rel)) {

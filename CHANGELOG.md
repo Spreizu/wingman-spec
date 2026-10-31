@@ -2,9 +2,77 @@
 
 Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
-## Unreleased
+## 0.12.0
 
-- **Extension CI.** `.github/workflows/extension.yml` runs on pushes and pull requests to `main`: typecheck, tests, production build and `vsce package` on Node 24 with pnpm from `package.json`. The `.vsix` is uploaded as the `wingman-spec-<version>` artifact; a `v*` tag also creates a GitHub release with it and publishes it to the VS Code Marketplace and Open VSX (`environment: marketplace`; Marketplace sign-in through Trusted Publishing or Microsoft Entra ID with GitHub OIDC, no stored PAT; Open VSX through the secret `OVSX_PAT`; a registry that is not set up is skipped; the tag must match the `package.json` version).
+Wingman Spec is now its own tool: one Go binary, `wingman-spec`, replaces the OpenSpec schema, the `openspec` CLI and the 15
+Node scripts that 0.11 copied into every project. The workflow, the `/spec-*` commands and the checks stay the same.
+Upgrade an 0.11 project once with `wingman-spec import openspec` ([docs/install.md](docs/install.md)).
+
+- **One CLI.** `wingman-spec` covers planning (`new`, `status`, `instructions`, `validate`, `lint`, `size`), the apply loop
+  (`next`, `check`, `review`, `finish`, `visual`), sync and archive, traceability (`anchors`, `guard`, `drift`, `problems`),
+  the new-product flow and setup (`init`, `update`, `doctor`, `config`, `root`). The artifact templates, the agent files,
+  the bundled skills and the visual check's helper are built in. `wingman-spec help reference` lists every exit code,
+  check and setting on one page.
+- **Install.** Install the extension: each platform build bundles the CLI and always runs that copy. **Wingman Spec: Set
+  Up This Folder** runs `init` with it. For CI, releases also carry archives for Linux, macOS and Windows on x64 and arm64
+  (`install.sh` checks the checksum).
+- **`wingman-spec init --harness all`** replaces `install.sh <project>`. It writes `.wingman-spec/` and the agent files for
+  Cursor, Claude Code and Codex. It also writes the `AGENTS.md` block and the shim
+  `.wingman-spec/bin/wingman-spec` that the agents call. `wingman-spec update` refreshes the generated files after an
+  upgrade.
+- **No prompt hook.** The hook that blocked OpenSpec's `/opsx:*` commands is gone, so both can be used side by side.
+  `init` and `update` never edit hook files: delete a 0.11 `spec-guard.cjs` entry by hand ([docs/install.md](docs/install.md)).
+- **New layout.** Settings, specs, changes, archive and ADRs live in `.wingman-spec/` (`wingman-spec.yaml`,
+  `specs/<capability>.md`, `changes/`, `archive/`, `adrs/`). `runs/`, `bin/`, `cache/` and `local/` in it are gitignored.
+  Archive folders carry the time: `archive/YYYY-MM-DD-HHMM-<change>/`.
+- **Settings are keys, not context lines.** `commands.test`, `commands.typecheck`, `commands.lint`, `commands.targeted`,
+  `commands.check_level` and `commands.test_run` replace the `- Test command:` lines. Unknown keys are errors. `wingman-spec
+  config` prints the merged settings.
+- **`import openspec` carries over the settings, not the old template.** A command fact written twice, or wrapped over
+  several lines, gives one `commands` key; a fact bullet with more prose stays whole in `context`. The 0.11 workflow
+  paragraphs and the default `rules` (now built in) are dropped; the project's facts and own rules stay.
+  `visual.ui_files: vue, php` (one comma string) loads as a list. A key written twice, or a value of the wrong shape, is
+  reported with its file line and the fix. `init` also removes the agent files of 0.10 and earlier.
+- **Several repositories share specs through a specs repository** (`init --layout specs`, then `init --layout link --specs
+  ../specs` in each code repo). It replaces the registered OpenSpec store; `import openspec --to .` converts a store.
+- **Parallel waves.** `next` hands out up to `parallel:` (default 3) tasks of one group whose `Files:` do not overlap, one
+  prompt each. `check --task` checks each on its own; the project commands run at the wave's last check, and a failure
+  there reopens the lane whose file it names.
+- **Deterministic sync.** `wingman-spec sync` applies RENAMED, REMOVED, MODIFIED and ADDED blocks in that order and promotes
+  the ADRs; a conflict is an error with its line, and nothing is written. Delta headings are shorter.
+- **Visual scenarios survive the design.** The design never deletes a scenario or its visual block. A state the live app
+  has no data for is reached with a test role, seed data or a route, or the scenario says `Not visual: <reason>`. `lint`
+  warns about a page-element scenario with neither, and a UI edge case needs a visual state even when no block is left.
+- **The timeline covers the whole change.** From the start of `/spec-propose`: `new`, `instructions`, `validate`, `lint`,
+  `size` and `app-map` each append an event, and every artifact written, rewritten or deleted becomes one, listing the
+  scenarios and visual blocks a spec gained or lost. The skills record questions, answers and approvals with `wingman-spec
+  log <change> <event> "<summary>"`. Calls from the editor carry `source: editor`. The Timeline tab groups by phase.
+- **Tamper evidence.** Each timeline line carries the SHA-256 of the line before. `validate`, `doctor` and the Timeline
+  tab name the first entry where the chain breaks (an edit, deletion, insertion or move). `archive` records the head hash
+  in `archived.json`. This detects changes; it cannot stop a full rewrite ([docs/timeline.md](docs/timeline.md)).
+- **Faster visual check.** One browser per check with up to 4 contexts (`visual.contexts`), a 100 ms quiet settle instead
+  of networkidle plus a pause, axe injected once per context, and one before capture per wave. On the bench scenario
+  (5 UI tasks, 2 widths, 4 guard specs) a build took 19.8 s instead of 55.8 s and `finish` 5.1 s instead of 28.2 s, with
+  the same captures and reports.
+- **Extension.** Every build bundles the CLI (`bin/wingman-spec`), and there is no universal build. The extension runs
+  the CLI for findings, sync state, new changes and drift decisions, and reads the three layouts. In each folder with
+  `.wingman-spec/` it keeps the shim pointing at the bundled CLI without asking, also after an update, and logs it. When
+  the generated agent files are older than the CLI (`update --check`), one notification offers `update`. Settings
+  removed: `wingmanSpec.verifierNode`, `wingmanSpec.openspecPath`, `wingmanSpec.adrDirectory`.
+- **Extension buttons run the CLI.** Validate, Status, Sync and Archive on the change page, and Doctor on the Overview,
+  run `wingman-spec <action> --json` directly. A button is enabled only when its preconditions hold (for example Sync
+  once every task is ticked and the change is not synced, Archive once it is synced and nothing else blocks), otherwise
+  it is disabled with a one-line reason. The answer shows inline: one quiet line on success; sync conflicts are listed
+  per requirement, each linked to its file and line, with a "Resolve with agent" hand-off. Archive asks first. Agent
+  hand-offs (propose, apply, fix, resolve) have their own look. The prompt buttons "Archive with agent", "Check sync
+  with agent", "Run /spec-sync" and "Sync ADRs", and the copy button beside agent prompts, are removed.
+- **`visual.ignore` in the settings follows the scenario rules.** The settings check accepted any `a11y:`, `runtime:`
+  or `content:` code and any 3-character `ignore_http` text; it now refuses what an `ignore:` line in a scenario
+  refuses (unknown codes, wildcards, texts such as `...`) with the same message.
+- **CI and releases.** `.github/workflows/ci.yml` runs Go vet and tests on Linux, macOS and Windows, gofmt,
+  golangci-lint, the 6 cross builds, the extension tests and every shell suite. A `v*` tag runs `release.yml`
+  (was `extension.yml`). It runs GoReleaser for the CLI archives, packages 6 vsix files, and publishes them to the VS Code
+  Marketplace and Open VSX (Trusted Publishing or Entra ID, no stored PAT; the tag must match the `package.json` version).
 - **SVG icon.** `assets/icon.svg` is the icon source: the original artwork traced by colour, with a rounded-rect background and one linear gradient per shape (16 KB, no embedded images). The README shows it; `vscode-extension/images/icon.png` is rendered from it at 128 px.
 - **Publisher id `elmo-egers`.** The extension id is now `elmo-egers.wingman-spec` (was `elmoegers.wingman-spec`).
 

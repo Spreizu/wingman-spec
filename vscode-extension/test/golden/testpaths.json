@@ -1,0 +1,152 @@
+[
+  {
+    "path": "src/app.ts",
+    "is_test_path": false,
+    "is_test_file": false,
+    "is_ui_file": false
+  },
+  {
+    "path": "src/app.test.ts",
+    "is_test_path": true,
+    "is_test_file": true,
+    "is_ui_file": false
+  },
+  {
+    "path": "src/app.spec.tsx",
+    "is_test_path": true,
+    "is_test_file": true,
+    "is_ui_file": true
+  },
+  {
+    "path": "tests/billing.py",
+    "is_test_path": true,
+    "is_test_file": true,
+    "is_ui_file": false
+  },
+  {
+    "path": "test/x.test.js",
+    "is_test_path": true,
+    "is_test_file": true,
+    "is_ui_file": false
+  },
+  {
+    "path": "__tests__/a.js",
+    "is_test_path": true,
+    "is_test_file": true,
+    "is_ui_file": false
+  },
+  {
+    "path": "pkg/bill/bill_test.go",
+    "is_test_path": true,
+    "is_test_file": true,
+    "is_ui_file": false
+  },
+  {
+    "path": "pkg/bill/bill.go",
+    "is_test_path": false,
+    "is_test_file": false,
+    "is_ui_file": false
+  },
+  {
+    "path": "spec/models/user_spec.rb",
+    "is_test_path": true,
+    "is_test_file": true,
+    "is_ui_file": false
+  },
+  {
+    "path": "app/models/user.rb",
+    "is_test_path": false,
+    "is_test_file": false,
+    "is_ui_file": false
+  },
+  {
+    "path": "src/test/java/com/acme/BillTest.java",
+    "is_test_path": true,
+    "is_test_file": true,
+    "is_ui_file": false
+  },
+  {
+    "path": "src/main/java/com/acme/Bill.java",
+    "is_test_path": false,
+    "is_test_file": false,
+    "is_ui_file": false
+  },
+  {
+    "path": "Tests/BillTests.cs",
+    "is_test_path": true,
+    "is_test_file": true,
+    "is_ui_file": false
+  },
+  {
+    "path": "lib/bill.ex",
+    "is_test_path": false,
+    "is_test_file": false,
+    "is_ui_file": false
+  },
+  {
+    "path": "test/bill_test.exs",
+    "is_test_path": true,
+    "is_test_file": true,
+    "is_ui_file": false
+  },
+  {
+    "path": "src/components/Grid.vue",
+    "is_test_path": false,
+    "is_test_file": false,
+    "is_ui_file": true
+  },
+  {
+    "path": "src/components/Grid.svelte",
+    "is_test_path": false,
+    "is_test_file": false,
+    "is_ui_file": true
+  },
+  {
+    "path": "src/pages/index.astro",
+    "is_test_path": false,
+    "is_test_file": false,
+    "is_ui_file": true
+  },
+  {
+    "path": "styles/app.css",
+    "is_test_path": false,
+    "is_test_file": false,
+    "is_ui_file": true
+  },
+  {
+    "path": "README.md",
+    "is_test_path": false,
+    "is_test_file": false,
+    "is_ui_file": false
+  },
+  {
+    "path": "e2e/login.spec.ts",
+    "is_test_path": true,
+    "is_test_file": true,
+    "is_ui_file": false
+  },
+  {
+    "path": "cypress/e2e/login.cy.ts",
+    "is_test_path": false,
+    "is_test_file": false,
+    "is_ui_file": false
+  },
+  {
+    "path": "src/__snapshots__/a.snap",
+    "is_test_path": false,
+    "is_test_file": false,
+    "is_ui_file": false
+  },
+  {
+    "path": "test_utils.py",
+    "is_test_path": true,
+    "is_test_file": true,
+    "is_ui_file": false
+  },
+  {
+    "path": "tests/fixtures/data.json",
+    "is_test_path": true,
+    "is_test_file": false,
+    "is_ui_file": false
+  }
+]

@@ -33,13 +33,6 @@ export class MarkerFixes implements vscode.CodeActionProvider {
         a.edit = new vscode.WorkspaceEdit();
         a.edit.replace(doc.uri, d.range, info.hint);
         out.push(a);
-      } else if (d.code === 'over-anchored') {
-        const e = removeMarkerEdit(doc.getText(), d.range.start.line);
-        if (!e) continue;
-        const a = new vscode.CodeAction('Remove this marker (it says too little about the code)', vscode.CodeActionKind.QuickFix);
-        a.diagnostics = [d];
-        a.edit = toWorkspaceEdit(doc.uri, [e]);
-        out.push(a);
       } else if (d.code === 'marker-placement' && !String(d.message).startsWith('duplicate-marker')) {
         const plan = moveMarkerPlan(doc.getText(), f.rel, d.range.start.line);
         if (!plan) continue;

@@ -1,5 +1,5 @@
 /**
- * The verifier's own findings (`verify-task.cjs problems`) as the editor reads them: one located list. Parsing is tolerant
+ * The verifier's own findings (`wingman-spec problems`) as the editor reads them: one located list. Parsing is tolerant
  * (a malformed entry is dropped, never thrown) because the JSON comes from a script in the workspace.
  */
 

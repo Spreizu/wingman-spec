@@ -1,0 +1,105 @@
+# Reconstructed openspec/config.yaml of an OpenSpec-era project (floreas_docker): the import bug fixture.
+schema: wingman-spec
+context: |
+  Workflow: the `wingman-spec` schema (see the "wingman-spec workflow" block in AGENTS.md): a senior analyst plans
+  (app-map, proposal, specs, design, ADRs, tasks); developers or one subagent per task implement test-first.
+
+  COMMANDS: /spec-explore, /spec-propose, /spec-apply, /spec-fix, /spec-sync, /spec-archive, /spec-garden (see AGENTS.md).
+
+  EXPLORE: when exploring or when requirements/decisions are unclear, invoke the
+  `grilling` skill by name and work through it until every branch is resolved. Do not
+  guess product or architecture decisions.
+
+  SYNC: a sync is not complete until the change's ADRs are promoted to the root `adr/` directory and the delta specs are
+  merged. Anchors are the `@spec` markers in the code; nothing is stored. `/spec-sync <change>` does all of it.
+  `/spec-archive <change>` runs it first, so run it on its own only to inspect or fix a sync problem
+  (`wingman-spec archive` refuses an unsynced change); after a plain `/opsx:sync`, run `/spec-sync <change> --adrs-only`.
+
+  Project facts:
+  - Product: Floreas web shop (catalog, cart, orders, admin) plus Docker stack.
+  - Language/framework: PHP 8.2, CodeIgniter 3.1.13 (MVC under `app/application/`).
+    Do not edit CodeIgniter core in `app/system/`.
+  - Runtime: docker-compose — nginx (Alpine), php:8.2-fpm (Firebird `interbase`
+    extension), ACME certs. App files mount at `/var/www/html` from `./app`.
+  - Database: Firebird via CodeIgniter `ibase` driver (`$active_group = 'ladu'`).
+    Query Builder is off (`$query_builder = FALSE`). Prefer library-level unit
+    tests that do not require a live DB.
+  - Front end: jQuery/Bootstrap assets in `app/assets/`; minify pipeline in
+    `app/min/`.
+  - i18n: Estonian, Russian, English language packs under
+    `app/application/language/`.
+  - Tests: PHPUnit 10 (`tests/php`, bootstrap `tests/bootstrap.php`) and Node
+    test runner (`tests/js/*.test.mjs`). Composer autoloads
+    `app/application/libraries/` via classmap.
+  - Test command: `composer test` (runs `composer test:php` then
+    `composer test:js`). PHP only: `composer test:php` or
+    `vendor/bin/phpunit --testsuite php`. JS only: `composer test:js`.
+  - Lint: none configured (no phpcs/phpstan/eslint in-repo).
+  - Conventions: CI3 style — controllers/models as classes, `defined('BASEPATH')`
+    guards, libraries in `app/application/libraries/`. New automated tests go
+    in `tests/php` or `tests/js`, not `tests/scripts`. Do not commit session
+    files, minify cache, or application logs.
+  `openspec/scripts/verify-task.cjs` runs the test command after every task. It refuses to start while the
+  test command is still <fill in>; write `none` to run no project tests (not recommended). The typecheck and lint
+  commands run in every check too (skipped when a task's `Done when:` already runs them); `none` disables one.
+  - Test command: composer test
+  - Typecheck command: none
+  - Lint command: none
+traceability: on
+anchor_placement: warn
+anchor_guard: warn
+anchor_fit: warn
+anchor_max: 3
+test_evidence: warn
+anchor_stale: info
+visual:
+  command: "docker compose up -d && docker compose logs -f --tail=0 nginx"
+  url: https://localhost/
+  reuse_server: true
+  ignore_https_errors: true
+  # Local docker has no catalog photos; 404s here are expected in dev, not a UI defect.
+  # ignore_http skips runtime:http-error / request-failed / console-error and content:broken-image whose message contains the text.
+  ignore_http:
+    - /catalog/image/
+  ready_timeout: 120
+  require_playwright: true
+  review: off
+  ui_files: vue, svelte, tsx, jsx, astro, html, htm, css, scss, sass, less, styl, php
+  roles:
+    admin:
+      login: /et/users/loginap
+      success: /et/ap/order/active
+      user_field: input[name=username]
+      password_field: input[name=password]
+      submit: button[type=submit]
+    customer:
+      login: /et/users/login
+      success: "#sidebar-wrapper"
+      user_field: input[name=username]
+      password_field: input[name=password]
+      submit: button[type=submit]
+rules:
+  app-map:
+    - 'Size S (see the proposal rules): only two lines, "This change ..." and "Fits ...", no headings.'
+  proposal:
+    - 'Start with a "Size: S|M|L" line and a "Risk: none" line (or security, money, data-migration, concurrency, public-api). S = 1 capability, at most 3 requirements, nothing BREAKING, no risk, no ADR, no visual scenarios; M = up to 2 capabilities or UI with visual scenarios; L = 3+ capabilities, BREAKING or any risk. verify-task.cjs size checks it against the specs.'
+    - List ADR candidates for every architecturally significant decision, or write "none".
+    - 'An "## Edge cases" section: every edge case the request or answers name (long text, empty, error, many items, limits), one bullet each ending with "-> <capability>/<scenario-slug>"; UI cases point at a visual scenario with a state showing that content. Size S trims documents, never scenarios.'
+  specs:
+    - Every scenario must use concrete inputs and exact expected outputs so it can become a failing test.
+    - 'Every requirement carries a line "Why: <who wants it, and why>" (one line, a named role or person, at least 5 words) directly under its SHALL sentence. Rewriting the Why of an existing requirement, or removing a requirement, needs the owner''s approval first: add "Owner approval: <name>, <date>" to the proposal only after they agreed.'
+    - Cover happy path plus at least one error/boundary case per requirement.
+    - Every user-visible UI behavior gets a visual scenario (a ```visual block with route, key elements, states and viewports).
+    - 'Every requirement that computes, transforms, sorts or stores data gets an "Invariant: ..." scenario: input unchanged and sharing no mutable objects with the result, same input gives the same result, order, rounding (whichever apply).'
+    - 'With a design input, visual scenarios name the design image (reference), use the design-map.md selectors as key lines and carry its Expect column as expect lines; at least one expect per map row, and font-size, font-weight and line-height for every text element (token where the project has one, else the literal design value).'
+  design:
+    - 'Size S: only Implementation guide and Pitfalls (plus a short Testing approach). Size M and L: every section, written for a junior developer.'
+  adrs:
+    - Size S writes only adrs/none.md; an ADR makes the change at least Size M.
+  tasks:
+    - 'No Size line in tasks.md: the cap comes from the Size line of proposal.md (S/M/L at most 3/5/8 implementation tasks); merge consecutive tasks on the same file.'
+    - Each task needs Spec, Test first, Files and Done when lines. One final code review of the whole change; group reviews only after group 1 of an L change and after groups marked (risky). No close-out tasks (verify-task.cjs finish does them).
+    - A review task may fix findings in any file named in this change's Files lines; it needs no Files line of its own.
+    - Test titles carry the scenario id they prove, e.g. [capability/scenario-slug]; tests never read source files as text.
+    - A task that builds or changes UI names its visual scenarios in a `Visual:` line; every visual scenario is named by a task.
+    - With a design-map.md, Files lines follow the map (its components and token files); build with project tokens and components, never new hex/px or arbitrary classes unless the map lists them under Gaps.

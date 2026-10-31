@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import './support/installStub.mjs';
+import { fakeBundle } from './support/bundle.ts';
 import { git, put, repo } from './support/gitRepo.ts';
 import { traceProject } from './trace-fixture.ts';
 
@@ -15,7 +16,7 @@ const { PanelData, readRunFiles } = await import('../src/editor/panelData.ts');
 const { VerifierClient } = await import('../src/editor/verifier.ts');
 
 const fakeVerifier = (findings: unknown[]) =>
-  new VerifierClient(async (_c: string, args: string[]) => ({ code: 0, stdout: args.includes('guard') ? JSON.stringify({ level: 'warn', findings: [] }) : args.includes('sync-check') ? JSON.stringify({ synced: false, problems: ['specs: not merged'], warnings: [] }) : JSON.stringify({ ok: false, findings }), stderr: '', timedOut: false }));
+  new VerifierClient(async (_c: string, args: string[]) => ({ code: 0, stdout: args.includes('guard') ? JSON.stringify({ level: 'warn', findings: [] }) : args.includes('sync-check') ? JSON.stringify({ synced: false, problems: ['specs: not merged'], warnings: [] }) : JSON.stringify({ ok: false, findings }), stderr: '', timedOut: false }), fakeBundle());
 
 const wait = (data: { onReady: () => void }): Promise<void> => new Promise((r) => (data.onReady = r));
 
@@ -52,7 +53,7 @@ test('not a git repository, no base branch and untrusted workspace are explained
   assert.match((d1.branch(plain) as { reason: string }).reason, /not a git repository/);
 
   const nobase = mkdtempSync(join(tmpdir(), 'wsx-nobase-'));
-  put(nobase, 'openspec/config.yaml', 'schema: wingman-spec\n');
+  put(nobase, 'wingman-spec.yaml', '');
   git(nobase, 'init', '-q', '-b', 'topic');
   put(nobase, 'a.txt', 'x');
   git(nobase, 'add', '-A');
@@ -93,9 +94,9 @@ test('the base can be set; a setting that names no ref falls back to the usual o
 test('dashboard data: run files, problems and sync-check are read once and kept; the switch turns the verifier off', async () => {
   host.reset();
   const dir = repo();
-  put(dir, 'openspec/.apply-runs/refunds/current', '20261025T1-1\n');
-  put(dir, 'openspec/.apply-runs/refunds/20261025T1-1/state.json', JSON.stringify({ task: { label: '1.1' }, attempts: 1, last_failure: 'boom', review: null }));
-  put(dir, 'openspec/.apply-runs/refunds/20261025T1-1/metrics.jsonl', '{"event":"check","task":"1.1","attempt":1,"ok":false,"failures":["boom"]}\n');
+  put(dir, 'runs/refunds/current', '20261025T1-1\n');
+  put(dir, 'runs/refunds/20261025T1-1/state.json', JSON.stringify({ task: { label: '1.1' }, attempts: 1, last_failure: 'boom', review: null }));
+  put(dir, 'runs/refunds/20261025T1-1/metrics.jsonl', '{"event":"check","task":"1.1","attempt":1,"ok":false,"failures":["boom"]}\n');
   assert.equal(readRunFiles(dir, 'refunds').runId, '20261025T1-1');
   assert.deepEqual(readRunFiles(dir, 'missing'), {});
   const store = { projects: [{ root: dir, workspaceFolder: dir, adrs: [], changes: [], error: undefined }], onDidChange: () => new stub.Disposable() };
@@ -105,6 +106,13 @@ test('dashboard data: run files, problems and sync-check are read once and kept;
   await ready;
   const got = d.dashboard(dir, 'refunds');
   assert.deepEqual([got?.run?.checksFailed, got?.findings?.length, got?.sync?.ok, got?.unavailable], [1, 1, false, undefined]);
+  d.invalidate();
+  assert.equal(d.dashboard(dir, 'refunds'), undefined);
+  await d.settled(5000);
+  assert.equal(d.dashboard(dir, 'refunds')?.sync?.ok, false, 'settled: the first render of a change page has the sync state');
+  const t0 = Date.now();
+  await d.settled(5000);
+  assert.ok(Date.now() - t0 < 1000, 'nothing in flight: no wait');
 
   host.settings['wingmanSpec.dashboardChecks'] = false;
   d.invalidate();

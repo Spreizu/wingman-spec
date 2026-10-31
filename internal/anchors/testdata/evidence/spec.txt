@@ -1,0 +1,25 @@
+✔ [todo/added] passes (0.527227ms)
+✖ [todo/removed] fails (0.113041ms)
+﹣ [todo/skipped] skipped (0.102207ms) # SKIP
+✔ [todo/quiet] untagged by name (0.064719ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 38.563658
+
+✖ failing tests:
+
+test at a.test.js:3:1
+✖ [todo/removed] fails (0.113041ms)
+  Error: boom
+      at TestContext.<anonymous> (/project/a.test.js:3:44)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1047:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+      at Test.postRun (node:internal/test_runner/test:1173:19)
+      at Test.run (node:internal/test_runner/test:1101:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)

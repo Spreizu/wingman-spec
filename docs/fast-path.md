@@ -11,13 +11,13 @@ A change is **fast** when all of these hold; otherwise it is **full**:
 - no UI change (no `visual` blocks, no UI files in `Files:`);
 - no dependency manifest in `Files:` (`package.json`, lockfiles, `composer.json`, `requirements.txt`, ...).
 
-`verify-task.cjs size <change>` prints the path and the reasons. The extension shows the app-map, design and ADR steps of a fast change as skipped.
+`wingman-spec size <change>` prints the path and the reasons. The extension shows the app-map, design and ADR steps of a fast change as skipped.
 
 ## What the fast path drops
 
 | Artifact | Fast | Full |
 | --- | --- | --- |
-| `app-map.md` | none, or the two lines from `verify-task.cjs app-map <change> --apply` | the analyst's map (Size S: two lines, also generated) |
+| `app-map.md` | none, or the two lines from `wingman-spec app-map <change> --apply` | the analyst's map (Size S: two lines, also generated) |
 | `design.md` | none | guide and pitfalls (S), full design (M/L) |
 | `adrs/` | none | `none.md` or the ADRs |
 | final review task | none | Size M/L, a Risk kind, or UI |
@@ -27,7 +27,7 @@ Specs, scenarios, edge cases, the `Done when:` tests, the scenario tags, the sou
 
 ## Scope upgrade
 
-The plan can lie about its scope, so the verifier looks at the edits. At `check` and `finish` it upgrades a fast change when the work since the run base touched a sensitive path, a UI file or a dependency manifest, or changed more than 150 lines. The upgrade is stored in `openspec/.apply-runs/<change>/upgrade.json`; the task that triggered it still passes (with a warning), and `next` then refuses with `path-artifacts` until app-map, design and the ADR record exist. The change never goes back to fast.
+The plan can lie about its scope, so the verifier looks at the edits. At `check` and `finish` it upgrades a fast change when the work since the run base touched a sensitive path, a UI file or a dependency manifest, or changed more than 150 lines. The upgrade is stored in `runs/<change>/upgrade.json`; the task that triggered it still passes (with a warning), and `next` then refuses with `path-artifacts` until app-map, design and the ADR record exist. The change never goes back to fast.
 
 ## Why
 

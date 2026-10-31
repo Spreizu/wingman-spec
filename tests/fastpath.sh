@@ -2,27 +2,28 @@
 # shellcheck disable=SC2016,SC2034
 # Planning path tests (quality.cjs planPath, verify-task.cjs lint/next/check/finish/app-map): the fast path
 # (Size S, Risk none, no sensitive path, no UI) needs no app-map, design or ADR record; anything else does; a fast change
-# whose edits leave its scope is upgraded. Usage: tests/fastpath.sh (needs openspec and node on PATH).
+# whose edits leave its scope is upgraded. Usage: tests/fastpath.sh (needs the wingman-spec binary, see tests/lib/ws.sh, and node).
 set -uo pipefail
 PKG="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=lib/ws.sh
+. "$PKG/tests/lib/ws.sh"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
-export SPEC_TRACEABILITY=off OPENSPEC_TELEMETRY=0 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
+export WINGMAN_SPEC_TRACEABILITY=off GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
 PASS=0; FAIL=0; rc=0; out=""
 ok()  { PASS=$((PASS+1)); echo "  ok   $*"; }
 bad() { FAIL=$((FAIL+1)); echo "  FAIL $*"; }
 expect() { if eval "$2"; then ok "$1"; else bad "$1  (rc=$rc)"; fi; }
 cd "$T" && mkdir p && cd p && git init -q
-openspec init --tools none >/dev/null 2>&1 || mkdir -p openspec/changes openspec/specs
-"$PKG/install.sh" . >/dev/null || { echo "install failed"; exit 1; }
-sed -i.b 's/Test command: <fill in>/Test command: none/' openspec/config.yaml && rm -f openspec/config.yaml.b
+ws_init . && ws_set visual off
+ws_cmd test none
 git add -A && git commit -qm init
-V="node openspec/scripts/verify-task.cjs"; C=openspec/changes/demo
+V="$WS"; C=.wingman-spec/changes/demo
 
 # change <size> <risk> <files> [tasks...]: a valid change with one capability; only proposal, specs and tasks.
 change() {
-  rm -rf "$C" openspec/.apply-runs; mkdir -p "$C/specs/demo"
+  rm -rf "$C" .wingman-spec/runs; mkdir -p "$C/specs"
   printf 'Size: %s\nRisk: %s\n\n## Why\nDemo change for the planning path tests.\n\n## What Changes\n- Adds a demo capability.\n\n## Edge cases\n- none named\n' "$1" "$2" > "$C/proposal.md"
-  printf '## ADDED Requirements\n\n### Requirement: Demo\nThe system SHALL greet.\n\n#### Scenario: greet\n- **WHEN** asked\n- **THEN** it greets\n' > "$C/specs/demo/spec.md"
+  printf '## ADDED\n\n### Requirement: Demo\nThe system SHALL greet.\n\n#### Scenario: greet\n- **WHEN** asked\n- **THEN** it greets\n' > "$C/specs/demo.md"
   printf '## 1. G\n- [ ] 1.1 one\n  - Files: %s\n  - Done when: `true` exits 0\n- [ ] 1.2 two\n  - Files: %s\n  - Done when: `true` exits 0\n' "$3" "$3" > "$C/tasks.md"
 }
 paths() { $V lint demo 2>&1 | grep -c '"kind": "path-artifacts"'; }
@@ -72,7 +73,7 @@ upgrade_case() { # <label> <stub that edits code> <grep for the reason>
   $V next demo --per-task >/dev/null 2>&1
   eval "$2"
   out="$($V check demo --reported done 2>&1)"; rc=$?
-  expect "$1: the task still passes, with a warning, and the upgrade is recorded" '[ $rc = 0 ] && printf "%s" "$out" | grep -q "left the fast path" && grep -q "$WHY" openspec/.apply-runs/demo/upgrade.json'
+  expect "$1: the task still passes, with a warning, and the upgrade is recorded" '[ $rc = 0 ] && printf "%s" "$out" | grep -q "left the fast path" && grep -q "$WHY" .wingman-spec/runs/demo/upgrade.json'
   rc=0; out="$($V next demo --per-task 2>&1)" || rc=$?
   expect "$1: next refuses until the full artifacts exist (path-artifacts)" '[ $rc = 2 ] && printf "%s" "$out" | grep -q "path-artifacts"'
 }
@@ -89,7 +90,7 @@ git clean -fdq src 2>/dev/null
 change S none src/greet.js; git add -A >/dev/null; git commit -qm c2 --allow-empty
 $V next demo --per-task >/dev/null 2>&1; mkdir -p src; seq 1 20 > src/small.js
 out="$($V check demo --reported done 2>&1)"; rc=$?
-expect "a small edit in a plain file stays on the fast path (no upgrade file)" '[ $rc = 0 ] && [ ! -f openspec/.apply-runs/demo/upgrade.json ] && ! printf "%s" "$out" | grep -q "left the fast path"'
+expect "a small edit in a plain file stays on the fast path (no upgrade file)" '[ $rc = 0 ] && [ ! -f .wingman-spec/runs/demo/upgrade.json ] && ! printf "%s" "$out" | grep -q "left the fast path"'
 
 echo "== final review task only where it pays off"
 revlint() { $V lint demo 2>&1 | grep -c "\"kind\": \"review\""; }

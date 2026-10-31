@@ -1,6 +1,6 @@
 # Why a check or a finish takes the time it takes
 
-`verify-task` runs the project's own commands (tests, typecheck, lint, a task's `Done when:`) and a set of scans of its own. Measured in a project of 4,400 files with 300 requirements and a test command that sleeps 20 seconds (so the project's suite is a fixed 20 s and everything above 20 s is ours), the scripts' own work was about 1 s per `check`; the rest was the suite, run more often than needed. `SPEC_PROFILE=1` (or `--timing`) prints what each command and scan cost, most expensive first, and records it in the run's `metrics.jsonl` (`event: profile`).
+`verify-task` runs the project's own commands (tests, typecheck, lint, a task's `Done when:`) and a set of scans of its own. Measured in a project of 4,400 files with 300 requirements and a test command that sleeps 20 seconds (so the project's suite is a fixed 20 s and everything above 20 s is ours), the scripts' own work was about 1 s per `check`; the rest was the suite, run more often than needed. `WINGMAN_SPEC_PROFILE=1` (or `--timing`) prints what each command and scan cost, most expensive first, and records it in the run's `metrics.jsonl` (`event: profile`).
 
 | Command | 0.10.3 | 0.11.0 | 0.11.1 |
 |---|---|---|---|
@@ -15,9 +15,9 @@ What was ours:
 - A `Done when:` that is the project's test command ran once per task of a batch and never reached the result cache, so `finish` ran it again. Now one command runs once per tree (the second task says "same command"), and a `Done when:` equal to the project's tests, typecheck or lint command shares the cache entry that `finish` reads. The key is the hash of the working tree without the run state and the change's `tasks.md` / `progress.md`, so ticking a box does not invalidate it; any other edit, a failing result and `--no-cache` do.
 - `sync` and `archive` ran the stale-anchor drift, which blames every anchored file (`git blame -w -M -C -C`, about 8 s for 400 files). They now run the drift without it (the stale-anchor list is advisory and `drift` still prints it), and `drift` keeps its blame results in the git directory, keyed by the file, its copies and its content and emptied when HEAD moves, so a second `drift` takes 0.35 s.
 - On a large repo the working-tree hash ran `git add -A` into a temporary index, reading and copying every untracked file into `.git`. Measured on 50,066 tracked files plus 1.7 GB of untracked data: `next` 40.7 s -> 0.35 s, the first `check` 31.8 s -> 1.6 s, `finish` 4.7 s -> 0.9 s, and `.git` no longer grows by 1.7 GB. The hash now reuses the real index and adds untracked files by name, size and mtime.
-- Live progress: a command running for 3 s is announced on stderr and then every 15 s with the elapsed time, and its end is printed. `--timeout SEC` or `SPEC_TIMEOUT_<TESTS|TYPECHECK|LINT|DONE_WHEN|VALIDATE>` limits one command.
+- Live progress: a command running for 3 s is announced on stderr and then every 15 s with the elapsed time, and its end is printed. `--timeout SEC` or `WINGMAN_SPEC_TIMEOUT_<TESTS|TYPECHECK|LINT|DONE_WHEN|VALIDATE>` limits one command.
 
-What is not ours: the project's own test, typecheck and lint time. A task's `Done when:` and the project tests are two regression gates; the second runs at every `check` by default. A project whose suite is slow can put `- Test run: finish` under the test command in `openspec/config.yaml` (or `SPEC_TEST_RUN=finish`): `check` then runs only the task's `Done when:`, and the whole suite runs once at `finish`. That removes the per-task regression gate (a task that breaks another test is found at `finish`, not at its own check), so it is the project owner's decision; the default is unchanged.
+What is not ours: the project's own test, typecheck and lint time. A task's `Done when:` and the project tests are two regression gates; the second runs at every `check` by default. A project whose suite is slow can put `commands.test_run: finish` under the test command in `.wingman-spec/wingman-spec.yaml` (or `WINGMAN_SPEC_TEST_RUN=finish`): `check` then runs only the task's `Done when:`, and the whole suite runs once at `finish`. That removes the per-task regression gate (a task that breaks another test is found at `finish`, not at its own check), so it is the project owner's decision; the default is unchanged.
 
 # A visual check on a page with defects that are not the task's
 
@@ -42,18 +42,18 @@ Audit on the synthetic project above: 4,400 files; tests 20 s, typecheck 4 s, li
 |---|---|---|
 | 0.10.3, one task per dispatch (always) | 6 / 6 / 6 / 5 | 166 s |
 | 0.11.1 default, `--per-task` | 5 / 5 / 5 / 5 | 142 s |
-| 0.11.2 default (`Check level: targeted`), one task per dispatch | 1 / 2 / 2 / 5 | 42 s |
+| 0.11.2 default (`check_level: targeted`), one task per dispatch | 1 / 2 / 2 / 5 | 42 s |
 | 0.11.2 default, one group per dispatch | 1 / 2 / 2 / 5 | 39 s |
-| `Check level: group`, one task per dispatch | 2 / 2 / 2 / 5 | 63 s |
-| `Check level: task`, one task per dispatch | 5 / 5 / 5 / 5 | 140 s |
-| `Check level: finish` | 1 / 1 / 1 / 5 | 30 s |
+| `check_level: group`, one task per dispatch | 2 / 2 / 2 / 5 | 63 s |
+| `check_level: task`, one task per dispatch | 5 / 5 / 5 / 5 | 140 s |
+| `check_level: finish` | 1 / 1 / 1 / 5 | 30 s |
 
 What the result cache skips: an identical repeat only, such as `finish` after the last `check` with no edit in between. Between two tasks the tree differs, so each check that runs the project's commands runs them.
 
 What runs when:
 
 - At every `check`: the `Done when:` of each task of the dispatch and the static scans (traceability, anchors, size, plan lint).
-- At every `check` (default `Check level: targeted`): the task's targeted tests only. These are the test files the change added or edited, the tests tagged with the task's scenarios, and the tests named after the task's files or after any source file the change has edited. They run through a per-file command: `- Targeted test command: <runner> {files}` in `openspec/config.yaml`, else a template derived from the test command for vitest, jest, mocha, ava, node --test, pytest, rspec, deno, bun and go. When no template is known, the check notes it and runs no tests.
+- At every `check` (default `check_level: targeted`): the task's targeted tests only. These are the test files the change added or edited, the tests tagged with the task's scenarios, and the tests named after the task's files or after any source file the change has edited. They run through a per-file command: `- Targeted test command: <runner> {files}` in `.wingman-spec/wingman-spec.yaml`, else a template derived from the test command for vitest, jest, mocha, ava, node --test, pytest, rspec, deno, bun and go. When no template is known, the check notes it and runs no tests.
 - At the check that ends a task group: typecheck and lint, with incremental flags where the tool has them (`tsc --incremental`, `eslint --cache`).
 - At a review task: the full test suite, typecheck and lint.
 - For a task that names a `Visual:` scenario or edits a UI file: the visual check of its own scenarios.
@@ -74,22 +74,22 @@ A project whose suite takes 60 s (a 5-task change, Size M, `node --test` with on
 
 | Setup | Checks of tasks 1 to 5 | `finish` | Whole change |
 |---|---|---|---|
-| `Check level: task` | 61, 61, 61, 61, 61 s | cached | 307 s |
-| `Check level: group` (0.11.2 before this) | 0.8, 0.7, 61, 0.6, 61 s | cached | 126 s |
-| `Check level: targeted` (default) | 0.9, 0.8, 0.8, 0.8, 0.7 s | 60.5 s | 66 s |
+| `check_level: task` | 61, 61, 61, 61, 61 s | cached | 307 s |
+| `check_level: group` (0.11.2 before this) | 0.8, 0.7, 61, 0.6, 61 s | cached | 126 s |
+| `check_level: targeted` (default) | 0.9, 0.8, 0.8, 0.8, 0.7 s | 60.5 s | 66 s |
 
-Incremental typecheck on 1,500 TypeScript files, one leaf file edited: `tsc` 5.9 takes 3.0 s without `--incremental` and 1.3 s with it; the native TypeScript 7 compiler shows no gain. The flags are written by `install.sh` when it detects the typecheck and lint commands.
+Incremental typecheck on 1,500 TypeScript files, one leaf file edited: `tsc` 5.9 takes 3.0 s without `--incremental` and 1.3 s with it; the native TypeScript 7 compiler shows no gain. The flags are written by `wingman-spec init` when it detects the typecheck and lint commands.
 
 ## Defaults and what they move
 
-`finish` still runs every project command and every declared scenario, so each fault is caught by `finish` at the latest. `tests/verify-task.sh` seeds 15 faults and catches all 15 at the check with `Check level: task`; `tests/targeted.sh` shows a fault in a targeted test caught at the check and one in any other test caught at `finish` with the default; `tests/runfreq.sh` and `tests/visual-cache.sh` cover the levels.
+`finish` still runs every project command and every declared scenario, so each fault is caught by `finish` at the latest. `tests/verify-task.sh` seeds 15 faults and catches all 15 at the check with `check_level: task`; `tests/targeted.sh` shows a fault in a targeted test caught at the check and one in any other test caught at `finish` with the default; `tests/runfreq.sh` and `tests/visual-cache.sh` cover the levels.
 
 | Default | Opt-in for the stricter gate | What moved |
 |---|---|---|
-| `Check level: targeted` | `- Check level: group` or `task` (or `SPEC_CHECK_LEVEL`) | a break in a test that no task targets is found at `finish`; a typecheck or lint break in a task that does not end its group is found at the group's last check. A break in a targeted test is still found at the task's check |
+| `check_level: targeted` | `commands.check_level: group` or `task` (or `WINGMAN_SPEC_CHECK_LEVEL`) | a break in a test that no task targets is found at `finish`; a typecheck or lint break in a task that does not end its group is found at the group's last check. A break in a targeted test is still found at the task's check |
 | `visual.scope: task` | `visual.scope: all` | a regression in another declared scenario (3 seeded: hidden count, page scrolling sideways, demoted heading) is found at `finish`, not at the task's check |
 | `visual.changed_only: on` | `visual.changed_only: off` | an identical passing visual run is not repeated; files the tree does not hold (a dependency, data or environment change) are not seen. Never applies when screenshots go to the visual review or a scenario has a `role:` |
 | `visual.request_timeout: 3` | `visual.request_timeout: 0` | a request slower than 3 s is reported as failed |
 | `visual.baseline: off` | `visual.baseline: on` | nothing: every defect still fails |
 
-`--per-task` (one task per dispatch) stays opt-in; it changes dispatches, not the check level. `- Test run: finish` still moves only the project tests to `finish`.
+`--per-task` (one task per dispatch) stays opt-in; it changes dispatches, not the check level. `commands.test_run: finish` still moves only the project tests to `finish`.

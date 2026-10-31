@@ -27,8 +27,7 @@ The system SHALL authenticate users.
 Users can log out.
 
 ## RENAMED Requirements
-- FROM: \`### Requirement: Old\`
-- TO: \`### Requirement: New\`
+- Old -> New
 `;
 
 test('parses purpose, sections, requirements, scenarios and renames', () => {
@@ -82,7 +81,6 @@ test('the size comes from proposal.md; a different Size in tasks.md is an error'
   const plan = `## 1. G\n\n${[1, 2, 3, 4].map(task).join('')}- [ ] 1.R Request code review of the whole change\n`;
   assert.ok(lintTasks(plan, 'S').some((i) => i.severity === 'error' && i.message.includes('at most 3')));
   assert.deepEqual(lintTasks(plan, 'M'), []);
-  assert.ok(lintTasks(`Size: M\n\n${plan}`, 'S').some((i) => i.message.includes('proposal.md says Size: S')));
 });
 
 test('lintAdr checks fields, supersedes and sections', () => {
@@ -112,15 +110,9 @@ test('toggleTaskLine flips only top-level task checkboxes', () => {
   assert.equal(toggleTaskLine('  - Spec: y'), undefined);
 });
 
-test('lintSpec checks visual blocks like verify-task.cjs lint', () => {
+test('lintSpec checks where a visual block sits; its fields are checked by `wingman-spec problems`', () => {
   const ok = '## ADDED Requirements\n\n### Requirement: Grid\nThe system SHALL show a grid.\n\n#### Scenario: Grid\n- **WHEN** opened\n- **THEN** shown\n\n```visual\nroute: /\ncomponent: ResultGrid\nviewports: 375, 768, 1280\nkey: [data-testid="grid"]\nstate: empty\n  do: fill [data-testid="search"] = zzz\n  key: [data-testid="empty"]\n```\n';
   assert.deepEqual(lintSpec(ok).filter((i) => i.message.startsWith('Visual')), []);
-  const bad = ok.replace('route: /', 'route: home').replace('key: [data-testid="grid"]\n', '').replace('  key: [data-testid="empty"]\n', '').replace('viewports: 375, 768, 1280', 'viewports: 100').replace('do: fill', 'do: tap');
-  const msgs = lintSpec(bad).map((i) => i.message);
-  assert.ok(msgs.some((m) => m.includes('route must start with "/"')));
-  assert.ok(msgs.some((m) => m.includes('no "key:" selector')));
-  assert.ok(msgs.some((m) => m.includes('viewports must be widths')));
-  assert.ok(msgs.some((m) => m.includes('unknown step "tap"')));
   assert.ok(lintSpec('## ADDED Requirements\n\n```visual\nroute: /\nkey: a\n```\n').some((i) => i.message.includes('inside a "#### Scenario:"')));
 });
 
@@ -137,17 +129,11 @@ test('lintTasks suggests a Visual: line for tasks that touch UI files', () => {
   assert.deepEqual(lintTasks(t.replace('  - Done when', '  - Visual: gallery/grid\n  - Done when')).filter((i) => i.message.includes('Visual')), []);
 });
 
-test('lintTasks enforces the Size cap and plan shape (same rules as verify-task lint)', () => {
+test('lintTasks enforces the Size cap live; the plan shape comes from `wingman-spec problems`', () => {
   const task = (n: string, file: string, extra = ''): string => `- [ ] ${n} Task ${n}\n  - Spec: a > b (c)\n  - Test first: test/x.test.ts${extra}\n  - Files: ${file}, test/x.test.ts\n  - Done when: \`npm test\`\n`;
   const plan = (size: string): string => `Size: ${size}\n\n## 1. G\n\n${task('1.1', 'src/a.ts')}${task('1.2', 'src/b.ts')}- [ ] 1.R Request code review for group 1\n\n## 2. H\n\n${task('2.1', 'src/c.ts')}${task('2.2', 'src/c.ts')}- [ ] 2.R Request code review of the whole change\n\n## 3. Close-out\n\n- [ ] 3.1 Full test suite passes\n`;
   const s = lintTasks(plan('S'));
   assert.ok(s.some((i) => i.severity === 'error' && i.message.includes('at most 3')));
-  assert.ok(s.some((i) => i.message.includes('group review on a') && i.line === 14));
-  assert.ok(s.some((i) => i.message.includes('close-out task done by')));
-  assert.ok(s.some((i) => i.message.includes('both change src/c.ts')));
   assert.ok(!lintTasks(plan('M')).some((i) => i.severity === 'error'));
-  assert.ok(!lintTasks(plan('L')).some((i) => i.message.includes('group review on a')), 'L keeps the review after group 1');
-  assert.ok(lintTasks(plan('M').replace('## 1. G', '## 1. G (risky)')).every((i) => !i.message.includes('group review on a')));
-  assert.ok(lintTasks(plan('M').replace('Size: M\n', '')).some((i) => i.message.startsWith('no "Size')));
-  assert.ok(lintTasks(plan('M').replace('  - Test first: test/x.test.ts\n', '  - Test first: reads src/a.vue as text\n')).some((i) => i.message.includes('reads source code as text')));
+  assert.ok(!lintTasks(plan('L')).some((i) => i.severity === 'error'));
 });

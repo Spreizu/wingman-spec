@@ -1,0 +1,6 @@
+{"at":"2026-10-30T22:39:23+02:00","event":"new","summary":"change created","prev":"0000000000000000000000000000000000000000000000000000000000000000"}
+{"at":"2026-10-30T22:39:23+02:00","event":"start","summary":"Block purchases for blocked firms","prev":"b5f1529e1c8dd8f495b0f1853316c8bebc02918c6db98989722bd3880292f62e"}
+{"at":"2026-10-30T22:39:23+02:00","event":"grill","summary":"Who unblocks? -> sales","prev":"6eee0b3e8899e811752c4e7376c163984065c424f31cbb715b194506c4d5cbb2"}
+{"at":"2026-10-30T22:39:23+02:00","event":"artifact","summary":"wrote proposal.md","details":{"seen_at":"validate"},"prev":"0317a6896d987bf7bb8dcfb7951d17c092addf51cd83ac5599aafa74af3c47ad"}
+{"at":"2026-10-30T22:39:23+02:00","event":"validate","ok":false,"summary":"not valid (exit 1)","prev":"312997fa7cf34127dd8ca0db63a9b8aac0211f9b00d490cb00a936fd830ada13"}
+{"at":"2026-10-30T22:39:23+02:00","event":"lint","ok":false,"summary":"planning lint found problems (exit 1)","details":{"source":"editor"},"prev":"0974f36f5955d173bdd8eba8ee7875aac5240b19332be5e950b8194a0a72b524"}

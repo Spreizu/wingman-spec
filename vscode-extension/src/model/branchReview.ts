@@ -3,7 +3,7 @@
  * touch (with their Why), which of those are untested, and the verifier findings that are about the diff. Pure: git and the verifier are
  * run by the editor layer, which hands the texts and findings in.
  */
-import guard from '../../../project-template/openspec/scripts/anchorguard.cjs';
+import guard from '../core/anchorDiff.ts';
 import { isScannable, isTestFile, isTestPath, slug, tagsIn } from './anchors.ts';
 import type { DiffFile } from './gitDiff.ts';
 import { insightOf } from './reqInsight.ts';
@@ -92,7 +92,8 @@ export function changedRequirements(cap: string, before: string | undefined, aft
   return out;
 }
 
-const SPEC_RE = /^openspec\/(?:specs|changes\/[^/]+\/specs)\/([^/]+)\/spec\.md$/;
+/** A living or delta spec in the diff: under `.wingman-spec/` of the code repo, or at the top of a specs repository. */
+const SPEC_RE = /^(?:\.wingman-spec\/)?(?:specs|changes\/[^/]+\/specs)\/([^/]+)\.md$/;
 
 /** Anchor events of every code and test file of the diff, with moves (the same unit removed in one place and added in another) folded together. */
 export function anchorMoves(files: ChangedFile[], resolves: (key: string) => boolean): AnchorMove[] {
@@ -173,7 +174,7 @@ export function reviewBranch(input: BranchInput): BranchReview {
 
   const relevant = input.findings.filter((f) => {
     const rel = posix(f.file.startsWith(input.codeRoot) ? f.file.slice(input.codeRoot.length + 1) : f.file);
-    return diffPaths.has(rel) || (f.requirement !== undefined && via.has(f.requirement)) || (f.change !== undefined && files.some((x) => posix(x.path).startsWith(`openspec/changes/${f.change}/`)));
+    return diffPaths.has(rel) || (f.requirement !== undefined && via.has(f.requirement)) || (f.change !== undefined && files.some((x) => [`changes/${f.change}/`, `.wingman-spec/changes/${f.change}/`].some((pre) => posix(x.path).startsWith(pre))));
   });
 
   return {

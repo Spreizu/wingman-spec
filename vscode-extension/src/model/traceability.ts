@@ -1,14 +1,13 @@
 /**
  * Read-only traceability model: requirements (with their `Why:`) -> scenarios and code/test anchors, plus the flags and
- * drift gaps `verify-task.cjs lint|drift` would report. It parses files only (specs, proposals and a scan for markers:
+ * drift gaps `wingman-spec lint|drift` would report. It parses files only (specs, proposals and a scan for markers:
  * the markers are the anchor index, nothing is stored); it never runs the verifier and never writes. Gap types and
  * keys match the verifier's.
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import chrono from '../../../project-template/openspec/scripts/chronology.cjs';
-import fitModule from '../../../project-template/openspec/scripts/anchorfit.cjs';
-import type { FitFinding } from '../../../project-template/openspec/scripts/anchorfit.cjs';
+import chrono from '../core/chronology.ts';
+import { archiveDir, changesDir as changesOf, configFiles, livingSpecsDir } from '../core/paths.ts';
 import { nearest, scanCode, slug } from './anchors.ts';
 import type { ScannedFile } from './anchors.ts';
 import { acceptedOf, proposalApproval, whyOf } from './requirementLines.ts';
@@ -113,8 +112,6 @@ export interface TraceGap {
   line?: number;
   /** The reason of the `Accepted:` line on the requirement, for the gaps that line covers (unanchored, untested). */
   accepted?: string;
-  /** `over-anchored` gaps: the finding kind and whether deleting the marker is the suggested fix. */
-  fit?: { kind: string; removable: boolean };
 }
 
 export interface UnresolvedMarker {
@@ -129,10 +126,8 @@ export interface TraceModel {
   codeRoot: string;
   mode: TraceMode;
   placement: PlacementLevel;
-  /** `anchor_fit` level and `anchor_max` (anchorfit.cjs). */
-  fit: { level: 'warn' | 'error' | 'off'; max: number; /** `anchor_many` of the config: requirements that are truly spread over many files. */ many?: ReadonlySet<string> };
-  /** Open `over-anchored` findings per file (relative to the code root): where the editor shows the marker and offers to remove it. */
-  fitFindings: Map<string, FitFinding[]>;
+  /** `anchor_many` of the config: requirements that are truly spread over many files (the CLI reports `over-anchored` markers). */
+  many: ReadonlySet<string>;
   /** The mode is not `off`, or a requirement carries a `Why:` line. */
   hasLayer: boolean;
   requirements: Map<string, TraceRequirement>;
@@ -146,6 +141,15 @@ const readIf = (f: string): string | undefined => {
     return readFileSync(f, 'utf8');
   } catch {
     return undefined;
+  }
+};
+
+/** Capabilities of a specs folder: `<cap>.md` files. */
+const specFiles = (d: string): string[] => {
+  try {
+    return readdirSync(d, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith('.md')).map((e) => e.name.slice(0, -3)).sort();
+  } catch {
+    return [];
   }
 };
 
@@ -166,6 +170,26 @@ export function readPlacement(configFiles: string[]): PlacementLevel {
     if (m) return (m[1] ?? 'warn').toLowerCase() as PlacementLevel;
   }
   return 'warn';
+}
+
+/** `anchor_many: [a/b, c/d]` (or a block list) from the first config file that has it. */
+export function anchorMany(configFiles: string[]): Set<string> {
+  for (const f of configFiles) {
+    const t = readIf(f) ?? '';
+    const m = /^anchor_many:[ \t]*(.*)$/m.exec(t);
+    if (!m) continue;
+    const inline = (m[1] ?? '').trim();
+    if (inline.startsWith('[')) return new Set(inline.replace(/[[\]'"]/g, '').split(',').map((x) => x.trim()).filter(Boolean));
+    const after = t.slice((m.index ?? 0) + m[0].length).split('\n');
+    const keys: string[] = [];
+    for (const l of after.slice(1)) {
+      const k = /^\s+-\s*['"]?([^'"\s#]+)/.exec(l);
+      if (!k) break;
+      keys.push(k[1] ?? '');
+    }
+    return new Set(keys);
+  }
+  return new Set();
 }
 
 export function readMode(configFiles: string[]): TraceMode {
@@ -198,9 +222,9 @@ function reqsOfSpec(cap: string, file: string, text: string, sections: string[])
 
 function livingRequirements(root: string): Map<string, TraceRequirement> {
   const out = new Map<string, TraceRequirement>();
-  const base = join(root, 'openspec', 'specs');
-  for (const cap of dirs(base)) {
-    const file = join(base, cap, 'spec.md');
+  const base = livingSpecsDir(root);
+  for (const cap of specFiles(base)) {
+    const file = join(base, `${cap}.md`);
     const text = readIf(file);
     if (text === undefined) continue;
     for (const r of reqsOfSpec(cap, file, text, ['BASE'])) out.set(r.key, r);
@@ -215,8 +239,8 @@ interface DeltaReq extends TraceRequirement {
 function deltasOf(changeDir: string): { cap: string; file: string; reqs: DeltaReq[]; renames: { from: string; to: string }[] }[] {
   const base = join(changeDir, 'specs');
   const out = [];
-  for (const cap of dirs(base)) {
-    const file = join(base, cap, 'spec.md');
+  for (const cap of specFiles(base)) {
+    const file = join(base, `${cap}.md`);
     const text = readIf(file);
     if (text === undefined) continue;
     const parsed = parseSpec(text);
@@ -229,7 +253,7 @@ function deltasOf(changeDir: string): { cap: string; file: string; reqs: DeltaRe
 
 /** Requirement keys the archived changes say should be in the living specs. */
 function archivedExpectation(root: string): Map<string, string> {
-  const dir = join(root, 'openspec', 'changes', 'archive');
+  const dir = archiveDir(root);
   const exp = new Map<string, string>();
   for (const { name: a } of chrono.archiveOrder(dir)) { // in the order they were archived (to the second), not by folder name
     for (const d of deltasOf(join(dir, a))) {
@@ -247,17 +271,17 @@ function archivedExpectation(root: string): Map<string, string> {
 
 /** Capabilities that an archived change specified but that have no living spec now: their test tags are stale. */
 function retiredCapabilities(root: string, living: Set<string>): Set<string> {
-  const dir = join(root, 'openspec', 'changes', 'archive');
+  const dir = archiveDir(root);
   const gone = new Set<string>();
-  for (const a of dirs(dir)) for (const cap of dirs(join(dir, a, 'specs'))) if (!living.has(cap)) gone.add(cap);
+  for (const a of dirs(dir)) for (const cap of specFiles(join(dir, a, 'specs'))) if (!living.has(cap)) gone.add(cap);
   return gone;
 }
 
 /**
- * Builds the model. `root` holds openspec/ (specs, changes); `codeRoot` is scanned for markers. They are the same folder unless the specs live in a separate repository or store.
+ * Builds the model. `root` is the specs root (specs, changes, archive); `codeRoot` is scanned for markers.
  */
 export function buildTrace(root: string, codeRoot: string, opts: { scan?: ScannedFile[] } = {}): TraceModel {
-  const configs = [join(codeRoot, 'openspec', 'config.yaml'), join(root, 'openspec', 'config.yaml')];
+  const configs = configFiles(codeRoot, root);
   const mode = readMode(configs);
   const placement = readPlacement(configs);
   const reqs = livingRequirements(root);
@@ -296,9 +320,8 @@ export function buildTrace(root: string, codeRoot: string, opts: { scan?: Scanne
 
   // pending changes
   const changes: TraceChange[] = [];
-  const changesDir = join(root, 'openspec', 'changes');
+  const changesDir = changesOf(root);
   for (const name of dirs(changesDir)) {
-    if (name === 'archive') continue;
     const dir = join(changesDir, name);
     const proposal = join(dir, 'proposal.md');
     const text = readIf(proposal);
@@ -332,7 +355,7 @@ export function buildTrace(root: string, codeRoot: string, opts: { scan?: Scanne
     changes.push({ name, dir, touches, proposal, requirements: eff, approval: proposalApproval(text), missingWhy, approvals });
   }
 
-  // drift over the living specs (same gap types and keys as `verify-task.cjs drift`)
+  // drift over the living specs (same gap types and keys as `wingman-spec drift`)
   const gaps: TraceGap[] = [];
   const add = (type: GapType, subject: string, text: string, extra: Partial<TraceGap> = {}): void => {
     const key = `${type}:${subject}`;
@@ -352,39 +375,10 @@ export function buildTrace(root: string, codeRoot: string, opts: { scan?: Scanne
   }
   for (const s of stale) add('stale-test-tag', s.tag, `test tag [${s.tag}] in ${s.file}: ${s.why}`, { file: join(codeRoot, s.file), line: s.line });
   for (const [k, a] of archivedExpectation(root)) {
-    if (!reqs.has(k)) add('unsynced-archive', k, `change ${a} was archived with requirement ${k} that is not in openspec/specs`);
-  }
-
-  // anchor fit: too many anchors, or anchors on code that does not implement the requirement (same findings as `drift`)
-  const fit = fitModule.fitConfig([configs[1] ?? '', configs[0] ?? ''], readIf);
-  const fitFindings = new Map<string, FitFinding[]>();
-  if (fit.level !== 'off') {
-    const allReqs = new Map<string, TraceRequirement>(reqs);
-    for (const c of changes) for (const [k, r] of c.requirements) if (!allReqs.has(k)) allReqs.set(k, r);
-    const capNames = new Set([...allReqs.values()].map((r) => r.cap));
-    const taskCaps = new Map<string, Set<string>>();
-    for (const c of changes) {
-      for (const g of parseTasks(readIf(join(c.dir, 'tasks.md')) ?? '')) {
-        for (const t of g.tasks) {
-          const owners = new Set([...(t.details.spec ?? '').matchAll(/([a-z0-9][a-z0-9-]*)\/[a-z0-9][a-z0-9-]*/g)].map((m) => m[1] ?? ''));
-          if (owners.size !== 1) continue;
-          for (const f of (t.details.files ?? '').split(/[\s,;]+/).map((x) => x.replace(/[`()]/g, '')).filter((x) => /[./]/.test(x))) {
-            const set = taskCaps.get(f) ?? new Set<string>();
-            set.add([...owners][0] ?? '');
-            taskCaps.set(f, set);
-          }
-        }
-      }
-    }
-    const files = scan.filter((f) => f.markers.length).map((f) => ({ file: f.file, text: readIf(join(codeRoot, f.file)) ?? '', test: f.test }));
-    const found = fitModule.fitFindings({ files, reqs: new Map([...allReqs].map(([k, r]) => [k, { name: r.name, block: r.block, cap: r.cap }])), capNames, taskCaps, max: fit.max, many: fit.many });
-    for (const x of found) {
-      fitFindings.set(x.file, [...(fitFindings.get(x.file) ?? []), x]);
-      add('over-anchored', `${x.key}@${x.file}:${x.line}`, x.text, { file: join(codeRoot, x.file), line: x.line - 1, fit: { kind: x.kind, removable: x.remove } });
-    }
+    if (!reqs.has(k)) add('unsynced-archive', k, `change ${a} was archived with requirement ${k} that is not in the living specs`);
   }
 
   const hasLayer = mode !== 'off' || [...reqs.values()].some((r) => r.why !== null);
-  return { root, codeRoot, mode, placement, fit, fitFindings, hasLayer, requirements: reqs, changes, gaps, unresolved };
+  return { root, codeRoot, mode, placement, many: anchorMany(configs), hasLayer, requirements: reqs, changes, gaps, unresolved };
 }
 

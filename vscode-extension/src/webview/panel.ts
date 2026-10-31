@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join, relative, resolve, isAbsolute } from 'node:path';
+import { greenfieldFile } from '../core/paths.ts';
 import * as vscode from 'vscode';
 import { sendToAgent, workspaceRoots } from '../agent.ts';
 import { readTextSafe } from '../model/specFiles.ts';
@@ -11,7 +12,10 @@ import type { ProjectStore } from '../store.ts';
 import { baseSpecPath } from './components.ts';
 import { renderPage } from './render.ts';
 import type { DashboardInputs } from '../model/changeDashboard.ts';
+import { CLI_ACTIONS } from '../model/cliActions.ts';
+import type { ActionResult, CliAction } from '../model/cliActions.ts';
 import { timelinePath } from '../model/timeline.ts';
+import { actionKey } from './types.ts';
 import type { BranchState, RoadmapState, Route, ViewData } from './types.ts';
 
 const PAGES = new Set(['overview', 'change', 'adrs', 'adr', 'specs', 'spec', 'history', 'archived', 'branch', 'roadmap']);
@@ -19,14 +23,16 @@ const PAGES = new Set(['overview', 'change', 'adrs', 'adr', 'specs', 'spec', 'hi
 /** Scaffold commands a webview may trigger. Everything else is ignored. */
 const WEBVIEW_COMMANDS = new Set(['newChange', 'newAdr', 'promoteAdr', 'promoteChange', 'supersedeAdr', 'refreshView']);
 
-/** What the dashboard may type into a terminal: a read-only verify-task call, nothing else. */
-export const TERMINAL_COMMAND = /^node openspec\/scripts\/verify-task\.cjs [A-Za-z0-9 ._:\/=@-]+$/;
+/** What the dashboard may type into a terminal: a call of the project's CLI shim, nothing else. */
+export const TERMINAL_COMMAND = /^\.wingman-spec\/bin\/wingman-spec [A-Za-z0-9 ._:\/=@-]+$/;
 
 /** Data read from git and the verifier in the background (see editor/panelData.ts). */
 export interface PanelExtras {
   branch(root: string | undefined): BranchState;
   roadmap(root: string | undefined): RoadmapState;
   dashboard(root: string, change: string): DashboardInputs | undefined;
+  settled?(ms: number): Promise<void>;
+  runAction?(root: string, action: CliAction, change?: string): Promise<ActionResult>;
 }
 
 function isRoute(value: unknown): value is Route {
@@ -51,8 +57,14 @@ export class SpecPanel implements vscode.Disposable {
   private readonly traces: () => TraceModel[];
   private readonly extras: PanelExtras | undefined;
   private revealTick = 0;
+  private readonly results: Record<string, ActionResult> = {};
+  private running: string | undefined;
 
-  constructor(store: ProjectStore, traces: () => TraceModel[] = () => [], extras?: PanelExtras) {
+  private readonly logo: vscode.Uri | undefined;
+
+  /** `logo`: the extension icon (images/icon.png), shown in the header and on the panel tab. */
+  constructor(store: ProjectStore, traces: () => TraceModel[] = () => [], extras?: PanelExtras, logo?: vscode.Uri) {
+    this.logo = logo;
     this.store = store;
     this.traces = traces;
     this.extras = extras;
@@ -72,8 +84,9 @@ export class SpecPanel implements vscode.Disposable {
     } else {
       this.panel = vscode.window.createWebviewPanel('wingmanSpec.dashboard', 'Wingman Spec', vscode.ViewColumn.Active, {
         enableScripts: true,
-        localResourceRoots: [],
+        localResourceRoots: this.logo ? [vscode.Uri.joinPath(this.logo, '..')] : [],
       });
+      if (this.logo) this.panel.iconPath = this.logo;
       this.panel.webview.onDidReceiveMessage((m: unknown) => void this.onMessage(m), undefined, this.disposables);
       this.panel.onDidDispose(() => (this.panel = undefined), undefined, this.disposables);
     }
@@ -105,8 +118,8 @@ export class SpecPanel implements vscode.Disposable {
     if (route.page === 'archived') {
       const archived = project?.archive.find((a) => a.dirName === route.name);
       if (archived) {
-        for (const f of ['proposal.md', 'design.md', 'tasks.md', 'timeline.jsonl']) paths.add(join(archived.dir, f));
-        for (const cap of archived.capabilities) paths.add(join(archived.dir, 'specs', cap, 'spec.md'));
+        for (const f of ['proposal.md', 'design.md', 'tasks.md', 'timeline.jsonl', 'archived.json']) paths.add(join(archived.dir, f));
+        for (const cap of archived.capabilities) paths.add(join(archived.dir, 'specs', `${cap}.md`));
         for (const a of archived.adrs) paths.add(join(archived.dir, 'adrs', `${a.slug}.md`));
       }
     }
@@ -139,9 +152,14 @@ export class SpecPanel implements vscode.Disposable {
     );
     const branch = route.page === 'branch' ? this.extras?.branch(route.root) : undefined;
     const roadmap = route.page === 'roadmap' ? this.extras?.roadmap(route.root) : undefined;
-    const greenfield = projects.some((p) => existsSync(join(p.root, 'openspec', 'greenfield.yaml')));
-    const dashboard = route.page === 'change' && this.extras ? this.extras.dashboard(route.root, route.name) : undefined;
-    return { projects, route, texts, baseSpecs, setup: setupStatus(workspaceRoots(this.store)), trace: this.traces(), revealTick: this.revealTick, ...(branch ? { branch } : {}), ...(roadmap ? { roadmap } : {}), ...(greenfield ? { greenfield } : {}), ...(dashboard ? { dashboard } : {}) };
+    const greenfield = projects.some((p) => existsSync(greenfieldFile(p.root)));
+    const dash = (): DashboardInputs | undefined => (route.page === 'change' && this.extras ? this.extras.dashboard(route.root, route.name) : undefined);
+    let dashboard = dash();
+    if (route.page === 'change' && !dashboard && this.extras?.settled) {
+      await this.extras.settled(1500);
+      dashboard = dash();
+    }
+    return { projects, route, texts, baseSpecs, setup: setupStatus(workspaceRoots(this.store)), trace: this.traces(), revealTick: this.revealTick, ...(branch ? { branch } : {}), ...(roadmap ? { roadmap } : {}), ...(greenfield ? { greenfield } : {}), ...(dashboard ? { dashboard } : {}), ...(this.extras?.runAction ? { actions: { trusted: vscode.workspace.isTrusted, results: this.results, ...(this.running ? { running: this.running } : {}) } } : {}) };
   }
 
   async render(): Promise<void> {
@@ -159,7 +177,7 @@ export class SpecPanel implements vscode.Disposable {
         if (!panel) return;
         const nonce = randomBytes(16).toString('base64');
         panel.title = data.route.page === 'change' ? `${data.route.name} - Wingman Spec` : 'Wingman Spec';
-        panel.webview.html = renderPage(data, nonce, panel.webview.cspSource);
+        panel.webview.html = renderPage(data, nonce, panel.webview.cspSource, this.logo && panel.webview.asWebviewUri(this.logo).toString());
       } while (this.dirty);
     } finally {
       this.rendering = false;
@@ -226,6 +244,9 @@ export class SpecPanel implements vscode.Disposable {
         }
         break;
       }
+      case 'cli':
+        await this.runCli(m['action'], m['root'], m['change']);
+        break;
       case 'copy':
         if (typeof m['text'] === 'string') {
           await vscode.env.clipboard.writeText(m['text']);
@@ -238,6 +259,33 @@ export class SpecPanel implements vscode.Disposable {
         }
         break;
     }
+  }
+
+  /** Runs one CLI action of a known project (and change), at most one at a time; archive asks first. The answer shows inline. */
+  private async runCli(action: unknown, root: unknown, change: unknown): Promise<void> {
+    const run = this.extras?.runAction?.bind(this.extras);
+    if (!run || this.running || typeof action !== 'string' || !CLI_ACTIONS.has(action) || typeof root !== 'string') return;
+    const project = this.store.projects.find((p) => p.root === root);
+    const name = action === 'doctor' ? undefined : typeof change === 'string' ? change : undefined;
+    if (!project || (action !== 'doctor' && !project.changes.some((c) => c.name === name)) || !vscode.workspace.isTrusted) return;
+    if (action === 'archive') {
+      const yes = await vscode.window.showWarningMessage(`Archive ${name}?`, { modal: true, detail: 'The change folder moves to archive/ of the specs root. The move is not committed.' }, 'Archive');
+      if (yes !== 'Archive') return;
+    }
+    this.running = action;
+    await this.render();
+    try {
+      const result = await run(root, action as CliAction, name);
+      this.results[actionKey(root, name)] = result;
+    } finally {
+      this.running = undefined;
+    }
+    if (action === 'sync' || action === 'archive') await this.store.refresh();
+    if (action === 'archive' && this.results[actionKey(root, name)]?.ok) {
+      this.results[actionKey(root)] = this.results[actionKey(root, name)] as ActionResult;
+      this.navigate({ page: 'overview' }, true);
+    }
+    await this.render();
   }
 
   dispose(): void {

@@ -33,8 +33,8 @@ const project = (): string => {
     mkdirSync(dirname(join(dir, f)), { recursive: true });
     writeFileSync(join(dir, f), text);
   };
-  put('openspec/config.yaml', 'schema: wingman-spec\ntraceability: on\n');
-  for (const l of fx.LANGS) put(`openspec/specs/${l.cap}/spec.md`, fx.spec(l));
+  put('wingman-spec.yaml', 'traceability: on\n');
+  for (const l of fx.LANGS) put(`specs/${l.cap}.md`, fx.spec(l));
   for (const [f, t] of Object.entries(fx.files())) put(f, t);
   return dir;
 };

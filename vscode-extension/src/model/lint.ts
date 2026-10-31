@@ -1,6 +1,5 @@
-import quality from '../../../project-template/openspec/scripts/quality.cjs';
-import testPaths from '../../../project-template/openspec/scripts/testpaths.cjs';
-import visual from '../../../project-template/openspec/scripts/visual-check.cjs';
+import quality from '../core/plan.ts';
+import testPaths from '../core/testpaths.ts';
 import { isPlaceholder, parseFrontMatter } from './frontMatter.ts';
 import { blankComments, splitSections } from './markdown.ts';
 import { parseSpec } from './specParser.ts';
@@ -22,8 +21,8 @@ const NORMATIVE_RE = /\b(SHALL|MUST)\b/;
 const KNOWN_ADR_STATUS = /^(proposed|accepted|superseded|deprecated|none)\b/i;
 
 /**
- * Checks ```visual blocks with the verifier's own parser (`visual-check.cjs parseBlock`, so fields, steps and rules cannot drift):
- * a block sits inside a scenario; the parser's errors are the editor's errors. The extra info line asks for `component:`.
+ * Checks where ```visual blocks sit (inside a scenario) and asks for `component:`. The block grammar itself (fields, steps,
+ * viewports, roles) is checked by the CLI (`wingman-spec problems --json`, shown in the Problems panel), so the rules live in one place.
  */
 export function lintVisualBlocks(text: string): Issue[] {
   const issues: Issue[] = [];
@@ -40,13 +39,9 @@ export function lintVisualBlocks(text: string): Issue[] {
     let j = i + 1;
     const body: string[] = [];
     for (; j < lines.length && !close.test(lines[j] ?? ''); j++) body.push(lines[j] ?? '');
-    const block = visual.parseBlock(body, open + 2);
+    const field = (k: string): boolean => body.some((b) => new RegExp(`^${k}:\\s*\\S`).test(b));
     if (!inScenario) issues.push({ line: open, severity: 'error', message: 'A visual block must sit inside a "#### Scenario:" block.' });
-    for (const e of block.errors) {
-      const m = /^line (\d+): ([\s\S]*)$/.exec(e);
-      issues.push({ line: m ? Math.max(0, Number(m[1]) - 1) : open, severity: 'error', message: `Visual block: ${m ? m[2] ?? e : e}` });
-    }
-    if (!block.component && block.route) issues.push({ line: open, severity: 'info', message: 'Visual block has no "component:". Every declared scenario guards later tasks (its ARIA structure is compared with a pre-task capture); without component: no task can change it on purpose without failing that guard.' });
+    if (!field('component') && field('route')) issues.push({ line: open, severity: 'info', message: 'Visual block has no "component:". Every declared scenario guards later tasks (its ARIA structure is compared with a pre-task capture); without component: no task can change it on purpose without failing that guard.' });
     i = j;
   }
   return issues;
@@ -96,10 +91,20 @@ const REQUIRED_DETAILS: { key: 'spec' | 'testFirst' | 'files' | 'doneWhen'; labe
 
 const filesOf = (s: string | undefined): string[] => (s ?? '').split(/[\s,;]+/).map((f) => f.replace(/[`()]/g, '')).filter((f) => /[./]/.test(f));
 
-/** Plan-size rules: exactly `verify-task.cjs lint` (`quality.cjs planLint`: size caps, reviews, close-out tasks, merges, source-text tests). */
+/**
+ * The live part of the plan-size rules: implementation tasks over the cap of the declared size. Every other plan rule (reviews,
+ * close-out tasks, merges, source-text tests) comes from `wingman-spec problems --json` in the Problems panel.
+ */
 export function lintTaskPlan(text: string, proposalSize = ''): Issue[] {
-  const { problems } = quality.planLint(text, proposalSize ? { size: proposalSize } : {});
-  return problems.map((p) => ({ line: Math.max(0, p.line - 1), severity: p.severity, message: p.text }));
+  const size = (proposalSize || quality.proposalSize(text).size || '') as keyof typeof quality.CAPS | '';
+  if (!size) return [];
+  const cap = quality.CAPS[size];
+  const groups = parseTasks(text);
+  const impl = groups.flatMap((g) => g.tasks.filter((t) => quality.isImplementationTask(g.title, t.id, t.title)));
+  const first = groups[0];
+  if (impl.length <= cap || !first) return [];
+  const next = size === 'S' ? 'M' : size === 'M' ? 'L' : '';
+  return [{ line: first.line, severity: 'error', message: `Size ${size} allows at most ${cap} implementation tasks; this plan has ${impl.length}. Merge tasks that touch the same files${next ? `, or set Size: ${next} in proposal.md` : ', or split the change'}.` }];
 }
 
 /** The `Size: S|M|L` line of a proposal.md (HTML comments ignored), or ''. */

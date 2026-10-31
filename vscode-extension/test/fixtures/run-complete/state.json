@@ -20,8 +20,8 @@
   ],
   "snapshots": [
     {
-      "file": "/proj/openspec/changes/add-discount-codes/tasks.md",
-      "snap": "/proj/openspec/.apply-runs/add-discount-codes/20261025T225401Z-1362048/pre/1792968845225-0.md"
+      "file": "/proj/changes/add-discount-codes/tasks.md",
+      "snap": "/proj/runs/add-discount-codes/20261025T225401Z-1362048/pre/1792968845225-0.md"
     }
   ],
   "attempt_open": false

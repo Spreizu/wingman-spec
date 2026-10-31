@@ -24,6 +24,9 @@ const pages = {
   overview: { page: 'overview' },
   'change-open-tasks': { page: 'change', root, name: 'demo' },
   'change-done-blocked': { page: 'change', root, name: 'shipped', dashboard: { run: { runId: 'r1', attempts: 1, reviewPending: false, checksPassed: 1, checksFailed: 0, exhausted: false, recent: [], verified: ['1.1 Done'] }, findings: [drift] } },
+  // The CLI buttons (model/cliActions.ts): a sync conflict listed per requirement, and a change ready to archive.
+  'change-sync-conflict': { page: 'change', root, name: 'shipped', dashboard: { run: { runId: 'r1', attempts: 1, reviewPending: false, checksPassed: 1, checksFailed: 0, exhausted: false, recent: [], verified: ['1.1 Done'] }, sync: { ok: false, problems: ['specs: changes/shipped/specs/auth.md:12: not merged: requirement "Login" differs from the living spec'], warnings: [] } }, result: { action: 'sync', change: 'shipped', ok: false, summary: 'Not synced: 2 conflicts, nothing was written.', lines: [{ text: 'not merged: requirement "Login" differs from the living spec', level: 'error', requirement: 'Login', file: `${root}/changes/shipped/specs/auth.md`, line: 12 }, { text: 'not merged: requirement "Logout" is missing from the living spec', level: 'error', requirement: 'Logout', file: `${root}/changes/shipped/specs/auth.md`, line: 20 }] } },
+  'change-ready-to-archive': { page: 'change', root, name: 'shipped', dashboard: { run: { runId: 'r1', attempts: 1, reviewPending: false, checksPassed: 1, checksFailed: 0, exhausted: false, recent: [], verified: ['1.1 Done'] }, findings: [], sync: { ok: true, problems: [], warnings: [] } }, result: { action: 'validate', change: 'shipped', ok: true, summary: 'Valid.', lines: [] } },
   specs: { page: 'specs', root },
   spec: { page: 'spec', root, name: 'auth' },
   adrs: { page: 'adrs', root },
@@ -34,9 +37,10 @@ const browser = await chromium.launch();
 let failures = 0;
 const fail = (m) => { failures++; console.log(`FAIL ${m}`); };
 for (const [name, r] of Object.entries(pages)) {
-  const { dashboard, ...route } = r;
+  const { dashboard, result, ...route } = r;
   const data = await makeData(root, route);
   if (dashboard) data.dashboard = dashboard;
+  if (result && data.actions) data.actions.results[`${root}\n${result.change}`] = result;
   const html = (await renderPage(data, 'NONCE', 'vscode-resource:')).replace(/<script[\s\S]*?<\/script>/g, '');
   for (const width of [375, 900]) {
     const page = await browser.newPage({ viewport: { width, height: 1000 } });

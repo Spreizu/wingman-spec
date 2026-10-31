@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { livingSpec } from '../core/paths.ts';
 import * as vscode from 'vscode';
 import { listBaseSpecNames, readTextSafe } from '../model/specFiles.ts';
 import type { Issue } from '../model/lint.ts';
@@ -27,7 +28,7 @@ function toDiagnostics(doc: vscode.TextDocument | undefined, text: string, issue
   });
 }
 
-/** Lints specs, tasks and ADRs against what the schema and `openspec validate` expect. */
+/** Lints specs, tasks and ADRs against what the schema and `wingman-spec validate` expect. */
 export function registerDiagnostics(store: ProjectStore): vscode.Disposable {
   const collection = vscode.languages.createDiagnosticCollection('wingman-spec');
   let known = new Set<string>();
@@ -52,7 +53,7 @@ export function registerDiagnostics(store: ProjectStore): vscode.Disposable {
     }
     const paths = new Set(knownFiles(store.projects));
     for (const p of store.projects) {
-      for (const name of await listBaseSpecNames(p.root)) paths.add(join(p.root, 'openspec', 'specs', name, 'spec.md'));
+      for (const name of await listBaseSpecNames(p.root)) paths.add(livingSpec(p.root, name));
     }
     for (const stale of known) if (!paths.has(stale)) collection.delete(vscode.Uri.file(stale));
     known = paths;

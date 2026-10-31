@@ -44,13 +44,13 @@ export interface ParsedSpec {
 
 const STEP_RE = /^\s*[-*]\s+\*\*(WHEN|THEN|AND|GIVEN|BUT)\*\*\s*(.*?)\s*$/;
 
-/** Same reading as `traceability.cjs parseSpec`: ADDED/MODIFIED/REMOVED/RENAMED by their first word, any other heading is the living spec. */
+/** Same reading as the CLI's spec parser: ADDED/MODIFIED/REMOVED/RENAMED by their first word, any other heading is the living spec. */
 function sectionOf(title: string): RequirementSection {
   const m = /^(ADDED|MODIFIED|REMOVED|RENAMED)\b/i.exec(title);
   return m?.[1] ? (m[1].toUpperCase() as RequirementSection) : 'BASE';
 }
 
-/** Lines inside (and on) a fenced code block: headings and steps there are example text, not structure (as in `traceability.cjs parseSpec`). */
+/** Lines inside (and on) a fenced code block: headings and steps there are example text, not structure (as in the CLI's spec parser). */
 function fencedLines(lines: string[]): boolean[] {
   const out: boolean[] = []; let fence: string | null = null;
   for (const l of lines) {
@@ -65,7 +65,7 @@ function fencedLines(lines: string[]): boolean[] {
   return out;
 }
 
-/** Parses a capability spec: either `openspec/specs/<name>/spec.md` or a change delta spec. */
+/** Parses a capability spec: either a living spec `specs/<name>.md` or a change delta spec. */
 export function parseSpec(text: string): ParsedSpec {
   const lines = blankComments(text.replace(/\r\n/g, '\n')).split('\n');
   const spec: ParsedSpec = { purpose: '', purposeLine: -1, requirements: [], renames: [] };
@@ -75,7 +75,6 @@ export function parseSpec(text: string): ParsedSpec {
   let scenario: Scenario | undefined;
   let rawLines: string[] = [];
   const purpose: string[] = [];
-  let pendingFrom: string | undefined;
 
   const closeRequirement = (): void => {
     if (req) req.raw = rawLines.join('\n').trim();
@@ -106,13 +105,9 @@ export function parseSpec(text: string): ParsedSpec {
     }
 
     if (section === 'RENAMED') {
-      const from = /FROM:\s*`?###\s*Requirement:\s*(.*?)`?\s*$/i.exec(line);
-      const to = /TO:\s*`?###\s*Requirement:\s*(.*?)`?\s*$/i.exec(line);
-      if (from) pendingFrom = from[1] ?? '';
-      else if (to && pendingFrom !== undefined) {
-        spec.renames.push({ from: pendingFrom, to: to[1] ?? '' });
-        pendingFrom = undefined;
-      }
+      // `- Old name -> New name`, one rename per line (the CLI's format)
+      const m = /^\s*[-*]\s+(.+?)\s*->\s*(.+?)\s*$/.exec(line);
+      if (m) spec.renames.push({ from: m[1] ?? '', to: m[2] ?? '' });
       return;
     }
 

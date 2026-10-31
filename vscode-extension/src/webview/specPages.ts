@@ -25,7 +25,7 @@ function pendingFor(d: ViewData, root: string, name: string): Pending[] {
 
 export function specsPage(d: ViewData): string {
   const project = findProject(d.projects, d.route.page === 'specs' ? d.route.root : undefined);
-  if (!project) return `${pageHeader('Specs', '', '', false)}${emptyState('No OpenSpec project found', '')}`;
+  if (!project) return `${pageHeader('Specs', '', '', false)}${emptyState('No Wingman Spec project found', '')}`;
 
   const names = d.baseSpecs[project.root] ?? [];
   const newOnly = new Set<string>();
@@ -45,7 +45,7 @@ ${pillRow(`${spec ? badge(`${spec.requirements.length} requirement${spec.require
 
   const body =
     cards.length === 0
-      ? emptyState('No capabilities yet', 'Promoted specs live in <code>openspec/specs/&lt;capability&gt;/spec.md</code>.')
+      ? emptyState('No capabilities yet', 'Living specs are <code>specs/&lt;capability&gt;.md</code> files in the specs root.')
       : `<div class="toolbar"><label class="search">${icon('search', 15)}<input data-filter-input placeholder="Filter capabilities" aria-label="Filter capabilities"></label></div>
 <div class="grid">${cards.join('')}</div>`;
   return `${pageHeader('Specs', `${names.length} promoted capabilit${names.length === 1 ? 'y' : 'ies'}`, '', false)}${body}`;
@@ -55,7 +55,7 @@ export function specPage(d: ViewData): string {
   const route = d.route;
   if (route.page !== 'spec') return '';
   const project = findProject(d.projects, route.root);
-  if (!project) return `${pageHeader('Spec', '')}${emptyState('No OpenSpec project found', '')}`;
+  if (!project) return `${pageHeader('Spec', '')}${emptyState('No Wingman Spec project found', '')}`;
 
   const path = baseSpecPath(project.root, route.name);
   const text = d.texts[path];

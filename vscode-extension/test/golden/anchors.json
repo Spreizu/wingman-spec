@@ -1,0 +1,242 @@
+[
+  {
+    "name": "marker above a function",
+    "text": "// @spec billing/add-item\nfunction add(a, b) {\n  return a + b;\n}\n",
+    "is_test": false,
+    "placement": [],
+    "units": [
+      {
+        "key": "billing/add-item",
+        "line": 1,
+        "start": 1,
+        "end": 3,
+        "whole": true,
+        "header": "function add(a, b) {",
+        "body": "function add(a, b) {\nreturn a + b;\n}"
+      }
+    ]
+  },
+  {
+    "name": "trailing marker",
+    "text": "function add(a, b) {\n  return a + b; // @spec billing/add-item\n}\n",
+    "is_test": false,
+    "placement": [
+      {
+        "line": 2,
+        "kind": "trailing-marker",
+        "keys": [
+          "billing/add-item"
+        ],
+        "text": "the marker is at the end of a code line: put it on its own line directly above the code it covers (or in the doc comment of the whole function)"
+      }
+    ],
+    "units": [
+      {
+        "key": "billing/add-item",
+        "line": 2,
+        "start": 1,
+        "end": 1,
+        "whole": false,
+        "header": "function add(a, b) {",
+        "body": "return a + b;"
+      }
+    ]
+  },
+  {
+    "name": "duplicate marker",
+    "text": "// @spec billing/add-item\n// @spec billing/add-item\nfunction add() {}\n",
+    "is_test": false,
+    "placement": [
+      {
+        "line": 2,
+        "kind": "duplicate-marker",
+        "keys": [
+          "billing/add-item"
+        ],
+        "text": "the same requirement is marked more than once in this function/unit: one marker per requirement per unit (doc comment for the whole unit, or one comment before the lines for a part)"
+      }
+    ],
+    "units": [
+      {
+        "key": "billing/add-item",
+        "line": 1,
+        "start": 2,
+        "end": 2,
+        "whole": true,
+        "header": "function add() {}",
+        "body": "function add() {}"
+      },
+      {
+        "key": "billing/add-item",
+        "line": 2,
+        "start": 2,
+        "end": 2,
+        "whole": true,
+        "header": "function add() {}",
+        "body": "function add() {}"
+      }
+    ]
+  },
+  {
+    "name": "file-top marker in code",
+    "text": "// @spec billing/add-item\n\nimport x from 'y';\n\nexport const a = 1;\n",
+    "is_test": false,
+    "placement": [
+      {
+        "line": 1,
+        "kind": "detached-marker",
+        "keys": [
+          "billing/add-item"
+        ],
+        "text": "the marker is not directly above code (a blank line or the end of a block follows): put it on the line(s) it covers, or in the doc comment of the whole function"
+      }
+    ],
+    "units": [
+      {
+        "key": "billing/add-item",
+        "line": 1,
+        "start": 0,
+        "end": 0,
+        "whole": false,
+        "header": "",
+        "body": ""
+      }
+    ]
+  },
+  {
+    "name": "file-top marker in a test",
+    "text": "// @spec billing/add-item\n\nimport x from 'y';\n\ntest('a', () =\u003e {});\n",
+    "is_test": true,
+    "placement": [
+      {
+        "line": 1,
+        "kind": "detached-marker",
+        "keys": [
+          "billing/add-item"
+        ],
+        "text": "the marker is not directly above code (a blank line or the end of a block follows): put it on the line(s) it covers, or in the doc comment of the whole function"
+      }
+    ],
+    "units": [
+      {
+        "key": "billing/add-item",
+        "line": 1,
+        "start": 0,
+        "end": 0,
+        "whole": false,
+        "header": "",
+        "body": ""
+      }
+    ]
+  },
+  {
+    "name": "detached marker",
+    "text": "function a() {\n  run();\n  // @spec billing/total\n\n}\n",
+    "is_test": false,
+    "placement": [
+      {
+        "line": 3,
+        "kind": "detached-marker",
+        "keys": [
+          "billing/total"
+        ],
+        "text": "the marker is not directly above code (a blank line or the end of a block follows): put it on the line(s) it covers, or in the doc comment of the whole function"
+      }
+    ],
+    "units": [
+      {
+        "key": "billing/total",
+        "line": 3,
+        "start": 2,
+        "end": 2,
+        "whole": false,
+        "header": "function a() {",
+        "body": ""
+      }
+    ]
+  },
+  {
+    "name": "doc comment marker",
+    "text": "/**\n * Adds an item.\n * @spec billing/add-item\n */\nexport function add(item) {\n  items.push(item);\n}\n",
+    "is_test": false,
+    "placement": [],
+    "units": [
+      {
+        "key": "billing/add-item",
+        "line": 3,
+        "start": 4,
+        "end": 6,
+        "whole": true,
+        "header": "export function add(item) {",
+        "body": "export function add(item) {\nitems.push(item);\n}"
+      }
+    ]
+  },
+  {
+    "name": "python lines",
+    "text": "def total(items):\n    # @spec billing/total\n    s = sum(i.cents for i in items)\n    return s\n",
+    "is_test": false,
+    "placement": [],
+    "units": [
+      {
+        "key": "billing/total",
+        "line": 2,
+        "start": 2,
+        "end": 3,
+        "whole": false,
+        "header": "def total(items):",
+        "body": "s = sum(i.cents for i in items)\nreturn s"
+      }
+    ]
+  },
+  {
+    "name": "go func",
+    "text": "// Total sums the bill.\n// @spec billing/total\nfunc Total(items []Item) int {\n\tt := 0\n\tfor _, i := range items {\n\t\tt += i.Cents\n\t}\n\treturn t\n}\n",
+    "is_test": false,
+    "placement": [],
+    "units": [
+      {
+        "key": "billing/total",
+        "line": 2,
+        "start": 2,
+        "end": 8,
+        "whole": true,
+        "header": "func Total(items []Item) int {",
+        "body": "func Total(items []Item) int {\nt := 0\nfor _, i := range items {\nt += i.Cents\n}\nreturn t\n}"
+      }
+    ]
+  },
+  {
+    "name": "two keys on one marker",
+    "text": "// @spec billing/add-item, billing/total\nconst x = add(1, 2);\n",
+    "is_test": false,
+    "placement": [],
+    "units": [
+      {
+        "key": "billing/add-item",
+        "line": 1,
+        "start": 1,
+        "end": 1,
+        "whole": false,
+        "header": "",
+        "body": "const x = add(1, 2);"
+      },
+      {
+        "key": "billing/total",
+        "line": 1,
+        "start": 1,
+        "end": 1,
+        "whole": false,
+        "header": "",
+        "body": "const x = add(1, 2);"
+      }
+    ]
+  },
+  {
+    "name": "no marker",
+    "text": "const x = 1;\n",
+    "is_test": false,
+    "placement": [],
+    "units": []
+  }
+]

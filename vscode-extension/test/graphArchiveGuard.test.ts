@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { after, test } from 'node:test';
 import { parseArchiveName, scanArchive } from '../src/model/archiveScanner.ts';
 import { layoutAdrGraph, NODE_H } from '../src/model/adrLayout.ts';
@@ -41,11 +41,11 @@ function put(rel: string, text: string): void {
 }
 
 test('archive scanner reads dated folders newest first with counts, specs and ADRs', async () => {
-  put('openspec/changes/archive/2026-09-01-old/tasks.md', '## 1. G\n\n- [x] 1.1 a\n- [x] 1.2 b\n');
-  put('openspec/changes/archive/2026-10-02-add-auth/proposal.md', '# P');
-  put('openspec/changes/archive/2026-10-02-add-auth/specs/auth/spec.md', 'x');
-  put('openspec/changes/archive/2026-10-02-add-auth/adrs/use-jwt.md', '---\ntitle: Use JWT\nstatus: Accepted\n---\nbody');
-  put('openspec/changes/archive/undated/tasks.md', '- [ ] 1.1 a\n');
+  put('archive/2026-09-01-old/tasks.md', '## 1. G\n\n- [x] 1.1 a\n- [x] 1.2 b\n');
+  put('archive/2026-10-02-add-auth/proposal.md', '# P');
+  put('archive/2026-10-02-add-auth/specs/auth.md', 'x');
+  put('archive/2026-10-02-add-auth/adrs/use-jwt.md', '---\ntitle: Use JWT\nstatus: Accepted\n---\nbody');
+  put('archive/undated/tasks.md', '- [ ] 1.1 a\n');
   const list = await scanArchive(tmp);
   assert.deepEqual(list.map((c) => c.dirName), ['undated', '2026-10-02-add-auth', '2026-09-01-old']);
   const auth = list.find((c) => c.name === 'add-auth');
@@ -58,7 +58,7 @@ test('archive scanner reads dated folders newest first with counts, specs and AD
   assert.deepEqual(await scanArchive(join(tmp, 'nope')), []);
 });
 
-test('spec-guard reuse: prompts run through the hook rules', () => {
+test('agent prompts: only one-line /spec-* commands are sent', () => {
   const root = join(tmp, 'ws');
   put('ws/.cursor/commands/spec-apply.md', 'x');
   assert.deepEqual(checkPrompt('/spec-apply demo', [root]), { ok: true });
@@ -68,13 +68,9 @@ test('spec-guard reuse: prompts run through the hook rules', () => {
   assert.equal(checkPrompt('hello', [root]).ok, false);
 });
 
-test('spec-guard reuse: the hook file itself exports the rules the extension uses', () => {
-  const hook = readFileSync(resolve(import.meta.dirname, '../../project-template/hooks/spec-guard.cjs'), 'utf8');
-  assert.ok(hook.includes('require.main === module'));
+test('setup status: installed entry points', () => {
   put('ws2/.cursor/commands/spec-apply.md', 'x');
-  put('ws2/.cursor/hooks.json', '{"hooks":{"beforeSubmitPrompt":[{"command":"node .cursor/hooks/spec-guard.cjs"}]}}');
   const status = setupStatus([join(tmp, 'ws2')]);
-  assert.equal(status.hook, true);
   assert.equal(status.commands, false);
   assert.deepEqual(status.missing, ['spec-explore', 'spec-propose', 'spec-fix', 'spec-sync', 'spec-archive']);
 });

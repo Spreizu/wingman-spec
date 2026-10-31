@@ -70,28 +70,26 @@ export function makeFixture(): string {
     mkdirSync(dirname(p), { recursive: true });
     writeFileSync(p, text);
   };
-  put('openspec/config.yaml', 'schema: wingman-spec\n');
-  put('openspec/specs/auth/spec.md', BASE);
-  put('openspec/changes/demo/.openspec.yaml', 'schema: wingman-spec\n');
+  put('wingman-spec.yaml', '');
+  put('specs/auth.md', BASE);
   put(
-    'openspec/changes/demo/proposal.md',
+    'changes/demo/proposal.md',
     '# Proposal\n\n## Why\n\nBecause users cannot sign in yet.\n\n## What Changes\n\nDo **the thing**.\n',
   );
-  put('openspec/changes/demo/specs/auth/spec.md', SPEC);
-  put('openspec/changes/demo/adrs/use-it.md', ADR('Use it', 'Proposed'));
-  put('openspec/changes/demo/adrs/no-decision.md', ADR('No architectural decision', 'none'));
-  put('openspec/changes/demo/tasks.md', '## 1. Core\n\n- [x] 1.1 First\n  - Spec: auth > Login\n  - Test first: t\n  - Done when: d\n- [ ] 1.2 Second <img src=x onerror=alert(1)>\n  - Spec: auth > Logout\n- [ ] 1.R Review\n');
-  put('openspec/changes/blocked/BLOCKED.md', '# Blocked\n\nWaiting on <i>infra</i>.\n');
-  put('openspec/changes/blocked/tasks.md', '## 1. X\n\n- [ ] 1.1 Y\n');
-  put('openspec/changes/shipped/.openspec.yaml', 'schema: wingman-spec\n');
-  put('openspec/changes/shipped/tasks.md', '## 1. Core\n\n- [x] 1.1 Done\n');
-  put('openspec/changes/archive/2026-09-30-first-cut/proposal.md', '# First cut\n\nShip it.\n');
-  put('openspec/changes/archive/2026-09-30-first-cut/tasks.md', '## 1. Core\n\n- [x] 1.1 Done thing\n- [x] 1.2 Other thing\n');
-  put('openspec/changes/archive/2026-09-30-first-cut/specs/auth/spec.md', SPEC);
-  put('openspec/changes/archive/2026-09-30-first-cut/adrs/old.md', ADR('Old', 'Accepted'));
-  put('adr/0003-standalone.md', ADR('Standalone', 'Proposed'));
-  put('adr/0001-old.md', ADR('Old', 'Superseded'));
-  put('adr/0002-new.md', ADR('New', 'Accepted', 'supersedes: 0001\n'));
+  put('changes/demo/specs/auth.md', SPEC);
+  put('changes/demo/adrs/use-it.md', ADR('Use it', 'Proposed'));
+  put('changes/demo/adrs/no-decision.md', ADR('No architectural decision', 'none'));
+  put('changes/demo/tasks.md', '## 1. Core\n\n- [x] 1.1 First\n  - Spec: auth > Login\n  - Test first: t\n  - Done when: d\n- [ ] 1.2 Second <img src=x onerror=alert(1)>\n  - Spec: auth > Logout\n- [ ] 1.R Review\n');
+  put('changes/blocked/BLOCKED.md', '# Blocked\n\nWaiting on <i>infra</i>.\n');
+  put('changes/blocked/tasks.md', '## 1. X\n\n- [ ] 1.1 Y\n');
+  put('changes/shipped/tasks.md', '## 1. Core\n\n- [x] 1.1 Done\n');
+  put('archive/2026-09-30-first-cut/proposal.md', '# First cut\n\nShip it.\n');
+  put('archive/2026-09-30-first-cut/tasks.md', '## 1. Core\n\n- [x] 1.1 Done thing\n- [x] 1.2 Other thing\n');
+  put('archive/2026-09-30-first-cut/specs/auth.md', SPEC);
+  put('archive/2026-09-30-first-cut/adrs/old.md', ADR('Old', 'Accepted'));
+  put('adrs/0003-standalone.md', ADR('Standalone', 'Proposed'));
+  put('adrs/0001-old.md', ADR('Old', 'Superseded'));
+  put('adrs/0002-new.md', ADR('New', 'Accepted', 'supersedes: 0001\n'));
   return root;
 }
 
@@ -106,6 +104,6 @@ export async function makeData(root: string, route: Route): Promise<ViewData> {
       else if ((p.endsWith('.md') || p.endsWith('.jsonl')) && existsSync(p)) texts[p] = readFileSync(p, 'utf8');
     }
   };
-  walk(join(root, 'openspec'));
-  return { projects: [project], route, texts, baseSpecs: { [project.root]: await listBaseSpecNames(root) }, setup: { commands: true, hook: true, missing: [] } };
+  walk(root);
+  return { projects: [project], route, texts, baseSpecs: { [project.root]: await listBaseSpecNames(root) }, setup: { commands: true, missing: [] }, actions: { trusted: true, results: {} } };
 }

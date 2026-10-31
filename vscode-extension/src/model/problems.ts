@@ -19,7 +19,7 @@ export interface DiagnosticSpec {
 }
 
 /** Codes the live anchor diagnostics (code view) already report, with the same quick fixes, so they are not shown twice. */
-const LIVE_CODES = new Set(['orphan-anchor', 'misplaced-marker', 'over-anchored', 'stale-test-tag']);
+const LIVE_CODES = new Set(['orphan-anchor', 'misplaced-marker', 'stale-test-tag']);
 export const coveredByLive = (f: VerifierFinding, codeViewOn: boolean): boolean => codeViewOn && f.source === 'drift' && LIVE_CODES.has(f.code);
 
 export function diagnosticOf(f: VerifierFinding): DiagnosticSpec {

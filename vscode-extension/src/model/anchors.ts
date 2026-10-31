@@ -1,24 +1,24 @@
 /**
  * Code anchors: `@spec <capability>/<requirement-slug>` markers in any file and `[capability/scenario-slug]` tags in
- * test files. Mirrors openspec/scripts/traceability.cjs and quality.cjs (same comment leaders, same slug rule), so the
- * editor agrees with `verify-task.cjs anchors|drift`. Pure Node, no VS Code.
+ * test files. Mirrors the CLI's trace package (same comment leaders, same slug rule), so the
+ * editor agrees with `wingman-spec anchors|drift`. Pure Node, no VS Code.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import placement from '../../../project-template/openspec/scripts/placement.cjs';
-import quality from '../../../project-template/openspec/scripts/quality.cjs';
-import traceability from '../../../project-template/openspec/scripts/traceability.cjs';
-import testPaths from '../../../project-template/openspec/scripts/testpaths.cjs';
+import placement from '../core/placement.ts';
+import quality from '../core/plan.ts';
+import traceability from '../core/plan.ts';
+import testPaths from '../core/testpaths.ts';
 
 /** The requirement/scenario slug: the name lower-cased, runs of other characters become one dash. */
 export const slug = (s: string): string => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'scenario';
 
-// The marker syntax lives in the verifier's placement.cjs (one definition for the editor and the scripts).
+// The marker syntax lives in core/placement.ts (the same rules as the CLI for the editor and the scripts).
 const { MARKER_LEADER, KEY } = placement;
 const { TAG_RE } = quality;
 const MAX_BYTES = 1024 * 1024;
 
-// Which files are tests lives in the verifier's testpaths.cjs (one definition for the editor and the scripts).
+// Which files are tests lives in core/testpaths.ts (the same rules as the CLI for the editor and the scripts).
 export const { isTestPath, isTestFile } = testPaths;
 
 /** True for a file the verifier would scan (relative, `/`-separated path): the verifier's own rule. */

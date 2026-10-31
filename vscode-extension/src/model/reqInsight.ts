@@ -107,7 +107,7 @@ export function warningsOf(i: Pick<ReqInsight, 'pending' | 'why' | 'scenarios' |
   return out;
 }
 
-/** The verifier's `anchor-sprawl` thresholds (anchorguard.cjs): more than this many anchors in more than this many files. */
+/** The verifier's `anchor-sprawl` thresholds (`wingman-spec guard`): more than this many anchors in more than this many files. */
 export const SPRAWL_ANCHORS = 6;
 export const SPRAWL_FILES = 3;
 
@@ -136,7 +136,7 @@ export function insightOf(model: TraceModel, key: string, adrs: RootAdr[] = []):
     tests: r.tests,
     pending,
     adrs: adrsMentioning(adrs, r.key, r.name),
-    warnings: warningsOf(base, /^\s*Anchors:\s*many\b/mi.test(r.block) || model.fit.many?.has(r.key) === true),
+    warnings: warningsOf(base, /^\s*Anchors:\s*many\b/mi.test(r.block) || model.many.has(r.key)),
   };
 }
 
@@ -286,7 +286,7 @@ export function planTest(i: ReqInsight, exists: (rel: string) => boolean): TestP
   return first && cand ? { file: cand, exists: false, reason: `the conventional test file for ${first}` } : undefined;
 }
 
-/** A starter test for one scenario, tagged so `verify-task.cjs` and the CodeLens find it. */
+/** A starter test for one scenario, tagged so `wingman-spec` and the CodeLens find it. */
 export function testStub(i: ReqInsight, scenarioSlug: string, file: string): string {
   const s = i.scenarios.find((x) => x.slug === scenarioSlug);
   const tag = `[${i.cap}/${scenarioSlug}]`;
@@ -304,13 +304,14 @@ export function testStub(i: ReqInsight, scenarioSlug: string, file: string): str
   return `// @spec ${i.key}\nit('${title}', () => {\n${given.map((g) => `  // ${g}`).join('\n')}${given.length ? '\n' : ''}  throw new Error('not written yet');\n});\n`;
 }
 
-/** The project test command from the OpenSpec config context ("- Test command: `npm test`"), or undefined when unset or `none`. */
+/** `commands.test` of wingman-spec.yaml, or undefined when unset, `none` or the `<fill in>` placeholder. */
 export function readTestCommand(configText: string): string | undefined {
-  const m = /^\s*-?\s*Test command:\s*(.*)$/im.exec(configText);
+  const block = /^commands:[ \t]*\n((?:[ \t]+.*\n?|[ \t]*\n)*)/m.exec(configText);
+  const m = block ? /^[ \t]+test:[ \t]*(.*)$/m.exec(block[1] ?? '') : null;
   if (!m) return undefined;
   let c = (m[1] ?? '').trim();
-  const tick = /^`([^`]+)`/.exec(c);
-  c = (tick ? tick[1] : c.replace(/\s+#.*$/, '')) ?? '';
+  const q = /^(['"])(.*)\1/.exec(c);
+  c = (q ? q[2] : c.replace(/\s+#.*$/, '')) ?? '';
   c = c.trim();
   if (!c || /^(none|off|n\/a)$/i.test(c) || /^<.*>$/.test(c) || /fill in/i.test(c)) return undefined;
   return c;

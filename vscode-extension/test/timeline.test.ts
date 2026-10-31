@@ -5,7 +5,7 @@ import { matchesGlob } from 'node:path';
 import { test } from 'node:test';
 import './support/installStub.mjs';
 
-const { parseTimeline, groupTimeline, duration, IDLE_GAP_SECONDS, timelinePath } = await import('../src/model/timeline.ts');
+const { parseTimeline, groupTimeline, timelineBlocks, duration, IDLE_GAP_SECONDS, timelinePath } = await import('../src/model/timeline.ts');
 const { timelineTab } = await import('../src/webview/timelineView.ts');
 const { STORE_PATTERN } = await import('../src/watcher.ts');
 
@@ -56,9 +56,35 @@ test('the tab: one line per event, details collapsed, decision distinct, idle ma
   assert.match(html, /class="tl-idle"[^>]*>Idle for 38 min 59 s</);
   assert.match(html, /<code>test -f ok<\/code>/);
   assert.doesNotMatch(html.replace(/<pre>[\s\S]*?<\/pre>/g, ''), /`/);
-  assert.match(html, /<h3 class="tl-task">Task 1\.1<\/h3>/);
+  assert.match(html, /<h4 class="tl-task">Task 1\.1<\/h4>/);
   assert.match(html, /<span class="tl-dur">2\.4 s<\/span><span class="tl-gap"[^>]*>\+10 s<\/span>/);
   assert.doesNotMatch(html, /class="badge/, 'no pills');
+});
+
+// A parallel wave: three tasks picked at once, checked as each subagent returns; the full tests then reopen 1.1.
+const WAVE = [
+  ev({ at: at(0), event: 'run-start', summary: 'run started (next)' }),
+  ev({ at: at(0, 1), event: 'next', task: '1.1', ok: true, summary: 'picked 1.1 Cart', wave: 1, lane: 1 }),
+  ev({ at: at(0, 1), event: 'next', task: '1.2', ok: true, summary: 'picked 1.2 User', wave: 1, lane: 2 }),
+  ev({ at: at(0, 1), event: 'next', task: '1.3', ok: true, summary: 'picked 1.3 Mail', wave: 1, lane: 3 }),
+  ev({ at: at(2), event: 'check', task: '1.2', ok: true, summary: 'all checks passed', wave: 1, lane: 2 }),
+  ev({ at: at(3), event: 'check', task: '1.1', ok: true, summary: 'all checks passed', wave: 1, lane: 1 }),
+  ev({ at: at(4), event: 'check', task: '1.3', ok: true, summary: 'all checks passed', wave: 1, lane: 3 }),
+  ev({ at: at(5), event: 'next', task: '1.1', ok: true, summary: 'picked 1.1 Cart', wave: 1, lane: 1 }),
+  ev({ at: at(9), event: 'next', task: '2.1', ok: true, summary: 'picked 2.1 Report' }),
+].join('\n');
+
+test('a parallel wave is one block with a lane per task, in lane order, beside each other', () => {
+  const b = timelineBlocks(parseTimeline(WAVE));
+  assert.deepEqual(b.map((x) => x.kind), ['group', 'wave', 'group']);
+  const w = b[1];
+  if (w?.kind !== 'wave') throw new Error('block 2 is not a wave');
+  assert.equal(w.wave, 1);
+  assert.deepEqual(w.lanes.map((l) => [l.task, l.entries.length]), [['1.1', 3], ['1.2', 2], ['1.3', 2]]);
+  const html = timelineTab(WAVE);
+  assert.match(html, /<h4 class="tl-task">Parallel wave 1: 3 tasks at once<\/h4><div class="tl-lanes">/);
+  assert.equal((html.match(/class="tl-lane"/g) ?? []).length, 3);
+  assert.match(html, /<h4 class="tl-task">Task 2\.1<\/h4>/);
 });
 
 test('no events: a calm empty state', () => {
@@ -71,7 +97,56 @@ test('durations read naturally', () => {
 
 test('live refresh: the watcher covers the timeline of every change', () => {
   const rel = timelinePath('/p', 'demo').slice('/p/'.length);
-  assert.equal(rel, 'openspec/.apply-runs/demo/timeline.jsonl');
+  assert.equal(rel, 'runs/demo/timeline.jsonl');
   assert.ok(matchesGlob(rel, STORE_PATTERN), STORE_PATTERN);
-  assert.ok(!matchesGlob('openspec/.apply-runs/demo/run1/metrics.jsonl', STORE_PATTERN), 'other run files do not refresh the views');
+  assert.ok(!matchesGlob('runs/demo/run1/metrics.jsonl', STORE_PATTERN), 'other run files do not refresh the views');
+});
+
+// A timeline the Go CLI wrote (new, log start/grill, an artifact, validate, lint from the editor).
+const { verifyChain, phaseSections } = await import('../src/model/timeline.ts');
+const { readFileSync } = await import('node:fs');
+const { createHash } = await import('node:crypto');
+const verifyHead = (lines: string[]) => createHash('sha256').update(lines[lines.length - 1] ?? '').digest('hex');
+const CHAINED = readFileSync(new URL('./fixtures/timeline/chained.jsonl', import.meta.url), 'utf8');
+
+test('the hash chain the CLI writes verifies; an edit, a deletion or a move names the first bad entry', () => {
+  assert.equal(verifyChain(CHAINED), undefined);
+  assert.equal(verifyChain(CHAINED.replace(/\n/g, '\r\n')), undefined, 'CRLF (git autocrlf) keeps the chain');
+  assert.equal(verifyChain(FILE), undefined, 'a timeline from before the chain is accepted');
+  const ls = CHAINED.trimEnd().split('\n');
+  const edited = verifyChain(CHAINED.replace('Who unblocks? -> sales', 'Who unblocks? -> nobody'));
+  assert.deepEqual([edited?.line, edited?.event], [4, 'artifact']);
+  assert.match(edited?.reason ?? '', /entry 3 was edited/);
+  assert.equal(verifyChain([ls[0], ls[2], ls[3]].join('\n'))?.line, 2, 'deleted entry');
+  assert.equal(verifyChain([ls[1], ls[2]].join('\n'))?.line, 1, 'deleted first entry');
+  assert.equal(verifyChain([ls[0], ls[2], ls[1]].join('\n'))?.line, 2, 'moved entry');
+  const html = timelineTab(CHAINED.replace('Block purchases', 'Allow purchases'));
+  assert.match(html, /<p class="tl-chain" role="note">This timeline was changed after it was written: entry 3 \(grill at [^)]+\) does not follow entry 2/);
+  assert.doesNotMatch(timelineTab(CHAINED), /tl-chain/);
+});
+
+test('archived.json anchors the head: a dropped last entry shows', () => {
+  const ls = CHAINED.trimEnd().split('\n');
+  const anchor = (n: number) => JSON.stringify({ archived_at: 'x', timeline_head: verifyHead(ls.slice(0, n)), timeline_entries: n });
+  assert.equal(verifyChain(CHAINED, anchor(ls.length)), undefined);
+  assert.match(verifyChain(ls.slice(0, -1).join('\n'), anchor(ls.length))?.reason ?? '', /does not match archived\.json/);
+});
+
+
+test('the tab groups by phase: Propose (start, questions, artifacts, validate, lint), then Build, then Verify', () => {
+  const extra = [
+    ev({ at: '2026-10-30T23:00:00+02:00', event: 'run-start', summary: 'run started (next)' }),
+    ev({ at: '2026-10-30T23:00:01+02:00', event: 'validate', ok: true, summary: 'valid' }),
+    ev({ at: '2026-10-30T23:10:00+02:00', event: 'finish', ok: true, summary: 'change verified' }),
+  ];
+  const ps = phaseSections(parseTimeline([CHAINED.trimEnd(), ...extra].join('\n')));
+  assert.deepEqual(ps.map((p) => [p.label, p.blocks.flatMap((b) => (b.kind === 'group' ? b.group.entries.map((e) => e.event) : []))]), [
+    ['Propose', ['new', 'start', 'grill', 'artifact', 'validate', 'lint']],
+    ['Build', ['run-start', 'validate']],
+    ['Verify', ['finish']],
+  ]);
+  const html = timelineTab(CHAINED);
+  assert.match(html, /<h3 class="tl-phase-title">Propose<\/h3>/);
+  assert.match(html, /Run from<\/div><ul><li>editor<\/li>/);
+  assert.match(html, /<span class="tl-step">Question<\/span>/);
 });

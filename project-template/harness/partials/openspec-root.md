@@ -1,8 +1,0 @@
-**OpenSpec root.** Paths such as `openspec/...` and `adr/` in this command are relative to the OpenSpec root: the directory that contains `openspec/`. Find it in this order:
-1. The current repository has `openspec/specs` or `openspec/changes`: it is the root (specs next to the code).
-2. The repository's `openspec/workspace.yaml` has `specs: <path>`, relative to the repository: that directory is the root. This is the workspace layout: the specs live in a separate git repository, usually open as another folder of a multi-root VS Code/Cursor workspace.
-3. `openspec/config.yaml` holds `store: <id>`: run `openspec context --json` and use `root.path`.
-   - If a pointer exists but its root cannot be found (`openspec context --json` has no `root`, e.g. `Unknown store '<id>'`, or the `specs:` folder does not exist), the store or specs repo is not cloned or registered on this machine. Run `node <code-repo>/openspec/scripts/verify-task.cjs doctor`, show its error text to the user unchanged (it names the exact `git clone` and `openspec store register` steps), and stop. Do not clone, register, create or guess a root yourself, and do not continue with step 4.
-4. No pointer at all: look at the other workspace folders for exactly one that has `openspec/config.yaml` with `openspec/specs` or `openspec/changes`. If there are none or several, ask the user.
-
-Run every `openspec` command from the root directory (for example `cd <root> && openspec status --change <name>`), and read and write `openspec/...` and `adr/` there. Code, tests and `openspec/scripts/` always stay in the code repository. In the workspace layout spec and ADR changes are committed in the specs repository, code changes in the code repository.

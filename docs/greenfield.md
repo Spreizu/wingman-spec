@@ -1,24 +1,24 @@
 # New product: plan from requirements
 
 For a product with no code yet. The analyst runs one command, `/spec-green-start`, again and again. It asks the verifier
-(`node openspec/scripts/verify-task.cjs greenfield status`) for the phase and the one next action, does it, and ends every run with
+(`wingman-spec greenfield status`) for the phase and the one next action, does it, and ends every run with
 `Done`, `Next` and `Blocked by`. Developers later run `/spec-green-next`.
 
 | Phase | What ends it |
 |---|---|
-| Inputs | the client's material is in `openspec/inputs/` |
+| Inputs | the client's material is in `inputs/` |
 | Questions | every question answered from a document, asked, or assumed (with owner, check point and re-plan trigger) |
 | Foundation | `understood.md` approved with the client's name; numeric non-functional requirements, fixed decisions as ADRs |
 | Capabilities | one spec-only change per capability and integration (requirements with their Why, contracts, failure cases) |
 | Review | a different agent reviews the spec; the client signs it off |
-| Roadmap | `/spec-green-plan` writes `openspec/roadmap/<slice>.md`: walking skeleton first, risky integrations early, size caps S/M/L |
-| Handover | `verify-task.cjs handover --write` when the gate is green |
+| Roadmap | `/spec-green-plan` writes `roadmap/<slice>.md`: walking skeleton first, risky integrations early, size caps S/M/L |
+| Handover | `wingman-spec handover --write` when the gate is green |
 
 The spec is the end state of the product. A slice carries tasks only (`Slice: <id>`, no spec delta); later changes go through
 `/spec-propose` and `/spec-garden`, and rewriting a requirement's Why or removing a requirement needs the owner's approval.
 
-**Mode guard.** `verify-task.cjs mode` says `greenfield`, `brownfield`, `greenfield-in-progress` or `implementation`. The marker
-`openspec/greenfield.yaml` is written only after an explicit yes. A greenfield command in the wrong mode exits 6 and writes nothing;
+**Mode guard.** `wingman-spec mode` says `greenfield`, `brownfield`, `greenfield-in-progress` or `implementation`. The marker
+`greenfield.yaml` in the specs root is written only after an explicit yes. A greenfield command in the wrong mode exits 6 and writes nothing;
 `/spec-adopt` refuses on an in-progress new product.
 
 **Files and parallel PRs.** Status, order and coverage are derived from the files each time, with no committed index. Every addition is

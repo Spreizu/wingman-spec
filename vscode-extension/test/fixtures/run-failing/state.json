@@ -7,7 +7,7 @@
     "id": "1",
     "description": "1.1 Replace SAVE10 by SAVE15 with the 20 euro cap",
     "line": 3,
-    "file": "/proj/openspec/changes/rework-percent-discount/tasks.md",
+    "file": "/proj/changes/rework-percent-discount/tasks.md",
     "label": "1.1",
     "title": "Replace SAVE10 by SAVE15 with the 20 euro cap",
     "details": [
@@ -33,8 +33,8 @@
   ],
   "snapshots": [
     {
-      "file": "/proj/openspec/changes/rework-percent-discount/tasks.md",
-      "snap": "/proj/openspec/.apply-runs/rework-percent-discount/20261025T223911Z-1307302/pre/1792967951215-0.md"
+      "file": "/proj/changes/rework-percent-discount/tasks.md",
+      "snap": "/proj/runs/rework-percent-discount/20261025T223911Z-1307302/pre/1792967951215-0.md"
     }
   ],
   "attempt_open": true,

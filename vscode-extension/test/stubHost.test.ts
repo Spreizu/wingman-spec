@@ -13,7 +13,7 @@ const { TraceCache, registerAnchorCode } = await import('../src/editor/anchorCod
 const { buildTrace } = await import('../src/model/traceability.ts');
 
 const dir = traceProject();
-writeFileSync(join(dir, 'openspec', 'config.yaml'), 'schema: wingman-spec\ncontext: |\n  - Test command: `npx vitest run`\n');
+writeFileSync(join(dir, 'wingman-spec.yaml'), 'commands:\n  test: npx vitest run\n');
 writeFileSync(join(dir, 'src', 'misplaced.ts'), 'export function m() {\n  run(); // @spec billing/add-item\n}\n');
 const store = {
   projects: [{ root: dir, workspaceFolder: dir, adrs: [], error: undefined }],

@@ -1,0 +1,13 @@
+.X..
+
+Failed tests:
+
+✖ [todo/removed] fails (0.120702ms)
+  Error: boom
+      at TestContext.<anonymous> (/project/a.test.js:3:44)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1047:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+      at Test.postRun (node:internal/test_runner/test:1173:19)
+      at Test.run (node:internal/test_runner/test:1101:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)

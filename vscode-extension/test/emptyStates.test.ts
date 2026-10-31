@@ -18,11 +18,11 @@ const ZERO_NOISE = /\b0\/0\b|\b0 (?:verified|lint errors?|implementation tasks?|
 
 const task = (id: string, title: string, checked: boolean): Task => ({ id, title, checked, line: 1, isReview: false, details: {} as Task['details'] });
 const changeOf = (tasks: Task[], extra: Partial<Change> = {}): Change => ({
-  name: 'add-search', dir: '/proj/openspec/changes/add-search', schema: 'wingman-spec', isWingmanSpec: true, skipSpecs: false, state: 'in-progress', artifacts: [], capabilities: [], adrs: [], noDecisions: [], adrsSynced: true,
+  name: 'add-search', dir: '/proj/changes/add-search', schema: 'wingman-spec', isWingmanSpec: true, skipSpecs: false, state: 'in-progress', artifacts: [], capabilities: [], adrs: [], noDecisions: [], adrsSynced: true,
   groups: tasks.length ? [{ number: '1', title: 'Core', tasks, isCloseOut: false }] : [], taskTotal: tasks.length, taskDone: tasks.filter((t) => t.checked).length, ...extra,
 } as unknown as Change);
 const card = (c: Change, inputs = {}, proposalText?: string): string =>
-  dashboardCard(buildDashboard({ change: c, inputs, cmd: (a) => `node openspec/scripts/verify-task.cjs ${a}`, ...(proposalText ? { proposalText } : {}) }), false);
+  dashboardCard(buildDashboard({ change: c, inputs, cmd: (a) => `.wingman-spec/bin/wingman-spec ${a}`, ...(proposalText ? { proposalText } : {}) }), false);
 
 test('rich text: backtick spans become <code>, HTML is escaped, a stray backtick is dropped', () => {
   assert.equal(rich('it starts with `next` <now>'), 'it starts with <code>next</code> &lt;now&gt;');
@@ -69,16 +69,12 @@ test('some tasks, all verified, blocked: a sub-line stays only when it says some
 const root = mkdtempSync(join(tmpdir(), 'wingman-empty-'));
 after(() => rmSync(root, { recursive: true, force: true }));
 const put = (rel: string, text: string): void => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), text); };
-put('openspec/config.yaml', 'schema: wingman-spec\n');
-put('openspec/changes/brand-new/.openspec.yaml', 'schema: wingman-spec\n');
-put('openspec/changes/brand-new/app-map.md', '# App map\n\nA todo list with a search box.\n');
-put('openspec/changes/half-done/.openspec.yaml', 'schema: wingman-spec\n');
-put('openspec/changes/half-done/tasks.md', '## 1. Core\n\n- [x] 1.1 Done\n- [ ] 1.2 Open\n');
-put('openspec/changes/blocked-one/.openspec.yaml', 'schema: wingman-spec\n');
-put('openspec/changes/blocked-one/tasks.md', '## 1. Core\n\n- [ ] 1.1 Open\n');
-put('openspec/changes/blocked-one/BLOCKED.md', 'Blocked: task 1.1 needs a decision about `sort order`.\n');
-put('openspec/changes/archive/2026-10-01-empty-archive/.openspec.yaml', 'schema: wingman-spec\n');
-put('openspec/changes/archive/2026-10-01-empty-archive/proposal.md', '## Why\nx\n');
+put('wingman-spec.yaml', '');
+put('changes/brand-new/app-map.md', '# App map\n\nA todo list with a search box.\n');
+put('changes/half-done/tasks.md', '## 1. Core\n\n- [x] 1.1 Done\n- [ ] 1.2 Open\n');
+put('changes/blocked-one/tasks.md', '## 1. Core\n\n- [ ] 1.1 Open\n');
+put('changes/blocked-one/BLOCKED.md', 'Blocked: task 1.1 needs a decision about `sort order`.\n');
+put('archive/2026-10-01-empty-archive/proposal.md', '## Why\nx\n');
 
 async function html(route: Route): Promise<string> {
   const d = await makeData(root, route);

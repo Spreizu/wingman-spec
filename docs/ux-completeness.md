@@ -7,8 +7,8 @@ that is written down once, at proposal time, where it becomes a scenario, a tagg
 
 ## Where it lives
 
-- Text: `project-template/harness/partials/ux-completeness.md`, one file, included by `/spec-explore`, `/spec-propose`
-  and `/spec-green-start` (the partial mechanism of `scripts/render-harness.sh`).
+- Text: `harness/partials/ux-completeness.md`, one file, included by `/spec-explore`, `/spec-propose`
+  and `/spec-green-start` (a `{{> ux-completeness}}` partial, rendered by `wingman-spec init` and `update`).
 - Answers: the `## UX checklist` section of `proposal.md`, one line per item: `- keyboard: scenario tasks/keyboard-add`
   or `- loading: Not applicable: the list is read from local state`.
 - Review: the `spec-reviewer` agent and the greenfield capability review (`RUBRIC.spec`) check that every UI-facing
@@ -16,7 +16,7 @@ that is written down once, at proposal time, where it becomes a scenario, a tagg
 
 ## Lint
 
-`verify-task.cjs lint` runs `uxLint` (warning level, so `ok` is unchanged). A change is UI-facing when its specs carry a
+`wingman-spec lint` runs `uxLint` (warning level, so `ok` is unchanged). A change is UI-facing when its specs carry a
 visual block or its `tasks.md` names UI files (`.vue`, `.jsx`, `.tsx`, `.svelte`, `.astro`, `.html`, `.css`, `.scss`,
 `.less`) in `Files:` lines; test files do not count. Slice changes are skipped (their capability answered the checklist).
 It warns when the section is missing, an item has no answer, a `scenario <id>` names a scenario the change lacks, a

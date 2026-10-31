@@ -11,6 +11,7 @@ import type { TraceModel } from '../model/traceability.ts';
 import type { ProjectStore } from '../store.ts';
 import { registerAnchorCommands } from './anchorCommands.ts';
 import { MarkerFixes } from './markerFixes.ts';
+import { configFiles } from '../core/paths.ts';
 import type { RevealPanel } from './anchorCommands.ts';
 
 const SETTING = 'codeView';
@@ -50,12 +51,12 @@ export class TraceCache implements vscode.Disposable {
     return this.insights.get(k);
   }
 
-  /** The project's test command from the OpenSpec config (and `scripts.test` of package.json for `npm test`), or undefined. */
+  /** The project's test command from wingman-spec.yaml (and `scripts.test` of package.json for `npm test`), or undefined. */
   testCommand(model: TraceModel): { command: string; script?: string } | undefined {
     const k = model.root;
     if (!this.testCommands.has(k)) {
       let found: { command: string; script?: string } | null = null;
-      for (const f of [join(model.codeRoot, 'openspec', 'config.yaml'), join(model.root, 'openspec', 'config.yaml')]) {
+      for (const f of configFiles(model.codeRoot, model.root)) {
         try {
           const c = readTestCommand(readFileSync(f, 'utf8'));
           if (c) {
@@ -77,7 +78,7 @@ export class TraceCache implements vscode.Disposable {
     return this.testCommands.get(k) ?? undefined;
   }
 
-  /** The model for an OpenSpec root. */
+  /** The model for a specs root. */
   byRoot(root: string): TraceModel | undefined {
     return this.all().find((m) => m.root === root);
   }
@@ -94,7 +95,7 @@ export class TraceCache implements vscode.Disposable {
     else this.timer = setTimeout(run, delay);
   }
 
-  /** Models of all projects (one per OpenSpec root). */
+  /** Models of all projects (one per specs root). */
   all(): TraceModel[] {
     return this.store.projects.filter((p) => !p.error).map((p) => this.of(p.root, p.workspaceFolder));
   }
@@ -147,7 +148,7 @@ class AnchorCodeLens implements vscode.CodeLensProvider {
     if (!text.includes('@spec')) return [];
     const { model } = hit;
     const placed = new Map<number, string>();
-    for (const p of anchorProblems(model, hit.rel, text)) if (p.code === 'marker-placement' || p.code === 'over-anchored') placed.set(p.line, p.message);
+    for (const p of anchorProblems(model, hit.rel, text)) if (p.code === 'marker-placement') placed.set(p.line, p.message);
     const seen = new Set<number>();
     const lenses: vscode.CodeLens[] = [];
     const test = isTestPath(hit.rel);
@@ -240,7 +241,7 @@ export function registerAnchorCode(cache: TraceCache, panel: RevealPanel): vscod
       checkAll();
     }),
     vscode.languages.registerCodeLensProvider(selector, lens),
-    vscode.languages.registerCodeLensProvider({ scheme: 'file', pattern: '**/openspec/specs/*/spec.md' }, reverse),
+    vscode.languages.registerCodeLensProvider({ scheme: 'file', pattern: '**/specs/*.md' }, reverse),
     vscode.languages.registerHoverProvider(selector, {
       provideHover(doc, pos) {
         if (!enabled()) return undefined;

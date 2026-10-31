@@ -1,4 +1,4 @@
-import quality from '../../../project-template/openspec/scripts/quality.cjs';
+import quality from '../core/plan.ts';
 import type { Task, TaskDetails, TaskGroup } from './types.ts';
 
 const GROUP_RE = /^##\s+(?:(\d+)\.\s*)?(.*?)\s*$/;
@@ -22,8 +22,8 @@ function stripComments(text: string): string {
 /**
  * Parses tasks.md as written by the wingman-spec schema: `## N. Group` headings, top-level
  * `- [ ] X.Y title` (or `* [ ]`) checkboxes, and indented non-checkbox detail lines. Only top-level
- * checkbox lines outside code fences count as tasks; verify-task.cjs refuses fenced or nested
- * checkboxes, so for a valid tasks.md this matches OpenSpec's count.
+ * checkbox lines outside code fences count as tasks; `wingman-spec validate` refuses fenced or nested
+ * checkboxes, so for a valid tasks.md this matches the CLI's count.
  */
 export function parseTasks(text: string): TaskGroup[] {
   const groups: TaskGroup[] = [];

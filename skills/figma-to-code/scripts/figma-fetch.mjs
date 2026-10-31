@@ -429,7 +429,7 @@ function stockClass(prop, px, ctx) {
 }
 const arbClass = (prop, v) => ({ 'font-size': `text-[${v}]`, 'font-weight': `font-[${v}]`, 'line-height': `leading-[${v}]`, 'letter-spacing': `tracking-[${v}]`, gap: `gap-[${v}]`, 'row-gap': `gap-y-[${v}]`, 'column-gap': `gap-x-[${v}]`, padding: `p-[${v}]`, 'padding-top': `pt-[${v}]`, 'padding-right': `pr-[${v}]`, 'padding-bottom': `pb-[${v}]`, 'padding-left': `pl-[${v}]`, 'border-radius': `rounded-[${v}]`, 'background-color': `bg-[${v}]`, color: `text-[${v}]`, 'border-color': `border-[${v}]`, 'border-width': `border-[${v}]`, width: `w-[${v}]`, height: `h-[${v}]` })[prop] || null;
 
-/** Index the project's tokens (verify-task.cjs design-system --format json) by what they can express. */
+/** Index the project's tokens (`wingman-spec design-system --json`) by what they can express. */
 export function indexTokens(ds) {
   const idx = { colors: [], spacing: [], radius: [], fontSize: [], weight: [], shadow: [], leading: {}, tailwind: ds?.tailwind?.version ?? null };
   for (const t of ds?.tokens || []) {

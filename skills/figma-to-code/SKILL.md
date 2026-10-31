@@ -57,7 +57,7 @@ With the REST helper, turn the response into facts the map can use:
 ```bash
 H="node <skill-dir>/scripts/figma-fetch.mjs"
 $H fetch "<url>" --assets --collapse-instances          # prints a summary; OUT = its "out" dir (node.json = normalised tree, facts.json, assets/)
-node <code-repo>/openspec/scripts/verify-task.cjs design-system --format json > "$OUT/design-system.json"
+.wingman-spec/bin/wingman-spec design-system --json > "$OUT/design-system.json"
 $H facts "$OUT/node.json" --design-system "$OUT/design-system.json" --at <frame-width>   # token > stock > arbitrary per value
 ```
 
@@ -75,7 +75,7 @@ same mapping by hand with the same ladder.
 
 Follow the `design-map` flow of `/spec-explore` (it is in the explore command; steps 1 to 4). In short, with the Figma specifics:
 
-1. Run `node <code-repo>/openspec/scripts/verify-task.cjs design-system` and open the token files and the shared components you will need.
+1. Run `.wingman-spec/bin/wingman-spec design-system` and open the token files and the shared components you will need.
 2. For **every** region, text and component of the node, in this order, and record the source:
    1. **token**: Figma variable/style names (`color/primary`, `spacing/card`, `Heading/Title`, or their `codeSyntax.WEB`) to the project's token of the same meaning, else the token with the same value. A same-value token with a different meaning (a gap that happens to equal a card padding) is only a candidate: check the name/role. `drift` rows are questions for the designer, not silent changes.
    2. **component**: Figma component/variant to the project's component and variant props (`Button / Variant=secondary` to `UiButton variant="secondary"`). Code Connect mappings (`get_code_connect_map`, `*.figma.tsx` files) are authoritative when present; otherwise match by name, variants and the design-system listing. Reuse the component; do not rebuild its internals from the Figma layers.
@@ -91,7 +91,7 @@ Follow the `design-map` flow of `/spec-explore` (it is in the explore command; s
 
 ## 3. Write the design map
 
-Write `<root>/openspec/explore-design/<slug>.md` in the exact format of the `design-map` partial (`# Design map`,
+Write `explore-design/<slug>.md` in the specs root, in the exact format of the `design-map` partial (`# Design map`,
 `Inputs:`, `## Design system`, `## Map` with Region | Selector | Implemented with | Source | Expect, `## Gaps`,
 `## Questions for the designer`). Figma-specific content:
 
@@ -116,7 +116,7 @@ Ask the user/designer for the Gaps and Questions you cannot resolve from the cod
    ```bash
    $H diff "$OUT/facts.json" code-values.json --md     # code-values.json: { "<testid>": { "gap": "4px", "font-weight": "600" } }
    ```
-   The helper's `Selector` column is the suggested id: write the real selectors (`[data-testid=...]`, or a structural one such as `[data-testid="account-overview"] h2` when the element has no test id; do not edit markup just to add ids). Status: `same`, `close` (within the visual check's tolerance), `changed`, `unknown` (go and read the code; do not guess). Alternative: put the Figma `expect:` lines into the change's visual block first and run `verify-task.cjs visual`; the failing expects are the changed rows (this is the red step).
+   The helper's `Selector` column is the suggested id: write the real selectors (`[data-testid=...]`, or a structural one such as `[data-testid="account-overview"] h2` when the element has no test id; do not edit markup just to add ids). Status: `same`, `close` (within the visual check's tolerance), `changed`, `unknown` (go and read the code; do not guess). Alternative: put the Figma `expect:` lines into the change's visual block first and run `wingman-spec visual`; the failing expects are the changed rows (this is the red step).
 3. Write the map as in section 3 (it covers the whole node, so lint and the visual check keep guarding untouched areas) and add a `## Diff vs current code` section with the table. **Only `changed` rows become tasks**, each with the exact class/token to set (`text-fg` to `text-primary`, `font-semibold` to `font-bold`, `gap-1` to `gap-2`). Rows that are `same` or `close` are listed as "not edited".
 4. Edit only those lines. Keep markup, classes, texts, tests and anything outside the diff intact; no reformatting, no opportunistic cleanups. If a changed value has no token: gap, as in BUILD.
 5. If a node exists in Figma but not in the code (new element) or the reverse (removed): list it as a separate row and ask, because it may be a design decision outside the update.
@@ -124,8 +124,8 @@ Ask the user/designer for the Gaps and Questions you cannot resolve from the cod
 ## 6. Verify (hand-off to the existing loop)
 
 Run what the project already runs, nothing new: the task's `Done when` command, then
-`node <code-repo>/openspec/scripts/verify-task.cjs visual <change>` (computed-style `expect:` checks, overflow, axe,
-console errors; it needs Playwright, `doctor` says if it is missing) and the finish/review steps of the OpenSpec
+`.wingman-spec/bin/wingman-spec visual <change>` (computed-style `expect:` checks, overflow, axe,
+console errors; it needs Playwright, `doctor` says if it is missing) and the finish/review steps of the wingman-spec
 apply flow. Use the Figma screenshot only as a temp file for your own side-by-side look (or the reviewer's rubric);
 **never commit it** and do not add a `reference:` to a path that does not exist in the repo. Fix, re-run. If the
 check could not run (no browser), say so and list the Expect facts that are still unverified.

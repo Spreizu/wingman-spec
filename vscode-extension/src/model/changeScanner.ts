@@ -1,11 +1,11 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
+import { CONFIG, adrsDir, changesDir as changesOf, deltaSpec, livingSpec } from '../core/paths.ts';
 import { scanArchive } from './archiveScanner.ts';
 import { computeAdrSync, isSynced, noDecisionReason, parseRootAdr, parseSourceAdr } from './adrSync.ts';
-import { readYamlKey } from './frontMatter.ts';
 import { countTasks, parseTasks } from './tasksParser.ts';
-import chrono from '../../../project-template/openspec/scripts/chronology.cjs';
-import quality from '../../../project-template/openspec/scripts/quality.cjs';
+import chrono from '../core/chronology.ts';
+import quality from '../core/plan.ts';
 import type {
   Artifact,
   ArtifactId,
@@ -55,19 +55,19 @@ async function listDir(path: string): Promise<import('node:fs').Dirent[]> {
   }
 }
 
-export async function hasOpenSpecProject(root: string): Promise<boolean> {
-  return exists(join(root, 'openspec', 'config.yaml'));
+/** True when `root` is a specs root (it holds `wingman-spec.yaml`). */
+export async function hasSpecsRoot(root: string): Promise<boolean> {
+  return exists(join(root, CONFIG));
 }
 
 async function readCapabilities(root: string, changeDir: string): Promise<Capability[]> {
   const specsDir = join(changeDir, 'specs');
   const out: Capability[] = [];
   for (const entry of await listDir(specsDir)) {
-    if (!entry.isDirectory()) continue;
-    const specPath = join(specsDir, entry.name, 'spec.md');
-    if (!(await exists(specPath))) continue;
-    const isExisting = await exists(join(root, 'openspec', 'specs', entry.name));
-    out.push({ name: entry.name, path: specPath, kind: isExisting ? 'delta' : 'new' });
+    if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+    const name = entry.name.slice(0, -3);
+    const isExisting = await exists(livingSpec(root, name));
+    out.push({ name, path: deltaSpec(changeDir, name), kind: isExisting ? 'delta' : 'new' });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -106,13 +106,13 @@ async function scanChange(
   root: string,
   name: string,
   dir: string,
-  defaultSchema: string,
   roots: RootAdr[],
 ): Promise<Change> {
-  const meta = (await readText(join(dir, '.openspec.yaml'))) ?? '';
-  const schema = readYamlKey(meta, 'schema') ?? defaultSchema;
-  const isWingmanSpec = schema === WINGMAN_SCHEMA;
-  const skipSpecs = readYamlKey(meta, 'skip_specs') === 'true';
+  const schema = WINGMAN_SCHEMA;
+  const isWingmanSpec = true;
+  const proposalText = (await readText(join(dir, 'proposal.md'))) ?? '';
+  /** `Specs: none` in proposal.md: a change without delta specs (the CLI's validate.SpecsNone). */
+  const skipSpecs = /^Specs:\s*none\b/im.test(proposalText);
 
   const tasksPath = join(dir, 'tasks.md');
   const tasksText = await readText(tasksPath);
@@ -138,7 +138,7 @@ async function scanChange(
       status: s.fields['status'] ?? '',
       sync: computeAdrSync(name, s, roots),
     }));
-    const declared = quality.proposalSize((await readText(join(dir, 'proposal.md'))) ?? '');
+    const declared = quality.proposalSize(proposalText);
     const fast = declared.size === 'S' && declared.risk !== null && declared.risk.length === 0;
     artifacts = await Promise.all(
       ARTIFACTS.map(async (a): Promise<Artifact> => {
@@ -174,20 +174,17 @@ async function scanChange(
   };
 }
 
-/** Scans one project root. `adrDirectory` is relative to the root (default `adr`). */
-export async function scanProject(root: string, adrDirectory = 'adr'): Promise<ProjectModel> {
-  const adrDir = join(root, ...adrDirectory.split(/[\\/]/).filter(Boolean));
+/** Scans one specs root (specs/, changes/, archive/, adrs/). */
+export async function scanProject(root: string): Promise<ProjectModel> {
+  const adrDir = adrsDir(root);
   const adrs = await readRootAdrs(adrDir);
 
-  const config = (await readText(join(root, 'openspec', 'config.yaml'))) ?? '';
-  const defaultSchema = readYamlKey(config, 'schema') ?? 'spec-driven';
-
-  const changesDir = join(root, 'openspec', 'changes');
+  const changesDir = changesOf(root);
   const entries = await listDir(changesDir);
   const changes = await Promise.all(
     entries
-      .filter((e) => e.isDirectory() && e.name !== 'archive' && !e.name.startsWith('.'))
-      .map((e) => scanChange(root, e.name, join(changesDir, e.name), defaultSchema, adrs)),
+      .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+      .map((e) => scanChange(root, e.name, join(changesDir, e.name), adrs)),
   );
   const git = chrono.gitAdded(changesDir);
   for (const c of changes) c.created = chrono.createdStamp(c.dir, git);

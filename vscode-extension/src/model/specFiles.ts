@@ -1,26 +1,15 @@
 import { promises as fs } from 'node:fs';
-import { join } from 'node:path';
+import { livingSpecsDir } from '../core/paths.ts';
 
-/** Names of the capability folders under `openspec/specs/` that contain a `spec.md`. */
+/** Capability names of the living specs (`specs/<capability>.md`). */
 export async function listBaseSpecNames(root: string): Promise<string[]> {
-  const dir = join(root, 'openspec', 'specs');
   let entries: import('node:fs').Dirent[];
   try {
-    entries = await fs.readdir(dir, { withFileTypes: true });
+    entries = await fs.readdir(livingSpecsDir(root), { withFileTypes: true });
   } catch {
     return [];
   }
-  const names: string[] = [];
-  for (const e of entries) {
-    if (!e.isDirectory()) continue;
-    try {
-      await fs.access(join(dir, e.name, 'spec.md'));
-      names.push(e.name);
-    } catch {
-      // folder without spec.md is ignored
-    }
-  }
-  return names.sort();
+  return entries.filter((e) => e.isFile() && e.name.endsWith('.md')).map((e) => e.name.slice(0, -3)).sort();
 }
 
 export async function readTextSafe(path: string): Promise<string | undefined> {

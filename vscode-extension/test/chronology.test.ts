@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, test } from 'node:test';
-import chrono from '../../project-template/openspec/scripts/chronology.cjs';
+import chrono from '../src/core/chronology.ts';
 import { scanProject } from '../src/model/changeScanner.ts';
 import { dashboardCard } from '../src/webview/dashboardView.ts';
 import { summarizeRun } from '../src/model/changeDashboard.ts';
@@ -23,7 +23,7 @@ function project(): { root: string; put: (rel: string, text: string) => void } {
     mkdirSync(dirname(p), { recursive: true });
     writeFileSync(p, text);
   };
-  put('openspec/config.yaml', 'schema: wingman-spec\n');
+  put('wingman-spec.yaml', '');
   return { root, put };
 }
 const local = (h: number, m: number, s: number): string => chrono.isoLocal(new Date(2026, 9, 28, h, m, s));
@@ -31,7 +31,7 @@ const names = (r: { archive: { dirName: string }[] }): string => r.archive.map((
 
 test('three changes archived on one day sort by the time they were archived, newest first, not by name', async () => {
   const { root, put } = project();
-  const a = 'openspec/changes/archive';
+  const a = 'archive';
   put(`${a}/2026-10-28-mango/tasks.md`, '## 1. A\n\n- [x] 1.1 Done\n');
   put(`${a}/2026-10-28-mango/archived.json`, JSON.stringify({ archived_at: local(9, 15, 0) }));
   put(`${a}/2026-10-28-apple/archived.json`, JSON.stringify({ archived_at: local(16, 40, 5) }));
@@ -43,21 +43,21 @@ test('three changes archived on one day sort by the time they were archived, new
 
 test('a legacy archive without the file falls back to the commit time, then the mtime, then the date in its name', async () => {
   const { root, put } = project();
-  const a = join(root, 'openspec/changes/archive');
+  const a = join(root, 'archive');
   const git = (...args: string[]): void => {
     execFileSync('git', args, { cwd: root, stdio: 'ignore', env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.invalid', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.invalid', GIT_COMMITTER_DATE: process.env['STAMP'] ?? '' } });
   };
   git('init', '-q');
-  put('openspec/changes/archive/2026-10-20-bravo/tasks.md', '## 1. A\n\n- [x] 1.1 Done\n');
-  put('openspec/changes/archive/2026-10-20-alpha/tasks.md', '## 1. A\n\n- [x] 1.1 Done\n');
+  put('archive/2026-10-20-bravo/tasks.md', '## 1. A\n\n- [x] 1.1 Done\n');
+  put('archive/2026-10-20-alpha/tasks.md', '## 1. A\n\n- [x] 1.1 Done\n');
   process.env['STAMP'] = '2026-10-20T08:00:00+02:00';
-  git('add', 'openspec/changes/archive/2026-10-20-bravo');
+  git('add', 'archive/2026-10-20-bravo');
   git('commit', '-qm', 'one');
   process.env['STAMP'] = '2026-10-20T09:30:00+02:00';
-  git('add', 'openspec/changes/archive/2026-10-20-alpha');
+  git('add', 'archive/2026-10-20-alpha');
   git('commit', '-qm', 'two');
   delete process.env['STAMP'];
-  put('openspec/changes/archive/2026-10-20-charlie/tasks.md', '## 1. A\n\n- [x] 1.1 Done\n'); // untracked: the mtime
+  put('archive/2026-10-20-charlie/tasks.md', '## 1. A\n\n- [x] 1.1 Done\n'); // untracked: the mtime
   const old = new Date('2026-10-20T07:00:00+02:00');
   utimesSync(join(a, '2026-10-20-charlie'), old, old);
   const p = await scanProject(root);
@@ -70,10 +70,10 @@ test('a legacy archive without the file falls back to the commit time, then the 
 
 test('the time of day is shown next to the date: History card, overview card, archived page, tooltip', async () => {
   const { root, put } = project();
-  put('openspec/changes/archive/2026-10-28-shown/tasks.md', '## 1. A\n\n- [x] 1.1 Done\n');
-  put('openspec/changes/archive/2026-10-28-shown/archived.json', JSON.stringify({ archived_at: local(14, 3, 22) }));
-  put('openspec/changes/archive/2026-10-28-dated/tasks.md', '## 1. A\n\n- [x] 1.1 Done\n');
-  utimesSync(join(root, 'openspec/changes/archive/2026-10-28-dated'), new Date(2026, 9, 28, 6, 5, 4), new Date(2026, 9, 28, 6, 5, 4));
+  put('archive/2026-10-28-shown/tasks.md', '## 1. A\n\n- [x] 1.1 Done\n');
+  put('archive/2026-10-28-shown/archived.json', JSON.stringify({ archived_at: local(14, 3, 22) }));
+  put('archive/2026-10-28-dated/tasks.md', '## 1. A\n\n- [x] 1.1 Done\n');
+  utimesSync(join(root, 'archive/2026-10-28-dated'), new Date(2026, 9, 28, 6, 5, 4), new Date(2026, 9, 28, 6, 5, 4));
   const html = async (route: Parameters<typeof makeData>[1]): Promise<string> => renderPage(await makeData(root, route), 'NONCE', 'vscode-resource:');
   const history = await html({ page: 'history' });
   assert.match(history, /2026-10-28 14:03:22/);
@@ -87,7 +87,7 @@ test('the time of day is shown next to the date: History card, overview card, ar
 
 test('an archive with no time at all shows only the date', async () => {
   const { root, put } = project();
-  put('openspec/changes/archive/2026-10-28-bare/tasks.md', '## 1. A\n\n- [x] 1.1 Done\n');
+  put('archive/2026-10-28-bare/tasks.md', '## 1. A\n\n- [x] 1.1 Done\n');
   const p = await scanProject(root);
   assert.ok(p.archive[0]);
   p.archive[0].archived = { at: '', ms: new Date(2026, 9, 28).getTime(), source: 'name' };
@@ -96,14 +96,18 @@ test('an archive with no time at all shows only the date', async () => {
   assert.ok(!/2026-10-28 \d\d:\d\d:\d\d/.test(html));
 });
 
-test('the changes list is ordered by the time each change was created, newest first', async () => {
+test('the changes list is ordered by the time each change was created (its first commit), newest first', async () => {
   const { root, put } = project();
-  put('openspec/changes/old-one/.openspec.yaml', `schema: wingman-spec\ncreated_at: ${local(8, 0, 0)}\n`);
-  put('openspec/changes/middle/.openspec.yaml', `schema: wingman-spec\ncreated_at: ${local(12, 30, 15)}\n`);
-  put('openspec/changes/zz-newest/.openspec.yaml', `schema: wingman-spec\ncreated_at: ${local(18, 45, 59)}\n`);
+  const env = (date: string) => ({ ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.invalid', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.invalid', GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date });
+  execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });
+  for (const [name, h, m, s] of [['old-one', 8, 0, 0], ['zz-newest', 18, 45, 59], ['middle', 12, 30, 15]] as const) {
+    put(`changes/${name}/proposal.md`, '# x\n');
+    execFileSync('git', ['add', `changes/${name}`], { cwd: root, stdio: 'ignore' });
+    execFileSync('git', ['commit', '-qm', name], { cwd: root, stdio: 'ignore', env: env(local(h, m, s)) });
+  }
   const p = await scanProject(root);
   assert.equal(p.changes.map((c) => c.name).join(), 'zz-newest,middle,old-one');
-  assert.equal(p.changes[0]?.created?.source, 'file');
+  assert.equal(p.changes[0]?.created?.source, 'git');
   const html = renderPage(await makeData(root, { page: 'overview' }), 'NONCE', 'vscode-resource:');
   assert.match(html, /2026-10-28 18:45:59/);
 });

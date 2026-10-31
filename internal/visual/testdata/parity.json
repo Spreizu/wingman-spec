@@ -1,0 +1,276 @@
+[
+ {
+  "route": "/",
+  "component": "Grid",
+  "viewports": [
+   375,
+   1280
+  ],
+  "reference": "design/a.png",
+  "references": [
+   {
+    "path": "design/a.png",
+    "crop": {
+     "x": 0,
+     "y": 10,
+     "w": 200,
+     "h": 300
+    },
+    "vps": {
+     "op": "in",
+     "nums": [
+      375
+     ]
+    },
+    "error": null
+   },
+   {
+    "path": "design/b.png",
+    "crop": null,
+    "vps": {
+     "op": ">=",
+     "nums": [
+      768
+     ]
+    },
+    "error": null
+   }
+  ],
+  "expects": [
+   {
+    "raw": "[data-testid=\"grid\"] background-color ~ token:color-primary",
+    "vps": null,
+    "kind": "style",
+    "sel": "[data-testid=\"grid\"]",
+    "prop": "background-color",
+    "op": "~",
+    "value": "token:color-primary",
+    "line": 15,
+    "state": null
+   },
+   {
+    "raw": "[data-testid=\"a\"] left-with [data-testid=\"b\"] @375",
+    "vps": {
+     "op": "in",
+     "nums": [
+      375
+     ]
+    },
+    "kind": "rel",
+    "sel": "[data-testid=\"a\"]",
+    "rel": "left-with",
+    "other": "[data-testid=\"b\"]",
+    "op": null,
+    "value": null,
+    "line": 16,
+    "state": null
+   },
+   {
+    "raw": "[data-testid=\"a\"] gap-to [data-testid=\"b\"]",
+    "vps": null,
+    "kind": "rel",
+    "sel": "[data-testid=\"a\"]",
+    "rel": "gap-to",
+    "other": "[data-testid=\"b\"]",
+    "op": null,
+    "value": null,
+    "error": "\"gap-to\" needs a distance: \"[data-testid=\"a\"] gap-to [data-testid=\"b\"] ~ 24px\"",
+    "line": 17,
+    "state": null
+   },
+   {
+    "raw": "garbage",
+    "vps": null,
+    "error": "cannot read expect \"garbage\": use \"<selector> <css-property> ~|=|!= <value>\" or \"<a> <left-with|right-with|top-with|...> <b>\"",
+    "line": 18,
+    "state": null
+   },
+   {
+    "raw": ".a:nth-child(2) above .b",
+    "vps": null,
+    "kind": "rel",
+    "sel": ".a:nth-child(2)",
+    "rel": "above",
+    "other": ".b",
+    "op": null,
+    "value": null,
+    "line": 36,
+    "state": "empty-list"
+   }
+  ],
+  "keys": [
+   "[data-testid=\"grid\"]"
+  ],
+  "overlays": [
+   "[role=\"dialog\"]"
+  ],
+  "role": "admin",
+  "absents": [
+   ".x"
+  ],
+  "redirects_to": null,
+  "ignores": [
+   "a11y:"
+  ],
+  "ignore_http": [
+   "/static/"
+  ],
+  "states": [
+   {
+    "name": "empty-list",
+    "steps": [
+     {
+      "op": "click",
+      "target": ".menu",
+      "strict": true
+     },
+     {
+      "op": "hover",
+      "target": ".x"
+     },
+     {
+      "op": "storage",
+      "target": "k",
+      "value": "v"
+     },
+     {
+      "op": "reload"
+     }
+    ],
+    "keys": [
+     "[data-testid=\"empty\"]"
+    ],
+    "expects": [
+     {
+      "raw": ".a:nth-child(2) above .b",
+      "vps": null,
+      "kind": "rel",
+      "sel": ".a:nth-child(2)",
+      "rel": "above",
+      "other": ".b",
+      "op": null,
+      "value": null,
+      "line": 36,
+      "state": "empty-list"
+     }
+    ],
+    "absents": []
+   },
+   {
+    "name": "empty-list",
+    "steps": [],
+    "keys": [],
+    "expects": [],
+    "absents": []
+   }
+  ],
+  "errors": [
+   "line 20: ignore \"layout:key-missing\" is refused: that defect is the scenario's own expectation failing (a key element, expect, absent, redirect, role, state or server problem), so it cannot be skipped. Fix the page or the scenario. Allowed: a11y:<rule> or a11y:, runtime:console-error, runtime:page-error, runtime:request-failed, runtime:http-error or runtime:, content:broken-image or content:, layout:horizontal-overflow",
+   "line 21: ignore-http \"/x\" is too broad (it would match almost every request): use at least 3 characters naming a path or host, e.g. \"/static/images/\"",
+   "line 24: redirects-to must be a path starting with \"/\", got \"login\"",
+   "line 27: step \"fill\" needs \"<selector> = <value>\"",
+   "line 32: step \"wait\" needs milliseconds",
+   "line 33: step \"goto\" needs a path starting with \"/\"",
+   "line 34: only \"click!\" and \"hover!\" can be strict; \"fill!\" is not allowed",
+   "line 37: \"route:\" belongs to the whole block, not to state \"empty-list\": un-indent it and put it above the first \"state:\" line (a state takes only do:, key: and expect:)",
+   "line 38: unknown state field \"bogus\" (do, key, expect, absent)",
+   "line 39: state name must be kebab-case, got \"Bad\"",
+   "line 40: duplicate state \"empty-list\"",
+   "line 41: expected \"key: value\", got \"not a field\""
+  ],
+  "file": "testdata/parity/cap.md",
+  "line": 7,
+  "capability": "cap",
+  "requirement": "Grid",
+  "scenario": "Grid shown",
+  "scenario_line": 4,
+  "steps_text": [
+   "- **WHEN** the page opens",
+   "- **THEN** grid"
+  ],
+  "id": "cap/grid-shown"
+ },
+ {
+  "route": null,
+  "component": null,
+  "viewports": [
+   375,
+   768,
+   1280
+  ],
+  "reference": null,
+  "references": [],
+  "expects": [],
+  "keys": [
+   "x"
+  ],
+  "overlays": [],
+  "role": null,
+  "absents": [],
+  "redirects_to": null,
+  "ignores": [],
+  "ignore_http": [],
+  "states": [
+   {
+    "name": "default",
+    "steps": [],
+    "keys": [],
+    "expects": [],
+    "absents": []
+   }
+  ],
+  "errors": [
+   "line 44: a visual block must sit inside a \"#### Scenario:\" block",
+   "missing \"route:\" (the path to open, e.g. \"route: /\")"
+  ],
+  "file": "testdata/parity/cap.md",
+  "line": 44,
+  "capability": "cap",
+  "requirement": "Grid",
+  "scenario": "",
+  "scenario_line": 43,
+  "steps_text": [],
+  "id": "cap/line-44"
+ },
+ {
+  "route": "/a",
+  "component": null,
+  "viewports": [
+   375,
+   768,
+   1280
+  ],
+  "reference": null,
+  "references": [],
+  "expects": [],
+  "keys": [],
+  "overlays": [],
+  "role": null,
+  "absents": [],
+  "redirects_to": null,
+  "ignores": [],
+  "ignore_http": [],
+  "states": [
+   {
+    "name": "default",
+    "steps": [],
+    "keys": [],
+    "expects": [],
+    "absents": []
+   }
+  ],
+  "errors": [
+   "line 48: a visual block must sit inside a \"#### Scenario:\" block",
+   "line 50: indented \"key:\" outside a state",
+   "no \"key:\" selector: name the elements that must be visible (e.g. key: [data-testid=\"search\"])"
+  ],
+  "file": "testdata/parity/cap.md",
+  "line": 48,
+  "capability": "cap",
+  "requirement": "Other",
+  "scenario": null,
+  "scenario_line": 43,
+  "steps_text": [],
+  "id": "cap/line-48"
+ }
+]

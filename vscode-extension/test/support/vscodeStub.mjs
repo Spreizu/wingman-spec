@@ -33,6 +33,7 @@ export class MarkdownString {
   appendMarkdown(s) { this.value += s; return this; }
 }
 export class Hover { constructor(contents, range) { this.contents = contents; this.range = range; } }
+export const ViewColumn = { Active: -1, One: 1 };
 export const DiagnosticSeverity = { Error: 0, Warning: 1, Information: 2, Hint: 3 };
 export class Diagnostic { constructor(range, message, severity) { this.range = range; this.message = message; this.severity = severity; } }
 export const CodeActionKind = { QuickFix: 'quickfix' };
@@ -66,9 +67,14 @@ export const host = {
   documents: [],
   handlers: { save: [], open: [], config: [] },
   watchers: [],
+  panels: [],
+  warningAnswer: undefined,
+  infoAnswer: undefined,
+  output: [],
   reset() {
     this.settings = {}; this.trusted = true; this.executed = []; this.messages = []; this.terminals = []; this.quickPicks = []; this.quickPickAnswer = undefined;
-    this.edits = []; this.inputs = []; this.inputAnswer = undefined; this.documents = []; this.watchers = [];
+    this.edits = []; this.inputs = []; this.inputAnswer = undefined; this.documents = []; this.watchers = []; this.panels = []; this.warningAnswer = undefined;
+    this.infoAnswer = undefined; this.output = [];
   },
 };
 
@@ -94,6 +100,8 @@ export const workspace = {
   onDidCloseTextDocument: noEvent,
   onDidChangeTextDocument: noEvent,
   onDidChangeConfiguration: event('config'),
+  onDidChangeWorkspaceFolders: event('folders'),
+  onDidGrantWorkspaceTrust: event('trust'),
   onDidCreateFiles: noEvent,
   onDidDeleteFiles: noEvent,
   onDidRenameFiles: noEvent,
@@ -106,14 +114,20 @@ export const workspace = {
   applyEdit: async (we) => { host.edits.push(we); return true; },
 };
 export const window = {
-  showInformationMessage: async (m) => { host.messages.push(m); return undefined; },
-  showWarningMessage: async (m) => { host.messages.push(m); return undefined; },
+  showInformationMessage: async (m, ...items) => { host.messages.push(m); return items.length ? host.infoAnswer : undefined; },
+  showWarningMessage: async (m, ...rest) => { host.messages.push(m); return rest.some((x) => typeof x === 'object' && x?.modal) ? host.warningAnswer : undefined; },
+  setStatusBarMessage: (m) => { host.messages.push(m); return new Disposable(); },
+  createWebviewPanel: (id, title) => {
+    const recv = new EventEmitter();
+    const p = { id, title, webview: { html: '', cspSource: 'stub', onDidReceiveMessage: (fn) => recv.event(fn), post: (m) => recv.fire(m) }, reveal() {}, onDidDispose: () => new Disposable(), dispose() {} };
+    host.panels.push(p); return p;
+  },
   showErrorMessage: async (m) => { host.messages.push(m); return undefined; },
   showQuickPick: async (items, opts) => { host.quickPicks.push({ items, opts }); return typeof host.quickPickAnswer === 'function' ? host.quickPickAnswer(items) : host.quickPickAnswer; },
   showInputBox: async (opts) => { host.inputs.push(opts); return host.inputAnswer; },
   createTerminal: (opts) => { const t = { opts, sent: [], shown: false, sendText(s) { this.sent.push(s); }, show() { this.shown = true; }, dispose() {} }; host.terminals.push(t); return t; },
   registerTreeDataProvider: (id, p) => { host.providers.tree.push({ id, provider: p }); return new Disposable(); },
-  createOutputChannel: () => ({ appendLine() {}, show() {}, dispose() {} }),
+  createOutputChannel: () => ({ appendLine(l) { host.output.push(l); }, append(t) { host.output.push(t); }, show() {}, dispose() {} }),
   withProgress: async (_o, task) => task({ report() {} }),
 };
 export const commands = {

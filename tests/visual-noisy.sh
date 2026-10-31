@@ -3,47 +3,47 @@
 # A visual check on a page full of defects the task did not cause: requests that never answer must not cost a timeout per state and
 # viewport (and must not hide the page's other checks), the same request or console error is reported once per viewport, visual.page_timeout
 # and visual.request_timeout cap the waits, and visual.baseline: on lets a task fail only on defects that are new since it started.
-# Needs openspec and node; Playwright + axe-core (PLAYWRIGHT_NODE_MODULES) for the browser part. Usage: tests/visual-noisy.sh
+# Needs the wingman-spec binary (tests/lib/ws.sh) and node; Playwright + axe-core (PLAYWRIGHT_NODE_MODULES) for the browser part. Usage: tests/visual-noisy.sh
 set -uo pipefail
 PKG="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=lib/ws.sh
+. "$PKG/tests/lib/ws.sh"
 T="$(mktemp -d)"; [ -n "${KEEP:-}" ] || trap 'rm -rf "$T"' EXIT; [ -z "${KEEP:-}" ] || echo "kept: $T"
-export OPENSPEC_TELEMETRY=0 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
+export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
 PASS=0; FAIL=0; rc=0
 ok()  { PASS=$((PASS+1)); echo "  ok   $*"; }
 bad() { FAIL=$((FAIL+1)); echo "  FAIL $*"; [ -z "${DEBUG:-}" ] || head -c 2500 "$T/v.json" "$T/v.err" 2>/dev/null; }
 expect() { if eval "$2"; then ok "$1"; else bad "$1  (rc=$rc)"; fi; }
 
-cd "$T" && mkdir p && cd p && git init -q && { openspec init --tools none >/dev/null 2>&1 || mkdir -p openspec/changes openspec/specs; }
-"$PKG/install.sh" . --harness all >/dev/null || { echo "install failed"; exit 1; }
+cd "$T" && mkdir p && cd p && git init -q && "$WS" init >/dev/null
 git add -A >/dev/null 2>&1; git commit -qm init >/dev/null 2>&1
-V="node openspec/scripts/verify-task.cjs"
+V="$WS"
 PORT="$(node -e 'const s=require("net").createServer().listen(0,()=>{console.log(s.address().port);s.close()})')"
 CLOSED="$(node -e 'const s=require("net").createServer().listen(0,()=>{console.log(s.address().port);s.close()})')"
 cp "$PKG/tests/fixtures/noisy/app.js" app.js
 setcfg() { # setcfg <extra visual lines>
   node -e '
-const fs=require("fs"); let t=fs.readFileSync("openspec/config.yaml","utf8");
+const fs=require("fs"); let t=fs.readFileSync(".wingman-spec/wingman-spec.yaml","utf8");
 t=t.replace(/^visual:.*(\n[ \t]+.*)*\n?/m, "visual:\n  command: node app.js "+process.argv[1]+" "+process.argv[2]+"\n  url: http://127.0.0.1:"+process.argv[1]+"/\n  ready_timeout: 20\n  screenshots: off\n"+process.argv[3]);
-t=t.replace(/Test command: <fill in>/,"Test command: none").replace(/Typecheck command: <fill in>/,"Typecheck command: none").replace(/Lint command: <fill in>/,"Lint command: none");
-fs.writeFileSync("openspec/config.yaml",t);' "$PORT" "$CLOSED" "$1"
+fs.writeFileSync(".wingman-spec/wingman-spec.yaml",t);' "$PORT" "$CLOSED" "$1"
 }
 mkchange() {
-  rm -rf openspec/changes/demo openspec/.apply-runs; mkdir -p openspec/changes/demo/specs/gallery
-  printf '## Why\nA noisy page.\n\n## What Changes\n- Adds a grid.\n\n## Edge cases\n- none named\n' > openspec/changes/demo/proposal.md
-  printf '## ADDED Requirements\n\n### Requirement: Gallery grid\nThe system SHALL show the grid.\nWhy: The owner wants it to work, so that people can rely on it.\n\n#### Scenario: Grid shown\n- **WHEN** the page is opened\n- **THEN** the grid is shown\n\n```visual\nroute: /\nviewports: 360, 1280\nkey: [data-testid="grid"]\nstate: open\n  do: click [data-testid="btn"]\n  key: [data-testid="panel"]\nstate: again\n  do: click [data-testid="btn"]\n  key: [data-testid="panel"]\n```\n' > openspec/changes/demo/specs/gallery/spec.md
-  printf '## 1. Gallery\n- [ ] 1.1 Grid\n  - Spec: gallery > Gallery grid\n  - Files: app.js\n  - Visual: all\n  - Done when: `true`\n' > openspec/changes/demo/tasks.md
+  rm -rf .wingman-spec/changes/demo .wingman-spec/runs; mkdir -p .wingman-spec/changes/demo/specs/gallery
+  printf '## Why\nA noisy page.\n\n## What Changes\n- Adds a grid.\n\n## Edge cases\n- none named\n' > .wingman-spec/changes/demo/proposal.md
+  printf '## ADDED\n\n### Requirement: Gallery grid\nThe system SHALL show the grid.\nWhy: The owner wants it to work, so that people can rely on it.\n\n#### Scenario: Grid shown\n- **WHEN** the page is opened\n- **THEN** the grid is shown\n\n```visual\nroute: /\nviewports: 360, 1280\nkey: [data-testid="grid"]\nstate: open\n  do: click [data-testid="btn"]\n  key: [data-testid="panel"]\nstate: again\n  do: click [data-testid="btn"]\n  key: [data-testid="panel"]\n```\n' > .wingman-spec/changes/demo/specs/gallery.md
+  printf '## 1. Gallery\n- [ ] 1.1 Grid\n  - Spec: gallery > Gallery grid\n  - Files: app.js\n  - Visual: all\n  - Done when: `true`\n' > .wingman-spec/changes/demo/tasks.md
 }
 REPORT() { node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).report)' "$T/v.json"; }
 RJ() { node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const a=process.argv.slice(3);console.log(eval(process.argv[2]))' "$(REPORT)" "$@"; }
 vrun() { rc=0; s0=$(date +%s); $V visual demo > "$T/v.json" 2> "$T/v.err" || rc=$?; secs=$(( $(date +%s) - s0 )); }
 
 echo "== config: the limits and the baseline switch (no browser)"
-cfgp() { node -e '
-const VC=require("./openspec/scripts/visual-check.cjs"); fs=require("fs"); fs.writeFileSync("/tmp/.noisy-cfg-'$$'","visual:\n  command: x\n  url: http://127.0.0.1:1/\n"+process.argv[1]);
-const c=VC.readLayers(["/tmp/.noisy-cfg-'$$'"]); console.log(JSON.stringify({p:c.page_timeout,r:c.request_timeout,b:c.baseline,e:c.ignore_errors}));' "$1"; rm -f "/tmp/.noisy-cfg-$$"; }
-expect "defaults: page_timeout 5, request_timeout 3, baseline off" '[ "$(cfgp "")" = "{\"p\":5,\"r\":3,\"b\":false,\"e\":[]}" ]'
-expect "page_timeout, request_timeout and baseline are read" '[ "$(cfgp $'"'"'  page_timeout: 8\n  request_timeout: 1.5\n  baseline: on\n'"'"')" = "{\"p\":8,\"r\":1.5,\"b\":true,\"e\":[]}" ]'
+cfgp() { ws_vcfg "$1" | node -e 'const t=require("fs").readFileSync(0,"utf8");try{const c=JSON.parse(t).visual;console.log(JSON.stringify({p:c.page_timeout,r:c.request_timeout,b:c.baseline}))}catch{console.log(t)}'; }
+expect "defaults: page_timeout 5, request_timeout 3, baseline off" '[ "$(cfgp "")" = "{\"p\":5,\"r\":3,\"b\":false}" ]'
+expect "page_timeout, request_timeout and baseline are read" '[ "$(cfgp $'"'"'  page_timeout: 8\n  request_timeout: 1.5\n  baseline: on\n'"'"')" = "{\"p\":8,\"r\":1.5,\"b\":true}" ]'
 expect "a limit that is not a number, or a page_timeout of 0, is a config problem naming the key" 'cfgp $'"'"'  page_timeout: 0\n'"'"' | grep -q "visual.page_timeout" && cfgp $'"'"'  request_timeout: soon\n'"'"' | grep -q "visual.request_timeout"'
+cfgc() { ws_vcfg "$1" | node -e 'const t=require("fs").readFileSync(0,"utf8");try{console.log(JSON.parse(t).visual.contexts)}catch{console.log(t)}'; }
+expect "visual.contexts: 4 by default, read from the file, 1 to 16" '[ "$(cfgc "")" = 4 ] && [ "$(cfgc $'"'"'  contexts: 2\n'"'"')" = 2 ] && cfgc $'"'"'  contexts: 40\n'"'"' | grep -q "visual.contexts 40"'
 
 echo "== in the browser (Playwright)"
 PWM="${PLAYWRIGHT_NODE_MODULES:-}"

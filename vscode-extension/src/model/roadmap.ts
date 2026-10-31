@@ -1,5 +1,5 @@
 /**
- * The roadmap of a new product as `verify-task.cjs roadmap --json` prints it: ordered slices, their derived state, and coverage. Parsing is tolerant (the JSON comes from a script in the workspace): a malformed entry is dropped.
+ * The roadmap of a new product as `wingman-spec roadmap --json` prints it: ordered slices, their derived state, and coverage. Parsing is tolerant (the JSON comes from the CLI): a malformed entry is dropped.
  */
 
 export type SliceStatus = 'planned' | 'proposed' | 'applying' | 'done';
