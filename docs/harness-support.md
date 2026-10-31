@@ -81,7 +81,7 @@ itself is harness-independent: the main agent orchestrates, a subagent implement
 ## Known gaps
 
 - **Codex:** no project slash commands. Users type `$spec-apply <change>` or ask "use the spec-apply skill". The skill's
-  description is written so implicit selection works too. Hooks need project trust. Subagent timeouts are not configurable
+  description is written so implicit selection works too. Subagent timeouts are not configurable
   per agent; the verifier's timeouts cover the checks, not the subagent's own run.
 - **Claude Code:** `.claude/commands/` is the legacy format but fully supported. `CLAUDE.md` does not include `AGENTS.md`
   automatically, so `wingman-spec init` appends an `@AGENTS.md` import line to `CLAUDE.md` (managed, idempotent).
@@ -97,7 +97,7 @@ itself is harness-independent: the main agent orchestrates, a subagent implement
   live under the specs repository's `runs/`; Codex's sandboxed `view_image` may refuse paths outside the
   code repository's writable roots, so add the specs repo as a writable root (or use the fallback).
 - **Untested here:** no `agent`, `claude` or `codex` CLI and no API keys exist on the build box, so the generated
-  files were checked for format (front matter, TOML parse, hook JSON) and the flow with stub subagents only. The visual
+  files were checked for format (front matter, TOML parse) and the flow with stub subagents only. The visual
   check itself (Playwright, axe, ARIA guard, pre-task capture, worktree fallback) is tested for real; the reviewer subagent is tested with stub replies.
 
 ## Traceability layer
@@ -108,7 +108,6 @@ command bodies, so Claude Code, Cursor and Codex get the same behaviour. `/spec-
 `wingman-spec archive` in all three, and the implementer subagent writes `@spec` comments in all three. Nothing about the layer needs a hook. Gaps:
 - A change folder moved to `archive/` by hand is not stopped on any harness; drift reports it later (`unsynced-archive`).
 - The agent writes the owner-approval line after the owner agreed; the CLI cannot verify it.
-- None of this was exercised with a real `claude`/`codex`/`agent` CLI on the build box. Stub orchestration and the measured runs used a single agent runner (see the CHANGELOG).
 
 ## Sources
 

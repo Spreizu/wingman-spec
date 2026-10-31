@@ -7,7 +7,7 @@ A change's timeline is `runs/<change>/timeline.jsonl`, one JSON line per event, 
 - **Planning commands**: `new`, `instructions`, `validate`, `lint`, `size` and `app-map` each append their event, with the result.
 - **Artifacts**: before each of those commands and each `log`, the CLI compares the artifacts with the last snapshot (`artifacts-snapshot.json`). Each file written, rewritten or deleted becomes one `artifact` event. A rewritten spec lists the scenarios and ```` ```visual ```` blocks added or removed, so a visual block lost during the design shows.
 - **Agent steps** that no command sees: the skills run `wingman-spec log <change> <event> "<summary>"` with `start`, `explore`, `grill`, `approval` or `note`.
-- **Build**: every `verify-task` step: run start, task picked (`next`), check start and result, fix round, tick, review, finish, sync and archive.
+- **Build**: every apply-loop step: run start, task picked (`next`), check start and result, fix round, tick, review, finish, sync and archive.
 - **Editor buttons**: the extension runs the CLI with `WINGMAN_SPEC_SOURCE=editor`, so its Validate, Status, Sync and Archive appear with `source: editor`.
 
 ## Plan changes during the build

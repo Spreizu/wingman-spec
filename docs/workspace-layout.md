@@ -111,9 +111,3 @@ ticks `tasks.md` in the specs repository, and keeps the run state in `runs/<chan
 worktrees of one code repo share it. The shim, the visual helper and the cache stay in the code repo's `.wingman-spec/`.
 The VS Code extension follows the same link. Drift is computed per code repo against the shared specs: a requirement
 implemented in another repo shows as unanchored there (accept it with `drift decide`).
-
-## Coming from an OpenSpec project
-
-The 0.11 release kept shared specs in a registered store (`store: <id>`). Convert the store folder once with
-`wingman-spec import openspec --to .` (it becomes a specs repository), then run step 2 in each code repo. The old
-`openspec/` folders in the code repos can then be deleted.

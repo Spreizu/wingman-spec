@@ -28,17 +28,6 @@ exists only after the roadmap), so one flat folder with typed prefixes keeps `gr
 branches that each add records add different paths and merge cleanly; the same name on both is an ordinary add/add conflict on that one
 file. The shared `exploration.md` holds only the capability map and the integration inventory.
 
-## What was tested
-
-- `tests/greenfield.sh` (92 cases): the guard (nothing written on a refusal), the state machine, roadmap and handover checks, and a
-  scripted walker that follows only `greenfield status` to `READY FOR HANDOVER`. The walker uses canned content, so it proves the state
-  machine, not the quality of an agent's specs.
-- One sample run (ToolShed, 4 input files): 9 capabilities, 46 requirements, 8 slices; the first two slices were built test-first (26
-  tests). 2 wrong turns, 0 refusals, 4 verifier defects found and fixed, 20 of 20 hidden facts present in the specs. One agent wrote the
-  inputs, the hidden facts, the specs and the code, and reviews were waived or self-done, so there was no independent review and no
-  blind no-roadmap arm; the comparison with "no roadmap" is the static order only (without it PayRail, webhook and sign-in come after
-  listings and inventory).
-
 ## Risks
 
 - A large spec makes merges and `drift` slow; split by capability and keep requirements short.

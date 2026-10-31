@@ -106,7 +106,7 @@ A lighter workflow with the same gates. Measured against v0.10.3 on four pre-wri
 - **The verifier ticks the task box** when a check passes; the implementer no longer edits `tasks.md`. This removed the most common first failure (a wrongly ticked or unticked box). `check` reports the progress after its own tick.
 - **One implementer per dispatch.** Size S: the whole change in one dispatch; M/L: one task group; a review task alone; `--per-task` restores one task per dispatch. `check` runs the `Done when:` command of every member and the project checks once.
 - **Review task only where it pays**: Size M/L, a Risk kind, or UI. A leftover review task on a fast change is a lint warning.
-- **Result cache.** Tests, typecheck and lint that passed in `check` are not run again in `finish` for the same tree and command; independent `finish` steps run in parallel. `--no-cache` / `SPEC_NO_CACHE=1` turns it off. See [docs/dispatch-and-cache.md](docs/dispatch-and-cache.md).
+- **Result cache.** Tests, typecheck and lint that passed in `check` are not run again in `finish` for the same tree and command; independent `finish` steps run in parallel. `--no-cache` / `SPEC_NO_CACHE=1` turns it off. See [docs/speed.md](docs/speed.md#result-cache).
 - **Explore and propose look in the repo first** and ask the user only what the repo cannot answer.
 - **One statement per rule** across `AGENTS.md`, commands, agents and schema (placement and accessible-name rules live in the implementer agent).
 - **Smaller repo.** Five unused extension exports removed; the workspace-layout walkthrough moved from the README to [docs/workspace-layout.md](docs/workspace-layout.md) (README 758 -> 334 lines).

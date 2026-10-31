@@ -27,25 +27,3 @@ backend change carries no placeholder.
 
 A form with no input has no validation timing, and a static list never loads. Forcing a scenario there produces noise
 that is never tested. The one-line reason is reviewed by `spec-reviewer` and stays in the proposal as the record.
-## Measurement (small sample, not a benchmark)
-
-Five spec-writing runs per variant (a result grid with search, two item lists, two task lists; prompts that name no states), written by
-one agent that knew the checklist while writing the baseline. The variant with the checklist was written as the baseline plus the
-checklist answers, so it cannot show less by construction.
-
-| | without | with |
-|---|---|---|
-| scenarios per run | 7.2 | 11.0 |
-| scenarios about a state or flow (keyword count) | 2.4 | 6.2 |
-| of the 9 items, covered by a scenario | 2.0 | 5.4 |
-| proposal words | 188 | 286 |
-| all artifact words | 649 | 947 |
-
-- 19 `Not applicable` lines; 17 were specific to the screen, 2 were weak (a persisted list's storage failure, a layout at 375px).
-  The lint only checks length; `spec-reviewer` judges the reason.
-- One result-grid change went through apply with and without the checklist. Hidden acceptance tests (6/6) and mutation score (0.933)
-  were equal. The added long-query scenario failed the visual check once (the page scrolled sideways at 375px) and was fixed; the
-  version without it ships that defect, which no hidden test covers.
-- The lint flagged all 5 runs without a checklist and none with one. Over 153 historical non-UI changes it flagged none.
-  It found one interaction: the edge-word hint read the checklist's item names as plan prose; the hint now skips that section.
-- Not shown: that an agent without the text would miss these states, and any effect on hidden-test scores.

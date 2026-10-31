@@ -23,10 +23,10 @@ explore (grilling) → app-map → proposal → specs → design → adrs → ta
 
 ## Install into a project
 
-Install the CLI ([docs/install.md](install.md)), then in the project:
+Run **Wingman Spec: Set Up This Folder** in the editor ([docs/install.md](install.md)), or in the project:
 
 ```bash
-wingman-spec init --harness all      # Cursor + Claude Code + Codex (or e.g. --harness claude,codex)
+.wingman-spec/bin/wingman-spec init --harness all      # Cursor + Claude Code + Codex (or e.g. --harness claude,codex)
 ```
 
 `wingman-spec init` is idempotent. It writes:
@@ -99,7 +99,7 @@ Commands, all prefixed `spec-` (Codex: `$spec-…`): `/spec-explore`, `/spec-pro
 
 **Existing codebase?** Run `/spec-adopt [scope]` once before the first change (`/spec-adopt src/billing` for one area, `--check` to only report). It agrees a capability inventory with you, writes baseline specs to `specs/<capability>.md` and records decisions already in the code as ADRs. It never overwrites an existing spec. Existing code is evidence of what happens today, not proof anyone wants it: only behavior a test, a document or the owner confirms becomes a requirement (each carries a `Confirmed:` line, and the spec's Purpose says `Baseline: adopted <date>`). Suspected bugs, debug leftovers, incidental details and unclear behavior go to `observed/<capability>.md`, one file per capability with an owner and how to confirm; `wingman-spec drift` lists adopted requirements without `Confirmed:` and incomplete entries (advisory). On the sample in `tests/fixtures/adopt` (7 seeded problems) the adopt command turns none into requirements and records all 7 (a regression fixture, not a benchmark).
 
-**Rewrites keep your edits.** Anything a tool rewrites in a file that already exists (`init` and `update` on AGENTS.md, CLAUDE.md, hook and workspace files; `adrs --fix`; `drift decide`; `greenfield approve`; the extension's marker fixes) changes only its own lines: comments, key order, blank lines, quoting and line endings stay byte for byte. A JSON hook file in an unusual layout is left untouched with a "register by hand" message. `tests/fixers.sh` checks each one.
+**Rewrites keep your edits.** Anything a tool rewrites in a file that already exists (`init` and `update` on AGENTS.md, CLAUDE.md and workspace files; `adrs --fix`; `drift decide`; `greenfield approve`; the extension's marker fixes) changes only its own lines: comments, key order, blank lines, quoting and line endings stay byte for byte. `tests/fixers.sh` checks each one.
 
 ## Configuration (`.wingman-spec/wingman-spec.yaml`)
 
@@ -350,7 +350,8 @@ authors (no account or token was available), so try it on one small frame first.
 
 ## VS Code extension
 
-`vscode-extension/` is **Wingman Spec**, a sidebar for Cursor and VS Code (`elmo-egers.wingman-spec`). It lists each active change with its artifact pipeline, test-first tasks, `BLOCKED.md`, the sync state of each ADR, and an Overview page (delivery board, ADR count, blockers). For traceability it adds an Explorer tree (capabilities, requirements with their Why, anchors, flags, drift gaps) and, in any file, CodeLens, hover, go-to-definition and warnings for `@spec` markers, including placement findings (setting `wingmanSpec.codeView`). It adds a branch review page (the git branch against its base), a change dashboard with what blocks the archive, and a Problems panel fed by `wingman-spec problems --json`; the CLI and git are only called read-only. The platform builds bundle the CLI. See [vscode-extension/README.md](../vscode-extension/README.md).
+`vscode-extension/` is the **Wingman Spec** extension for VS Code and Cursor; it bundles the CLI. Pages, commands and
+settings: [vscode-extension/README.md](../vscode-extension/README.md).
 
 ## Develop / test
 
@@ -358,7 +359,7 @@ Requires Go (see `go.mod`) and Node 22. The shell suites run against the binary 
 
 | Suite | Covers |
 |---|---|
-| `tests/smoke.sh` | `init --harness all` (settings, shim, AGENTS block, commands, subagents, skills, hooks, the guard), `update` idempotency, and one Size S change from `new` to `archive` and `drift` |
+| `tests/smoke.sh` | `init --harness all` (settings, shim, AGENTS block, commands, subagents, skills, no hook files), `update` idempotency, and one Size S change from `new` to `archive` and `drift` |
 | `tests/installer.sh` | `install.sh` against a local mirror: checksum, install folder, version pin, a bad checksum refused |
 | `tests/parallel-waves.sh` | parallel waves: lanes, `check --task`, file ownership, the wave's last check reopening a lane or the wave |
 | `tests/fastpath.sh`, `tests/runcache.sh` | the fast path and its upgrade; the result cache |
@@ -371,7 +372,7 @@ Requires Go (see `go.mod`) and Node 22. The shell suites run against the binary 
 | `tests/visual-ignore.sh` | `ignore:` and `ignore-http:` (exact, prefix, repeatable, console errors of 403/404/500 loads matched by URL or by the same skipped failure), `visual.ignore` / `visual.ignore_http` in config, the ignored list in the report, unsafe values refused, key / absent / expect / overlap failures never skippable, the `next`/`check` path (needs Playwright + axe-core) |
 | `tests/next-perf.sh` | `next` and `check` on a large repo (20,000 tracked files, ignored `node_modules`, an untracked 190 MB docker data directory): under 3 s and 6 s, nothing written into `.git`, the real index untouched, an edit of a tracked or untracked file changes the hash, the data is not counted as changed lines |
 | `tests/runfreq.sh` | how often tests, typecheck, lint and `Done when` run in a 5-task change, counted: one task or one group per dispatch, `check_level` targeted (default), group, task and finish (also set in `wingman-spec.yaml`), a fault at an early task caught at the first check or at `finish`, a review task always running everything |
-| `tests/targeted.sh` | the default check level: which test files a check runs (changed, tagged with the task's scenarios, named after its files), the per-file command template from the test command or `- Targeted test command:`, the note when none is known, a fault in a targeted test caught at the check and one in any other test caught at `finish`, `group` and `task` as opt-ins |
+| `tests/targeted.sh` | the default check level: which test files a check runs (changed, tagged with the task's scenarios, named after its files), the per-file command template from the test command or `commands.targeted`, the note when none is known, a fault in a targeted test caught at the check and one in any other test caught at `finish`, `group` and `task` as opt-ins |
 | `tests/timeline.sh` | the timeline of a change: a fake run writes its events in order, a plan edited mid-build becomes one decision entry with what changed, the reason and the owner approval state, parallel appends lose no line, `archive` keeps the timeline |
 | `tests/visual-cache.sh` | `visual.changed_only` (a pass is not repeated; test and Markdown edits do not matter, a changed page does; a failing run is never stored; `WINGMAN_SPEC_NO_CACHE`) and `visual.scope` (default `task`: own scenario per task, the other spec's scenario at `finish`; `all`: every scenario per task) |
 | `tests/visual-noisy.sh` | a page with requests that never answer, console errors, axe defects and overflow: waited for once, the load failure keeps the other checks, runtime defects once per viewport, `visual.page_timeout` / `request_timeout`, `visual.baseline` (old defects listed once, new ones fail) (needs Playwright + axe-core) |

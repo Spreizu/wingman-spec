@@ -24,7 +24,7 @@ repository: [docs/workspace-layout.md](workspace-layout.md).
 ## The shim
 
 `.wingman-spec/bin/wingman-spec` is a link to the extension's bundled CLI (a `.cmd` file on Windows). The `/spec-*`
-commands, the subagents, the hooks and the dashboard's terminal buttons call the CLI through it, so committed files
+commands, the subagents and the dashboard's terminal buttons call the CLI through it, so committed files
 never name the extension's install folder, which differs per version and machine. It is gitignored and per clone.
 Whenever the extension starts in a folder with `.wingman-spec/`, it creates the shim, or points it at the bundled CLI
 again when it is missing, broken or names another binary. That also happens in specs repositories, in each folder
@@ -37,11 +37,6 @@ The extension updates through the editor, and the shim follows it. When the proj
 than the bundled CLI, one notification offers **Run update**. That runs `wingman-spec update`, which rewrites the
 generated agent files, the bundled skills, the `AGENTS.md` block and the shim. It never runs by itself, because those
 files are committed. Your settings, specs, changes and ADRs are not touched. Review and commit what changed.
-
-## Without the editor
-
-CI and other tools can use the same binary from the release archives (`install.sh` on Linux and macOS, the zip on
-Windows). Projects in the editor always use the extension's bundled CLI.
 
 ## From the OpenSpec-based 0.11 release
 
@@ -59,10 +54,9 @@ This Folder** for the last step.
 The import moves the living specs (`specs/<capability>/spec.md` becomes `specs/<capability>.md`), the changes, the
 archive, the ADRs, the roadmap and greenfield records, and turns the `config.yaml` context lines into `commands:` keys.
 It prints a warning for anything it could not carry over. A shared store of OpenSpec specs becomes a specs repository with
-`--to .`, run in the store folder. `init` then rewrites the `/spec-*` commands and subagents. The `openspec` CLI is no longer
+`--to .`, run in the store folder; then run `wingman-spec init --layout link --specs <path>` in each code repository and
+delete its old `openspec/` folder. `init` then rewrites the `/spec-*` commands and subagents. The `openspec` CLI is no longer
 needed.
 
-`init` never edits hook files. The 0.11 prompt hook blocked OpenSpec's `/opsx:*` commands; to use them again, delete it by
-hand. In `.cursor/hooks.json` remove the `beforeSubmitPrompt` entry `{"command": "node .cursor/hooks/spec-guard.cjs"}`. In
-`.claude/settings.json` and `.codex/hooks.json` remove the `UserPromptSubmit` entry whose command runs
-`.claude/hooks/spec-guard.cjs` or `.codex/hooks/spec-guard.cjs`. Then delete those `spec-guard.cjs` files.
+`init` never edits hook files, so the 0.11 prompt hook stays until you delete it: the `spec-guard.cjs` entry in
+`.cursor/hooks.json`, `.claude/settings.json` and `.codex/hooks.json`, and the `spec-guard.cjs` files next to them.

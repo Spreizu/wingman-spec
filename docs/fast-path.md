@@ -34,16 +34,3 @@ The plan can lie about its scope, so the verifier looks at the edits. At `check`
 The planning artifacts of a Size S change cost wall time and words, and they carry no decision: one capability, no risk, no sensitive path, no UI. The gates that catch defects (the `Done when:` tests, scenario tags, `finish`) do not depend on them. The artifacts that carry a decision (design, ADRs, the app-map of a bigger change) stay mandatory for anything with a decision in it: bigger than S, any risk, sensitive paths, UI. The upgrade rule keeps the fast path honest when the plan understated the work.
 
 The task tick moved to the verifier for the same reason: the verifier already knows the task passed, so the implementer writes no bookkeeping.
-
-## Measured (v0.10.3 against 0.11.0, same plan and same code per task)
-
-Cells were driven by a person-as-agent script from pre-written plans, not by a model, so planning time is not compared. Acceptance, traps and mutation scores were identical in all four cells and no cell needed a fix round.
-
-| Cell | Dispatches | Artifact words | Instruction tokens | Script seconds |
-| --- | --- | --- | --- | --- |
-| Size S, no risk (todo due dates) | 3 -> 1 | 1141 -> 817 | 15802 -> 9291 | 2.2 -> 1.1 |
-| Size S, no risk (a second small feature) | 3 -> 1 | 1203 -> 914 | 15867 -> 9337 | 2.4 -> 1.2 |
-| Size L, money risk (full path) | 2 -> 2 | 1560 -> 1556 | 12458 -> 12325 | 1.8 -> 1.6 |
-| Size M, UI (full path, visual check) | 3 -> 2 | 1089 -> 1076 | 16039 -> 12446 | 48.9 -> 30.1 |
-
-Instruction tokens are bytes/4 of the dispatch prompts, the implementer file per dispatch, the apply command and `AGENTS.md`. The full-path cells keep their artifacts; their saving comes from batching and the result cache (see [dispatch-and-cache.md](dispatch-and-cache.md)).

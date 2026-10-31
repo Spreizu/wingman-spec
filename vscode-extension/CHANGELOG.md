@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.12.0
 
+- Each platform build bundles the `wingman-spec` CLI and always runs it; there is no universal build and no CLI to install. The extension keeps each project's shim `.wingman-spec/bin/wingman-spec` on the bundled CLI. **Set Up This Folder** runs `init`; when the generated agent files are older than the CLI, one notification offers `update`. Removed settings: `wingmanSpec.verifierNode`, `wingmanSpec.openspecPath`, `wingmanSpec.adrDirectory`. Details in the repository changelog.
 - The icon is rendered from `assets/icon.svg` in the repository. CI builds and packages the extension on every push to `main`.
 - A `v*` tag publishes the extension to the VS Code Marketplace and Open VSX (used by Cursor). Marketplace metadata: categories, keywords, gallery banner, a shorter description.
 - The change page's step bar (circles and connector lines in a card) is now one quiet line of artifacts under the change name: done ones have a check, missing ones are muted, skipped ones are muted and struck through.

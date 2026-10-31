@@ -33,7 +33,7 @@ This command is the approved path to edit specs after apply. `/spec-apply` and i
 
 3. **Choose where the delta lives.**
    - **Active change** (`changes/<name>/` exists): patch it in place. Rewrite that change's spec files so they describe the corrected contract. Append a `QA fix` group to `tasks.md` (its tasks do not count against the `Size:` cap; merge findings that touch the same file into one task); never uncheck finished work. Touch `proposal.md`, `design.md` or `adrs/` only when the correction actually changes why, how, or a decision.
-   - **Archived, or no owning change**: confirm a kebab-case name (default `fix-<original>`), run `.wingman-spec/bin/wingman-spec new <name>`. Write **short** artifacts in schema order (`app-map` → `proposal` → `specs` → `design` → `adrs` → `tasks`). Keep them short: this is a follow-up, not a new product. A Size S, Risk none change without sensitive paths or UI writes only `proposal`, `specs` and `tasks`. Deltas target the promoted specs in `specs/`.
+   - **Archived, or no owning change**: confirm a kebab-case name (default `fix-<original>`), run `.wingman-spec/bin/wingman-spec new <name>`. Write **short** artifacts in artifact order (`app-map` → `proposal` → `specs` → `design` → `adrs` → `tasks`). Keep them short: this is a follow-up, not a new product. A Size S, Risk none change without sensitive paths or UI writes only `proposal`, `specs` and `tasks`. Deltas target the promoted specs in `specs/`.
 
    Never write `specs/` or `adrs/` here. Promotion stays `/spec-sync`.
 

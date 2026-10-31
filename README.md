@@ -69,7 +69,7 @@ errors. `wingman-spec config` prints the merged settings, `wingman-spec doctor` 
 
 ## Documentation
 
-- [Install](docs/install.md): the CLI, the extension, the shim, upgrades and the OpenSpec import.
+- [Install](docs/install.md): the extension, the shim, upgrades and the OpenSpec import.
 - [Reference](docs/reference.md): artifacts, commands, configuration keys, visual check, design input, bundled skills.
 - [Speed and defaults](docs/speed.md): what runs when and what each default costs.
 - [Timeline](docs/timeline.md): the build log and plan changes.
