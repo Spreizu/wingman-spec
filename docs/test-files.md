@@ -2,7 +2,8 @@
 
 `internal/testpaths` in the CLI is the one definition of "this file is a test". The CLI commands (`check`, `finish`, `anchors`, `drift`, `problems`) and the editor extension (code view, branch review, requirement counts) use it. A test file is found by its directory (whole path segment, any case: `tests/`, `test/`, `__tests__/`, `spec/`, .NET `Foo.Tests/`, `FooTests/`) or by its name (suffix forms are case-sensitive: `FooTest.php`, not `contest.php`). It must have a code extension to be read for tags. The tag is `[<capability>/<scenario-slug>]` anywhere in the file; the anchor `@spec <capability>/<requirement-slug>` is read in every source file after any comment leader (`//`, `#`, `/*`, `*`, `--`, `;`, `%`).
 
-`test_files:` in `wingman-spec.yaml` adds globs on top (`**` for any directories, `*`, `?`; a `!glob` entry drops files), for `trace`, `check` and `finish`; the editor extension does not read it yet.
+`test_files:` in `wingman-spec.yaml` adds globs on top for `trace`, `check` and `finish`. Globs use `**` for any
+directories, `*` and `?`, and a `!glob` entry drops files. The editor extension does not read it yet.
 
 | Language | Test files | Carry the tag in |
 |---|---|---|
