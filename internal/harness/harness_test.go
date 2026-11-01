@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"go.yaml.in/yaml/v3"
 )
 
 var src = fstest.MapFS{
@@ -29,7 +31,7 @@ func TestRender(t *testing.T) {
 		}
 	}
 	for p, want := range map[string]string{
-		".cursor/commands/spec-a.md":     "---\ndescription: \"Do a\"\n---\n<!-- " + mark + "commands/spec-a.md; edits are overwritten on update -->\nRun /spec-b next.\npartial line\n",
+		".cursor/commands/spec-a.md":     "---\n# " + mark + "commands/spec-a.md; edits are overwritten on update\ndescription: \"Do a\"\n---\nRun /spec-b next.\npartial line\n",
 		".claude/commands/spec-a.md":     "argument-hint: \"<x>\"\n",
 		".agents/skills/spec-a/SKILL.md": "Invoke as `$spec-a <x>`.\n\nRun $spec-b next.\n",
 		".cursor/agents/spec-r.md":       "model: inherit\nreadonly: true\n",
@@ -38,6 +40,20 @@ func TestRender(t *testing.T) {
 	} {
 		if !strings.Contains(got[p], want) {
 			t.Errorf("%s:\n%s\nwant it to contain %q", p, got[p], want)
+		}
+	}
+	// the generated-file note sits in the frontmatter (a YAML comment the harness strips), never in the body the chat shows
+	for p, f := range got {
+		if strings.HasSuffix(p, ".toml") {
+			continue
+		}
+		parts := strings.SplitN(f, "---\n", 3)
+		if len(parts) != 3 || parts[0] != "" || !strings.Contains(parts[1], "# "+mark) || strings.Contains(parts[2], mark) || strings.Contains(parts[2], "<!--") {
+			t.Errorf("%s: want the note as a frontmatter comment only:\n%s", p, f)
+		}
+		var fm map[string]string
+		if err := yaml.Unmarshal([]byte(parts[1]), &fm); err != nil || fm["description"] == "" {
+			t.Errorf("%s: frontmatter does not parse as YAML with a description: %v", p, err)
 		}
 	}
 	if !strings.HasSuffix(got[".codex/agents/spec-r.toml"], "developer_instructions = '''\nRead only.\n'''\n\n[features]\nshell_tool = false\n") {
@@ -127,10 +143,20 @@ func TestInstall(t *testing.T) {
 	_ = os.WriteFile(stale, []byte("<!-- "+mark+"commands/spec-old.md -->\n"), 0o644)
 	old := filepath.Join(d, ".cursor/commands/spec-next.md") // 0.10's, written by install.sh
 	_ = os.WriteFile(old, []byte("<!-- "+oldMark+"commands/spec-next.md; edits are overwritten on reinstall -->\n"), 0o644)
+	gone := filepath.Join(d, ".claude/commands/spec-gone.md") // this version's note, in the frontmatter
+	_ = os.WriteFile(gone, []byte("---\n# "+mark+"commands/spec-gone.md; edits are overwritten on update\ndescription: \"x\"\n---\nx\n"), 0o644)
+	cur := filepath.Join(d, ".cursor/commands/spec-a.md") // the 0.12 HTML-comment note is replaced by the frontmatter one
+	_ = os.WriteFile(cur, []byte("---\ndescription: \"Do a\"\n---\n<!-- "+mark+"commands/spec-a.md; edits are overwritten on update -->\nold\n"), 0o644)
 	mine := filepath.Join(d, ".cursor/commands/mine.md")
-	_ = os.WriteFile(mine, []byte("mine\n"), 0o644)
-	if _, err := Install(d, src, skills, Options{Harnesses: []string{"cursor"}}); err != nil {
+	_ = os.WriteFile(mine, []byte("---\n# my own command\ndescription: \"mine\"\n---\n<!-- keep -->\nmine\n"), 0o644)
+	if _, err := Install(d, src, skills, Options{Harnesses: []string{"cursor", "claude"}}); err != nil {
 		t.Fatal(err)
+	}
+	if _, err := os.Stat(gone); err == nil {
+		t.Error("stale generated file with the frontmatter note kept")
+	}
+	if b, _ := os.ReadFile(cur); strings.Contains(string(b), "<!--") || !strings.HasPrefix(string(b), "---\n# "+mark) {
+		t.Errorf("update left the old note: %q", b)
 	}
 	if _, err := os.Stat(stale); err == nil {
 		t.Error("stale generated file kept")
@@ -138,8 +164,8 @@ func TestInstall(t *testing.T) {
 	if _, err := os.Stat(old); err == nil {
 		t.Error("0.10 generated file kept")
 	}
-	if _, err := os.Stat(mine); err != nil {
-		t.Error("user file removed")
+	if b, _ := os.ReadFile(mine); string(b) != "---\n# my own command\ndescription: \"mine\"\n---\n<!-- keep -->\nmine\n" {
+		t.Errorf("user file changed or removed: %q", b)
 	}
 }
 

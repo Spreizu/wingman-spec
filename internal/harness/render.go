@@ -122,18 +122,19 @@ func Render(src fs.FS, h string) ([]File, error) {
 		if d == "" {
 			return nil, fmt.Errorf("harness/commands/%s.md has no description", c.name)
 		}
-		note := "<!-- " + mark + "commands/" + c.name + ".md; edits are overwritten on update -->\n"
+		// a YAML comment in the frontmatter: the harness strips it, so it never reaches the chat (an HTML comment did)
+		note := "# " + mark + "commands/" + c.name + ".md; edits are overwritten on update\n"
 		switch h {
 		case "cursor":
-			add(".cursor/commands/"+c.name+".md", "---\ndescription: \""+d+"\"\n---\n"+note+c.body)
+			add(".cursor/commands/"+c.name+".md", "---\n"+note+"description: \""+d+"\"\n---\n"+c.body)
 		case "claude":
-			fm := "---\ndescription: \"" + d + "\"\n"
+			fm := "---\n" + note + "description: \"" + d + "\"\n"
 			if hint != "" {
 				fm += "argument-hint: \"" + hint + "\"\n"
 			}
-			add(".claude/commands/"+c.name+".md", fm+"---\n"+note+c.body)
+			add(".claude/commands/"+c.name+".md", fm+"---\n"+c.body)
 		case "codex":
-			s := "---\nname: " + c.name + "\ndescription: \"" + d + "\"\n---\n" + note
+			s := "---\n" + note + "name: " + c.name + "\ndescription: \"" + d + "\"\n---\n"
 			if hint != "" {
 				s += "Invoke as `$" + c.name + " " + hint + "`.\n\n"
 			}
@@ -145,26 +146,26 @@ func Render(src fs.FS, h string) ([]File, error) {
 		if n == "" || d == "" {
 			return nil, fmt.Errorf("harness/agents/%s.md needs name and description", a.name)
 		}
-		note := "<!-- " + mark + "agents/" + n + ".md; edits are overwritten on update -->\n"
+		note := "# " + mark + "agents/" + n + ".md; edits are overwritten on update\n"
 		switch h {
 		case "cursor":
-			s := "---\nname: " + n + "\ndescription: \"" + d + "\"\nmodel: inherit\n"
+			s := "---\n" + note + "name: " + n + "\ndescription: \"" + d + "\"\nmodel: inherit\n"
 			if ro {
 				s += "readonly: true\n"
 			}
-			add(".cursor/agents/"+n+".md", s+"---\n"+note+a.body)
+			add(".cursor/agents/"+n+".md", s+"---\n"+a.body)
 		case "claude":
-			s := "---\nname: " + n + "\ndescription: \"" + d + "\"\n"
+			s := "---\n" + note + "name: " + n + "\ndescription: \"" + d + "\"\n"
 			if ro {
 				s += "tools: Read, Grep, Glob\n"
 			}
-			add(".claude/agents/"+n+".md", s+"---\n"+note+a.body)
+			add(".claude/agents/"+n+".md", s+"---\n"+a.body)
 		case "codex":
 			b := strings.TrimRight(codexify(a.body), "\n")
 			if strings.Contains(b, "'''") {
 				return nil, fmt.Errorf("harness/agents/%s.md contains ''' and cannot be a TOML literal string", a.name)
 			}
-			s := "name = \"" + n + "\"\ndescription = \"" + codexify(d) + "\"\n# " + mark + "agents/" + n + ".md; edits are overwritten on update\n" +
+			s := "name = \"" + n + "\"\ndescription = \"" + codexify(d) + "\"\n" + note +
 				"developer_instructions = '''\n" + b + "\n'''\n"
 			if ro {
 				s += "\n[features]\nshell_tool = false\n"
