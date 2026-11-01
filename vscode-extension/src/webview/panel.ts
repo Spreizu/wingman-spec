@@ -15,6 +15,7 @@ import type { DashboardInputs } from '../model/changeDashboard.ts';
 import { CLI_ACTIONS } from '../model/cliActions.ts';
 import type { ActionResult, CliAction } from '../model/cliActions.ts';
 import { timelinePath } from '../model/timeline.ts';
+import type { AgentFiles } from '../editor/agentFiles.ts';
 import { actionKey } from './types.ts';
 import type { BranchState, RoadmapState, Route, ViewData } from './types.ts';
 
@@ -61,6 +62,8 @@ export class SpecPanel implements vscode.Disposable {
   private running: string | undefined;
 
   private readonly logo: vscode.Uri | undefined;
+  /** Set by the extension: the folders whose agent files are older than the bundled CLI, and the update that refreshes them. */
+  agentFiles: Pick<AgentFiles, 'list' | 'update'> | undefined;
 
   /** `logo`: the extension icon (images/icon.png), shown in the header and on the panel tab. */
   constructor(store: ProjectStore, traces: () => TraceModel[] = () => [], extras?: PanelExtras, logo?: vscode.Uri) {
@@ -159,7 +162,8 @@ export class SpecPanel implements vscode.Disposable {
       await this.extras.settled(1500);
       dashboard = dash();
     }
-    return { projects, route, texts, baseSpecs, setup: setupStatus(workspaceRoots(this.store)), trace: this.traces(), revealTick: this.revealTick, ...(branch ? { branch } : {}), ...(roadmap ? { roadmap } : {}), ...(greenfield ? { greenfield } : {}), ...(dashboard ? { dashboard } : {}), ...(this.extras?.runAction ? { actions: { trusted: vscode.workspace.isTrusted, results: this.results, ...(this.running ? { running: this.running } : {}) } } : {}) };
+    const agentUpdates = vscode.workspace.isTrusted ? (this.agentFiles?.list() ?? []) : [];
+    return { projects, route, texts, baseSpecs, setup: setupStatus(workspaceRoots(this.store)), trace: this.traces(), revealTick: this.revealTick, ...(agentUpdates.length ? { agentUpdates } : {}), ...(branch ? { branch } : {}), ...(roadmap ? { roadmap } : {}), ...(greenfield ? { greenfield } : {}), ...(dashboard ? { dashboard } : {}), ...(this.extras?.runAction ? { actions: { trusted: vscode.workspace.isTrusted, results: this.results, ...(this.running ? { running: this.running } : {}) } } : {}) };
   }
 
   async render(): Promise<void> {
@@ -241,6 +245,15 @@ export class SpecPanel implements vscode.Disposable {
           const t = vscode.window.createTerminal({ name: 'Wingman Spec', cwd: project.workspaceFolder });
           t.show();
           t.sendText(text, false);
+        }
+        break;
+      }
+      case 'updateAgentFiles': {
+        const folder = m['folder'];
+        const known = this.agentFiles?.list().some((u) => u.folder === folder);
+        if (typeof folder === 'string' && known && vscode.workspace.isTrusted) {
+          await this.agentFiles?.update(folder); // progress and the result come back through refresh()
+          await this.store.refresh();
         }
         break;
       }

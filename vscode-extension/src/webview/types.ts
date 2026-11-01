@@ -1,3 +1,4 @@
+import type { AgentUpdate } from '../editor/agentFiles.ts';
 import type { BranchReview } from '../model/branchReview.ts';
 import type { RoadmapReport } from '../model/roadmap.ts';
 import type { DashboardInputs } from '../model/changeDashboard.ts';
@@ -45,6 +46,8 @@ export interface ViewData {
   dashboard?: DashboardInputs;
   /** The CLI actions: whether they may run here, the one running, and the last answer per project root and change (`root` + newline + change). */
   actions?: { trusted: boolean; running?: string; results: Record<string, ActionResult> };
+  /** Workspace folders whose generated agent files `wingman-spec update` would rewrite: the header's Update button. */
+  agentUpdates?: AgentUpdate[];
   /** Counts up each time a lens, hover link or tree item asks to reveal something, so the page scrolls to it again even on the same route. */
   revealTick?: number;
 }

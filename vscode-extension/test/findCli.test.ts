@@ -1,5 +1,5 @@
 // The extension always runs its bundled CLI and keeps each project's shim pointing at it: missing, stale, Windows .cmd,
-// multi-root, and the one update offer when generated agent files are older than the CLI.
+// multi-root, and the Update button state when generated agent files are older than the CLI.
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -73,31 +73,41 @@ test('on Windows the shim is a .cmd file naming the bundled .exe', () => {
   assert.equal(readFileSync(shim(d) + '.cmd', 'utf8'), `@"${exe}" %*\r\n`);
 });
 
-test('every folder of a multi-root workspace with .wingman-spec/ gets the shim; stale agent files get one update offer', posix, async () => {
+test('every folder of a multi-root workspace with .wingman-spec/ gets the shim; stale agent files show an Update button, no popup', posix, async () => {
   host.reset();
   const bin = bundle();
   const exe = join(bin, 'wingman-spec');
   const [code, specs, other] = [project(), project(), tmp()];
   const calls: string[] = [];
+  let updated = false;
   const run: Runner = async (cmd, args, opts) => {
     calls.push(`${opts.cwd}: ${[cmd, ...args].join(' ')}`);
-    const stale = opts.cwd === code ? ['.cursor/commands/spec-apply.md'] : [];
+    if (!args.includes('--check')) updated = true;
+    const stale = opts.cwd === code && !updated ? ['.cursor/commands/spec-apply.md', 'AGENTS.md'] : [];
     return { code: 0, stdout: args.includes('--check') ? JSON.stringify({ stale }) : 'updated\n', stderr: '', timedOut: false };
   };
   (workspace as { workspaceFolders: unknown[] }).workspaceFolders = [code, specs, other].map((f) => ({ uri: Uri.file(f) }));
-  host.infoAnswer = 'Run update';
   const old = process.env['WINGMAN_SPEC_BIN'];
   delete process.env['WINGMAN_SPEC_BIN'];
+  let changes = 0;
   try {
-    const d = registerCliSetup(new VerifierClient(run, bin), run);
+    const { disposable, agentFiles } = registerCliSetup(new VerifierClient(run, bin), () => changes++, run);
     await new Promise((r) => setTimeout(r, 20));
     assert.equal(readlinkSync(shim(code)), exe);
     assert.equal(lstatSync(shim(specs)).isSymbolicLink(), true);
     assert.equal(existsSync(join(other, '.wingman-spec')), false);
     assert.equal(host.output.filter((l: string) => l.startsWith('Created')).length, 2);
-    assert.equal(host.messages.filter((m: string) => m.includes('older than the bundled CLI')).length, 1);
-    assert.deepEqual(calls.filter((c) => c.endsWith(' update')), [`${code}: ${exe} update`]);
-    d.dispose();
+    assert.equal(host.messages.length, 0, 'no notification');
+    assert.deepEqual(calls.filter((c) => c.endsWith('--check --json')), [`${code}: ${shim(code)} update --check --json`, `${specs}: ${shim(specs)} update --check --json`]);
+    assert.deepEqual(agentFiles.list().map((u) => [u.folder, u.stale]), [[code, 2]]);
+    assert.ok(changes >= 2);
+    assert.equal(await agentFiles.update(specs), false, 'a current folder is not updated');
+    const p = agentFiles.update(code);
+    assert.equal(agentFiles.list()[0]?.running, true, 'the button shows progress');
+    assert.equal(await p, true);
+    assert.deepEqual(calls.filter((c) => c.endsWith(' update')), [`${code}: ${shim(code)} update`], 'update runs through the project shim');
+    assert.deepEqual(agentFiles.list(), [], 'the button hides once the files are current');
+    disposable.dispose();
   } finally {
     if (old !== undefined) process.env['WINGMAN_SPEC_BIN'] = old;
     (workspace as { workspaceFolders: unknown[] }).workspaceFolders = [];
@@ -124,7 +134,7 @@ test('Set Up This Folder runs init with the bundled CLI, then the new project ge
   const old = process.env['WINGMAN_SPEC_BIN'];
   delete process.env['WINGMAN_SPEC_BIN'];
   try {
-    const disp = registerCliSetup(new VerifierClient(run, bin), run);
+    const disp = registerCliSetup(new VerifierClient(run, bin), () => {}, run).disposable;
     await host.commands.get('wingmanSpec.init')();
     assert.deepEqual(calls[0], ['init', '--harness', 'all', '--layout', 'specs']);
     assert.equal(readlinkSync(shim(d)), join(bin, 'wingman-spec'));

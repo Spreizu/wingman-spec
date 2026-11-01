@@ -25,6 +25,21 @@ function navItem(route: Route, active: boolean, iconHtml: string, label: string,
   return `<button class="nav-item${active ? ' active' : ''}" ${routeAttr(route)}>${iconHtml}<span class="grow">${esc(label)}</span>${count ? `<span class="count">${esc(count)}</span>` : ''}</button>`;
 }
 
+/**
+ * The header's Update button: one per folder whose generated agent files are older than the bundled CLI, nothing when
+ * they are current. While `update` runs it is disabled and says so; a failed run keeps it, with the error as its tooltip.
+ */
+export function updateButtons(d: ViewData): string {
+  const ups = d.agentUpdates ?? [];
+  return ups
+    .map((u) => {
+      const label = u.running ? 'Updating...' : ups.length > 1 ? `Update ${u.name}` : 'Update';
+      const title = u.error ? `wingman-spec update failed: ${u.error}` : `${u.stale} generated agent file(s) in ${u.name} are older than the bundled CLI. Runs wingman-spec update, which rewrites only the files it generated.`;
+      return `<button class="btn update-btn"${u.running ? ' disabled aria-busy="true"' : ` data-update="${esc(u.folder)}"`} title="${esc(title)}">${esc(label)}</button>`;
+    })
+    .join('');
+}
+
 function nav(d: ViewData, specCount: number, logo: string | undefined): string {
   const archiveCount = d.projects.reduce((n, p) => n + p.archive.length, 0);
   const key = routeKey(d.route);
@@ -52,7 +67,7 @@ function nav(d: ViewData, specCount: number, logo: string | undefined): string {
     .join('');
 
   return `<nav class="nav">
-<div class="brand">${logo ? `<img class="brand-mark" src="${esc(logo)}" alt="">` : ''}Wingman Spec</div>
+<div class="brand">${logo ? `<img class="brand-mark" src="${esc(logo)}" alt="">` : ''}<span class="grow">Wingman Spec</span>${updateButtons(d)}</div>
 ${navItem({ page: 'overview' }, is({ page: 'overview' }), icon('home'), 'Overview')}
 ${navItem({ page: 'adrs' }, d.route.page === 'adrs' || d.route.page === 'adr', icon('adr'), 'ADRs', String(adrTotal))}
 ${navItem({ page: 'specs' }, d.route.page === 'specs' || d.route.page === 'spec', icon('file'), 'Specs', String(specCount))}

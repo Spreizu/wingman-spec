@@ -33,6 +33,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .nav { position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 18px 12px; border-right: 1px solid var(--line); background: var(--vscode-sideBar-background, transparent); }
 .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px; font-weight: 700; font-size: 14px; letter-spacing: .02em; }
 .brand-mark { width: 26px; height: 26px; flex: none; }
+.brand .grow { flex: 1; min-width: 0; }
+.brand .update-btn { padding: 2px 8px; font-size: 11px; font-weight: 400; letter-spacing: 0; }
 .nav-label { margin: 18px 8px 6px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
 .nav-item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 6px 8px; border: 0; border-radius: 7px; background: none; text-align: left; color: var(--vscode-foreground); }
 .nav-item:hover { background: var(--vscode-list-hoverBackground, rgba(127,127,127,.12)); }

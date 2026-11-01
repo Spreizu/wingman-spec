@@ -34,9 +34,10 @@ output channel.
 ## Upgrade
 
 The extension updates through the editor, and the shim follows it. When the project's generated agent files are older
-than the bundled CLI, one notification offers **Run update**. That runs `wingman-spec update`, which rewrites the
-generated agent files, the bundled skills, the `AGENTS.md` block and the shim. It never runs by itself, because those
-files are committed. Your settings, specs, changes and ADRs are not touched. Review and commit what changed.
+than the bundled CLI, an **Update** button appears in the panel header. It runs `wingman-spec update` through the
+shim and disappears once the files are current. The update rewrites only what Wingman Spec generated: the agent
+files, the bundled skills, the `AGENTS.md` block and the shim. It never runs by itself, because those files are
+committed. Your settings, specs, changes and ADRs are not touched. Review and commit what changed.
 
 ## From the OpenSpec-based 0.11 release
 

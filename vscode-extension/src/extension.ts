@@ -38,6 +38,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const data = new PanelData(store, traceCache, verifier);
   const panel = new SpecPanel(store, () => traceCache.all(), data, vscode.Uri.joinPath(context.extensionUri, 'images', 'icon.png'));
   data.onReady = () => panel.refresh();
+  const cliSetup = registerCliSetup(verifier, () => panel.refresh());
+  panel.agentFiles = cliSetup.agentFiles;
   const problems = registerProblems(store, traceCache, verifier);
   const codeLens = new SpecCodeLensProvider(store);
   const markdownFiles: vscode.DocumentSelector = { language: 'markdown', scheme: 'file' };
@@ -79,7 +81,7 @@ export function activate(context: vscode.ExtensionContext): void {
       rewatch(true);
       void refresh();
     }),
-    registerCliSetup(verifier),
+    cliSetup.disposable,
     vscode.commands.registerCommand('wingmanSpec.refresh', refresh),
     vscode.commands.registerCommand('wingmanSpec.openFile', openFile),
     vscode.commands.registerCommand('wingmanSpec.openDashboard', show({ page: 'overview' })),

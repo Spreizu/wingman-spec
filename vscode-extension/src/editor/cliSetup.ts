@@ -2,42 +2,22 @@ import { join } from 'node:path';
 import * as vscode from 'vscode';
 import { ensureShim } from '../core/shim.ts';
 import { SHIM } from '../core/paths.ts';
+import { AgentFiles, updateBin } from './agentFiles.ts';
 import { execRunner } from './verifier.ts';
 import type { Runner, VerifierClient } from './verifier.ts';
 
-/** The generated files `wingman-spec update --check --json` reports as older than the CLI ([] when unreadable). */
-export function parseStale(stdout: string): string[] {
-  try {
-    const v = (JSON.parse(stdout) as { stale?: unknown }).stale;
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
-  } catch {
-    return [];
-  }
-}
+export { parseStale } from './agentFiles.ts';
 
 /**
  * Keeps every trusted workspace folder with `.wingman-spec/` running the bundled CLI: its shim is (re)created silently with a
  * line in the output channel (also after an extension update, whose install path differs). Generated agent files older than
- * the bundled CLI get one notification per folder offering `wingman-spec update`, never an automatic rewrite of committed files.
+ * the bundled CLI are checked once per folder (`update --check`, nothing written); the panel header then shows an Update
+ * button (see AgentFiles). Committed files are never rewritten without that click.
  */
-export function registerCliSetup(verifier: VerifierClient, run: Runner = execRunner): vscode.Disposable {
+export function registerCliSetup(verifier: VerifierClient, changed: () => void, run: Runner = execRunner): { disposable: vscode.Disposable; agentFiles: AgentFiles } {
   const out = vscode.window.createOutputChannel('Wingman Spec');
   const checked = new Set<string>();
-  const offerUpdate = async (folder: string, exe: string): Promise<void> => {
-    const r = await run(exe, ['update', '--check', '--json'], { cwd: folder, timeoutMs: 30000 });
-    const stale = parseStale(r.stdout);
-    if (stale.length === 0) return;
-    const pick = await vscode.window.showInformationMessage(
-      `Wingman Spec: ${stale.length} generated agent file(s) in ${folder} are older than the bundled CLI.`,
-      'Run update',
-    );
-    if (pick !== 'Run update') return;
-    const u = await run(exe, ['update'], { cwd: folder, timeoutMs: 120000 });
-    out.appendLine(`wingman-spec update in ${folder} (exit ${u.code ?? 'none'}):`);
-    out.append(u.stdout + u.stderr);
-    if (u.code === 0) void vscode.window.showInformationMessage('Wingman Spec: agent files updated. Review and commit them.');
-    else out.show(true);
-  };
+  const agentFiles = new AgentFiles(run, changed, (t) => out.append(t), (folder) => updateBin(folder, verifier.bin() ?? ''));
   const sync = (): void => {
     if (!vscode.workspace.isTrusted) return;
     const exe = verifier.bin();
@@ -54,7 +34,7 @@ export function registerCliSetup(verifier: VerifierClient, run: Runner = execRun
       }
       if (!checked.has(folder)) {
         checked.add(folder);
-        void offerUpdate(folder, exe);
+        void agentFiles.check(folder);
       }
     }
   };
@@ -86,10 +66,11 @@ export function registerCliSetup(verifier: VerifierClient, run: Runner = execRun
     sync();
   };
   sync();
-  return vscode.Disposable.from(
+  const disposable = vscode.Disposable.from(
     out,
     vscode.commands.registerCommand('wingmanSpec.init', init),
     vscode.workspace.onDidChangeWorkspaceFolders(sync),
     vscode.workspace.onDidGrantWorkspaceTrust(sync),
   );
+  return { disposable, agentFiles };
 }

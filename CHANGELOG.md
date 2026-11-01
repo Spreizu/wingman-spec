@@ -56,7 +56,8 @@ Upgrade an 0.11 project once with `wingman-spec import openspec` ([docs/install.
 - **Extension.** Every build bundles the CLI (`bin/wingman-spec`), and there is no universal build. The extension runs
   the CLI for findings, sync state, new changes and drift decisions, and reads the three layouts. In each folder with
   `.wingman-spec/` it keeps the shim pointing at the bundled CLI without asking, also after an update, and logs it. When
-  the generated agent files are older than the CLI (`update --check`), one notification offers `update`. Settings
+  the generated agent files are older than the CLI (`update --check`), an **Update** button appears in the panel
+  header. It runs `update` through the shim, shows progress and disappears once the files are current. Settings
   removed: `wingmanSpec.verifierNode`, `wingmanSpec.openspecPath`, `wingmanSpec.adrDirectory`.
 - **Extension buttons run the CLI.** Validate, Status, Sync and Archive on the change page, and Doctor on the Overview,
   run `wingman-spec <action> --json` directly. A button is enabled only when its preconditions hold (for example Sync

@@ -46,7 +46,7 @@ This Folder**: it runs `wingman-spec init --harness all` with the bundled CLI.
 `init` creates `.wingman-spec/` (settings, specs, changes, archive, ADRs), installs the `/spec-*` commands, subagents and bundled
 skills for your agents, adds the workflow block to `AGENTS.md`, and writes the shim
 `.wingman-spec/bin/wingman-spec`, which the agents call. The extension keeps that shim pointing at its bundled CLI, also after
-an update, and offers `wingman-spec update` when the generated files are older than the CLI. Commit `.wingman-spec/` except the
+an update, and shows an **Update** button for `wingman-spec update` when the generated files are older than the CLI. Commit `.wingman-spec/` except the
 gitignored `runs/`, `bin/`, `cache/` and `local/`. A project that used the OpenSpec-based 0.11 release converts once with
 `wingman-spec import openspec`. See [docs/install.md](docs/install.md).
 
