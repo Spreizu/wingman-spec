@@ -93,8 +93,8 @@ func (o *Options) Check() error {
 	if o.Session != "" && !sessionRE.MatchString(o.Session) {
 		return die(Usage, "--session needs 1-64 letters, digits or . _ : -")
 	}
-	if !slices.Contains([]string{"done", "failed", "blocked"}, o.Reported) {
-		return die(Usage, "--reported must be done|failed|blocked")
+	if !slices.Contains([]string{"done", "failed", "blocked", "none"}, o.Reported) {
+		return die(Usage, "--reported must be done|failed|blocked|none (none: the reply has no STATUS line)")
 	}
 	if !slices.Contains([]string{"json", "prompt"}, o.Format) {
 		return die(Usage, "--format must be json|prompt")

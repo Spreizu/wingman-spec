@@ -45,7 +45,7 @@ func (v *vflags) bind(c *cobra.Command, which int) {
 		f.StringVar(&v.o.Format, "format", v.o.Format, "json|prompt")
 	}
 	if which&fCheck != 0 {
-		f.StringVar(&v.o.Reported, "reported", v.o.Reported, "what the implementer reported: done|failed|blocked")
+		f.StringVar(&v.o.Reported, "reported", v.o.Reported, "what the implementer reported: done|failed|blocked, or none when the reply has no STATUS line")
 	}
 	if which&(fCheck|fVisual) != 0 {
 		f.BoolVar(&v.o.Changed, "changed-only", false, "skip the visual check when the app is unchanged since it last passed")

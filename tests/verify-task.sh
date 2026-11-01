@@ -134,7 +134,7 @@ expect "last allowed attempt fails with exit 4" '[ $rc = 4 ]'
 $V next demo >/dev/null 2>&1; rc=$?
 expect "next keeps refusing after exhaustion (exit 4)" '[ $rc = 4 ]'
 $V next demo --new-run >/dev/null 2>&1; rc=$?
-expect "--new-run starts a fresh run" '[ $rc = 0 ] && [ "$(ls -d .wingman-spec/runs/demo/*/ | wc -l)" = 2 ]'
+expect "--new-run starts a fresh run" '[ $rc = 0 ] && [ "$(ls -d .wingman-spec/runs/demo/*/ | grep -vc /notes/)" = 2 ]'
 reset_change '- [ ] 1.1 a
   - Done when: `true`'
 orch 'sed -i.b "s/Done when: .true./Done when: \`echo edited\`/" "$F"; rm -f "$F.b"; '"$TICK1" "done"

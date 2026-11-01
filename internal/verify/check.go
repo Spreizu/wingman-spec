@@ -769,7 +769,11 @@ func (e *Env) Check() error {
 	if blocked {
 		o.fail("BLOCKED.md exists")
 	}
-	if e.O.Reported != "done" {
+	switch e.O.Reported {
+	case "done":
+	case "none":
+		o.fail("the subagent's reply ended without a STATUS line")
+	default:
 		o.fail("subagent reported STATUS: " + e.O.Reported)
 	}
 	var vis *Obj
@@ -836,6 +840,7 @@ func (e *Env) pass(run string, st *State, checks []any, vis *Obj, warnings []str
 		e.recordPass(run, m)
 	}
 	done := st.Task.Label
+	e.dropNotes(done)
 	st.Task, st.Attempts, st.LastFailure, st.Review = nil, 0, nil, nil
 	writeState(run, st)
 	_, p, _ := loadTasks(changeDir)
@@ -1124,7 +1129,21 @@ func (e *Env) reject(run string, st *State, failures []string, x rejectInfo) err
 		lf = lf[len(lf)-tailMax:]
 	}
 	st.LastFailure = &lf
-	exhausted := st.Attempts >= e.O.MaxAttempts
+	exhausted, n := st.Attempts >= e.O.MaxAttempts, st.Attempts
+	t := st.Task
+	fp := fingerprint(x.checks, failures)
+	t.Fingerprints = append(t.Fingerprints, fp)
+	t.NoStatus = e.O.Reported == "none"
+	repeat := ""
+	if k := len(t.Fingerprints); fp != "" && k >= 2 && t.Fingerprints[k-2] == fp {
+		repeat = fp
+	}
+	if repeat != "" && !exhausted && !x.blocked {
+		// the same failure twice: the approach is ruled out; the next attempt is the last and starts over
+		t.RuledOut = repeat
+		st.Attempts = max(st.Attempts, e.O.MaxAttempts-1)
+		t.OldDiff = e.startOver(st)
+	}
 	if exhausted {
 		st.Exhausted = true
 	}
@@ -1140,7 +1159,7 @@ func (e *Env) reject(run string, st *State, failures []string, x rejectInfo) err
 	for _, f := range failures {
 		firsts = append(firsts, firstLine(f))
 	}
-	logMetric(run, O("event", ev, "task", st.Task.Label, "attempt", st.Attempts, "ok", false, "blocked", x.blocked, "exhausted", exhausted, "seconds", x.seconds, "checks", x.checks, "failures", firsts).Merge(x.metric))
+	logMetric(run, O("event", ev, "task", st.Task.Label, "attempt", n, "fingerprint", fp, "repeat", repeat != "", "ok", false, "blocked", x.blocked, "exhausted", exhausted, "seconds", x.seconds, "checks", x.checks, "failures", firsts).Merge(x.metric))
 	result, code := "failed", Fail
 	switch {
 	case x.blocked:
@@ -1148,7 +1167,13 @@ func (e *Env) reject(run string, st *State, failures []string, x rejectInfo) err
 	case exhausted:
 		result, code = "exhausted", Exhausted
 	}
-	out := O("result", result, "task", st.Task.Label, "attempt", st.Attempts, "max_attempts", e.O.MaxAttempts, "failures", failures, "reverted", true, "checks", x.checks, "visual", If(x.visual != nil, x.visual), "warnings", If(x.warnings != nil, x.warnings))
+	out := O("result", result, "task", st.Task.Label, "attempt", n, "max_attempts", e.O.MaxAttempts, "failures", failures, "reverted", true, "checks", x.checks, "visual", If(x.visual != nil, x.visual), "warnings", If(x.warnings != nil, x.warnings))
+	switch {
+	case repeat != "" && exhausted:
+		out.Set("repeated", repeat).Set("stopped", fmt.Sprintf("attempts %d and %d failed the same way; another attempt would repeat it. Stop and report to the user: this failure, the attempt note (%s) and what was ruled out", n-1, n, rel(e.code, e.notePath(t.Label))))
+	case repeat != "":
+		out.Set("repeated", repeat).Set("next_attempt", fmt.Sprintf("attempt %d of %d is the last: it starts over from the task's pre-task files with a different approach", st.Attempts+1, e.O.MaxAttempts))
+	}
 	if st.lane != nil {
 		out.Set("wave", waveObj(st))
 		if others := st.otherOpenLanes(); len(others) > 0 && (x.blocked || exhausted) {

@@ -56,6 +56,7 @@ You implement the task (or the tasks, in order) the prompt lists, then stop. You
 
 ## Rules
 - Your working directory is the code repository. The change files live where the prompt says (outside the code repository when the specs live in a separate repository); use exactly that path.
-- Do not edit specs, ADRs, other tasks, `.wingman-spec/bin/` or anything under `runs/` (the verifier's run log, including the pre-task capture it compares with). Do not commit.
+- Do not edit specs, ADRs, other tasks, `.wingman-spec/bin/` or anything under `runs/` (the verifier's run log, including the pre-task capture it compares with) except your attempt note. Do not commit.
 - If the task is impossible, or the specs or design are wrong or ambiguous: do NOT improvise. Write the problem and what you need to `BLOCKED.md` in the change directory.
+- Before you reply, overwrite the attempt note the prompt names with what you tried and what you ruled out, in at most 150 words.
 - End your reply with exactly one line: `STATUS: done`, `STATUS: failed` (could not make it pass) or `STATUS: blocked` (wrote BLOCKED.md).

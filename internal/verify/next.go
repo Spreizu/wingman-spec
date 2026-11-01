@@ -203,6 +203,9 @@ func (e *Env) Next() error {
 				w.Lanes = append(w.Lanes, &Lane{Task: TaskState{Member: memberOf(t.T, t.File)}, Status: laneOpen})
 			}
 			w.Hashes = e.waveHashes(w.Lanes)
+			for _, l := range w.Lanes {
+				e.savePre(&l.Task)
+			}
 			st = &State{Change: e.O.Change, Started: runstate.Now(), PreTasks: pre, Snapshots: snaps, Wave: w, Waves: w.N}
 			logMetric(r, O("event", "dispatch", "wave", w.N, "tasks", w.labels(), "remaining", prog.Remaining))
 			e.recordBase()
@@ -225,6 +228,7 @@ func (e *Env) Next() error {
 		st = &State{Change: e.O.Change, Started: runstate.Now(), Task: task, PreTasks: pre, Snapshots: snaps, Waves: waves}
 		logMetric(r, O("event", "dispatch", "task", task.Label, "remaining", prog.Remaining))
 		e.recordBase()
+		e.savePre(task)
 	}
 	st.AttemptOpen = true
 	writeState(r, st)
@@ -411,6 +415,8 @@ func (e *Env) packetFor(changeDir, r string, st *State, vl vlint, tinfo CmdInfo,
 	packet := O("result", "task", "change", e.O.Change, "specs_root", e.R.Specs, "code_root", e.code, "change_dir", changeDir, "run", r,
 		"task", pt, "batch", batch, "done_when", st.Task.DoneWhen.Cmd, "test_cmd", tinfo.Cmd, "read", read, "earlier", earlier,
 		"attempt", st.Attempts+1, "max_attempts", e.O.MaxAttempts, "last_failure", st.LastFailure, "progress", prog,
+		"attempt_note", e.notePath(st.Task.Label), "previous_note", If(st.Attempts > 0 && e.readNote(st.Task.Label) != "", e.readNote(st.Task.Label)),
+		"ruled_out", If(st.Task.RuledOut != "", st.Task.RuledOut), "no_status", If(st.Task.NoStatus, true),
 		"visual", O("scenarios", ids(vt), "viewports", list(vports), "references", refs, "self_check", "wingman-spec visual "+e.O.Change, "guards", vcfg.Scope == "all"),
 		"trace", O("scenarios", tagIDs(tr.Explicit), "requirement_level", tagIDs(tr.Implicit)),
 		"anchors", anchorKeys, "warnings", warnings, "review_range", rr)
@@ -468,8 +474,26 @@ func (e *Env) packetPrompt(changeDir string, st *State, batch []PacketTask, read
 		if st.LastFailure != nil {
 			lf = *st.LastFailure
 		}
-		add(fmt.Sprintf("This is attempt %d of %d. The previous attempt was rejected by the verifier:\n%s", st.Attempts+1, e.O.MaxAttempts, lf))
+		t := st.Task
+		switch {
+		case t.RuledOut != "":
+			kept := ""
+			if t.OldDiff != "" {
+				kept = " (the failed attempt's diff is in `" + rel(t.OldDiff) + "`)"
+			}
+			add(fmt.Sprintf("This is attempt %d of %d, the last one. The two attempts before it failed the same way, so their approach is ruled out:\n  %s\nDo not repair that approach; take a different one. The verifier put this task's files back as they were when the task was handed out%s. The last failure:\n%s", st.Attempts+1, e.O.MaxAttempts, t.RuledOut, kept, lf))
+		case t.NoStatus:
+			add(fmt.Sprintf("This is attempt %d of %d. The previous attempt ended without a STATUS line (it ran out of turns or stopped), so the verifier did not check it. Continue from the files as they are.", st.Attempts+1, e.O.MaxAttempts))
+		default:
+			add(fmt.Sprintf("This is attempt %d of %d. The previous attempt was rejected by the verifier:\n%s", st.Attempts+1, e.O.MaxAttempts, lf))
+		}
+		if n := e.readNote(t.Label); n != "" {
+			add("The previous attempt's note (tried / ruled out): " + n)
+		} else if t.NoStatus {
+			add("It left no attempt note.")
+		}
 	}
+	add("Attempt note: overwrite `" + rel(e.notePath(st.Task.Label)) + "` before you reply.")
 	if len(vscen) > 0 {
 		var vp []string
 		for _, v := range vports {

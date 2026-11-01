@@ -76,6 +76,11 @@ Upgrade an 0.11 project once with `wingman-spec import openspec` ([docs/install.
 - **Publisher id `elmo-egers`.** The extension id is now `elmo-egers.wingman-spec` (was `elmoegers.wingman-spec`).
 - **Browsers stay headless.** The visual check and its bundled helper always start Chromium headless and never take
   the focus. The `AGENTS.md` block tells agents to keep any browser they start headless too.
+- **Retries learn from the failed attempt.** `check` stores a fingerprint of each rejected attempt: the failing check,
+  the first failing test and the first error line. When two attempts in a row fail the same way, the next one is the
+  last. Its prompt rules out that approach, and the task's `Files:` are put back with the failed diff kept. Each
+  implementer writes a short attempt note in `runs/<change>/notes/`, and the retry prompt carries it. A reply with no
+  `STATUS:` line is checked with `--reported none`.
 
 ## 0.11.2
 

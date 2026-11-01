@@ -76,6 +76,9 @@ func (s *State) laneView(l *Lane) *State {
 func (s *State) syncLane() *State {
 	p, l := s.parent, s.lane
 	l.Attempts, l.LastFailure, l.AttemptOpen, l.Review, l.VisualBefore = s.Attempts, s.LastFailure, s.AttemptOpen, s.Review, s.VisualBefore
+	if s.Task != nil {
+		l.Task = *s.Task
+	}
 	switch {
 	case s.Task == nil && l.Status != lanePassed:
 		l.Status = lanePassed

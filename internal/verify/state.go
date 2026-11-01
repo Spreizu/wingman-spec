@@ -35,6 +35,13 @@ type DoneWhen struct {
 type TaskState struct {
 	Member
 	Members []Member `json:"members,omitempty"`
+	// Retry bookkeeping (retry.go): one failure fingerprint per rejected attempt ("" when no check ran), the
+	// fingerprint that two attempts in a row repeated (the next attempt starts over), the failed attempt's diff kept
+	// then, and whether the last reply had no STATUS line.
+	Fingerprints []string `json:"fingerprints,omitempty"`
+	RuledOut     string   `json:"ruled_out,omitempty"`
+	OldDiff      string   `json:"old_diff,omitempty"`
+	NoStatus     bool     `json:"no_status,omitempty"`
 }
 
 // ReviewState is a pending visual review.
