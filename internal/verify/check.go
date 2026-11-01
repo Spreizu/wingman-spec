@@ -234,13 +234,7 @@ func (e *Env) targetedTests(changeDir string, st *State, testCmd string) targete
 	if len(files) == 0 {
 		return targeted{why: "no test file targets this task (none changed, tagged with its scenarios or named after its files); the full suite runs at finish", files: []string{}, counts: counts}
 	}
-	var qf, dirs []string
-	for _, f := range files {
-		qf = append(qf, shq(f))
-		dirs = append(dirs, shq("./"+filepath.ToSlash(filepath.Dir(f))))
-	}
-	cmd := strings.Replace(strings.Replace(tpl, "{files}", strings.Join(qf, " "), 1), "{dirs}", strings.Join(uniq(dirs), " "), 1)
-	return targeted{cmd: cmd, tpl: tpl, source: source, files: files, counts: counts}
+	return targeted{cmd: withFiles(tpl, files), tpl: tpl, source: source, files: files, counts: counts}
 }
 
 // ---------- check level ----------
@@ -990,6 +984,7 @@ func (e *Env) runChecks(changeDir, run string, st *State, tinfo CmdInfo, o *outc
 			return vis, "", nil
 		}
 	}
+	e.reviewProof(changeDir, st, tinfo, o)
 	return vis, review, rubric
 }
 

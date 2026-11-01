@@ -42,6 +42,7 @@ type TaskState struct {
 	RuledOut     string   `json:"ruled_out,omitempty"`
 	OldDiff      string   `json:"old_diff,omitempty"`
 	NoStatus     bool     `json:"no_status,omitempty"`
+	PreTree      string   `json:"pre_tree,omitempty"` // review task: the working tree as it was handed out (reviewproof.go)
 }
 
 // ReviewState is a pending visual review.

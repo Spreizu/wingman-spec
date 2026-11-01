@@ -409,6 +409,10 @@ func (e *Env) packetFor(changeDir, r string, st *State, vl vlint, tinfo CmdInfo,
 	if tasks.IsReview(st.Task.Label, st.Task.Title) {
 		if x := runstate.ReviewRange(e.code, e.changeBase()); x != nil {
 			rr = x
+			if st.Task.PreTree == "" { // kept for the review proof at check
+				st.Task.PreTree = x.Head
+				writeState(r, st)
+			}
 		}
 	}
 	pt := &PacketTask{st.Task.Label, st.Task.Title, list(st.Task.Details)}

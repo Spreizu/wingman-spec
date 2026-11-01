@@ -81,6 +81,9 @@ Upgrade an 0.11 project once with `wingman-spec import openspec` ([docs/install.
   last. Its prompt rules out that approach, and the task's `Files:` are put back with the failed diff kept. Each
   implementer writes a short attempt note in `runs/<change>/notes/`, and the retry prompt carries it. A reply with no
   `STATUS:` line is checked with `--reported none`.
+- **Review fixes need proof.** A review task that changes code lists each fix as `Review fix: <slug> - <finding>` in
+  `progress.md`. `check` runs the test tagged `[review:<slug>]` on the code as the review got it, where it must fail,
+  and on the fixed code, where it must pass. `untestable: <reason>` skips the test with a warning in the timeline.
 
 ## 0.11.2
 

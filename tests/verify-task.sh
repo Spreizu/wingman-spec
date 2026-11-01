@@ -862,7 +862,7 @@ key: [data-testid="about"]
   $V next other >/dev/null 2>&1; F="$C2/tasks.md" bash -c "$DEMOTE; $TICK1"; out="$($V check other 2>&1)"; rc=$?
   expect "a review task editing a file no task of the change names is still caught" '[ $rc = 1 ] && printf "%s" "$out" | grep -q "regression:aria-changed"'
   reset_review "site/about.html, site/theme.css, site/index.html"
-  $V next other >/dev/null 2>&1; F="$C2/tasks.md" bash -c "$DEMOTE; $TICK1"; out="$($V check other 2>&1)"; rc=$?
+  $V next other >/dev/null 2>&1; F="$C2/tasks.md" bash -c "$DEMOTE; $TICK1; echo 'Review fix: brand-tag - the brand heading - untestable: a fixture edit' >> $C2/progress.md"; out="$($V check other 2>&1)"; rc=$?
   expect "a review task may change a file another task of the change names in Files: (no Files: of its own)" '[ $rc = 0 ] || [ $rc = 5 ]'
   echo "  regressions caught: $RCAUGHT/3"
   git checkout -q site/; rm -f site/about.html; rm -rf "$C2" .wingman-spec/archive .wingman-spec/specs/app.md; git add -A; git commit -qm "drop other and the archived demo" >/dev/null; scope_default
