@@ -34,7 +34,7 @@ Confirm the kebab-case change name first; that name is also the exploration slug
    - Write the prose by the `spec-writing` skill.
    `wingman-spec lint <name>` reports the planning path and any missing artifact (`path-artifacts`). The **fast** path (Size S, `Risk: none`, no UI, no sensitive path in `Files:`) writes only proposal, specs and tasks. Every other change is **full**.
 
-   **Decide the size before the first artifact.** The size table is in the proposal instruction; proposal.md gets `Size: S|M|L` and `Risk:` lines, and `wingman-spec size` checks them against the specs. In short: **S** is 1 capability, at most 3 requirements, nothing BREAKING, no risk, no ADR, no visual scenarios. **M** is up to 2 capabilities, or a UI change with visual scenarios. **L** is 3 or more capabilities, anything BREAKING, or a risk (security, money, data-migration, concurrency, public-api). Task caps S/M/L: 3/5/8. Size trims documents, never scenarios or edge cases.
+   **Decide the size before the first artifact.** proposal.md gets `Size: S|M|L` and `Risk:` lines; `lint` checks them against the specs. In short: **S** is 1 capability, at most 3 requirements, nothing BREAKING, no risk, no ADR, no visual scenarios. **M** is up to 2 capabilities, or a UI change with visual scenarios. **L** is 3 or more capabilities, anything BREAKING, or a risk (security, money, data-migration, concurrency, public-api). Task caps S/M/L: 3/5/8. Size trims documents, never scenarios or edge cases.
 
    What each one must achieve (details are in each instruction):
    - `app-map`: where this change sits in the whole app; capabilities, dependencies, build order; this change's slice (S: `wingman-spec app-map <name> --apply`).
@@ -59,7 +59,7 @@ Confirm the kebab-case change name first; that name is also the exploration slug
 
 4. **Ask only when it matters.** If a question would change the specs, the approach or the task breakdown, look for the answer in the repo first. Ask the user (use `grilling`) only when the repo cannot answer it. Decide wording choices yourself. Record each answer: `wingman-spec log <name> grill "<question> -> <answer>"`. Record an owner approval the same way: `log <name> approval "<what was approved>"`.
 
-5. **Validate.** Run `.wingman-spec/bin/wingman-spec validate <name>` and `.wingman-spec/bin/wingman-spec lint <name>`. Fix every error; each one names its rule and line. Errors include a Size line below what the specs need (raise the size and write the full artifacts) and a plan over its task cap (3/5/8). Fix warnings by merging or deleting tasks where they say so. `wingman-spec help reference` lists the checks.
+5. **Validate.** Run `.wingman-spec/bin/wingman-spec lint <name> --text` and fix what it reports until it exits 0. Each line names the file, line and rule. A Size below what the specs need means raising the size and writing the full artifacts.
 
 6. **Summarize.** Print: change name, location, artifacts created, the ADR slugs, task count, and the next step: "Run `/spec-apply <name>` to implement, test-first."
 

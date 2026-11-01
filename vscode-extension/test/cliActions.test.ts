@@ -37,13 +37,14 @@ test('visibility: open or no tasks hide sync and archive; validate needs a propo
   assert.ok(bs.every((b) => !b.primary));
 });
 
-test('preconditions: all tasks ticked, not synced: Sync runs and Archive asks for the sync first', () => {
+test('preconditions: all tasks ticked, not synced: Archive is the primary (it gates and merges), Sync stays as a secondary', () => {
   const c = change(2, 2);
   const inputs = { sync: { ok: false, problems: ['x'], warnings: [] } };
   const bs = changeActions({ change: c, inputs, dashboard: buildDashboard({ change: c, inputs, cmd: (a) => a }), trusted: true });
   assert.equal(by(bs, 'sync').enabled, true);
-  assert.equal(by(bs, 'sync').primary, true, 'complete, not synced: Sync is the next step');
-  assert.equal(by(bs, 'archive').reason, 'Sync first: the specs or ADRs are not merged.');
+  assert.equal(by(bs, 'archive').enabled, true, 'the unsynced specs do not block the archive: it merges them');
+  assert.equal(by(bs, 'archive').primary, true);
+  assert.ok(!by(bs, 'sync').primary);
   const blockedFile = changeActions({ change: { ...c, state: 'blocked' }, inputs, trusted: true });
   assert.ok(blockedFile.every((b) => !b.primary), 'a blocked change: the header explores the blocker');
 });
@@ -58,8 +59,15 @@ test('preconditions: synced and nothing else blocks: Archive runs as the primary
   const blocked = changeActions({ change: c, inputs, dashboard: { blocking: [{ id: 'drift-gaps' }] } as never, trusted: true });
   assert.equal(by(blocked, 'archive').reason, '1 item blocks the archive (listed below).');
   assert.ok(blocked.every((b) => !b.primary), 'done but blocked: no primary, the blockers are listed');
-  assert.equal(by(changeActions({ change: c, trusted: true }), 'archive').reason, 'Checking the sync state...');
+  assert.equal(by(changeActions({ change: c, trusted: true }), 'sync').reason, 'Checking the sync state...');
   assert.match(by(changeActions({ change: c, inputs: { unavailable: 'the CLI is missing' }, trusted: true }), 'sync').reason ?? '', /Sync state unknown: the CLI is missing/);
+});
+
+test('answers: a refused archive lists every failed gate check, located when it names a file', () => {
+  const out = { result: 'refused', problem: '2 archive condition(s) fail', problems: ['finish: finish has not passed: run `wingman-spec finish c`', 'lint: .wingman-spec/changes/c/tasks.md:3: error: 1.1: no `Files:` line'] };
+  const r = readAction('archive', 'c', { code: 1, stdout: JSON.stringify(out), stderr: '' }, '/code');
+  assert.equal(r.summary, 'Not archived: 2 problems, nothing was written.');
+  assert.deepEqual(r.lines.map((l) => [l.file, l.line]), [[undefined, undefined], ['/code/.wingman-spec/changes/c/tasks.md', 3]]);
 });
 
 test('an untrusted workspace or a running action disables every button with the reason', () => {
@@ -83,7 +91,7 @@ test('answers: archive, refusal, validate, status, doctor, and an answer that is
   const archived = readAction('archive', 'c', { code: 0, stdout: '{"result":"archived","dir":"/r/archive/2026-10-30-1200-c","warnings":[]}', stderr: '' }, '/r');
   assert.equal(archived.summary, 'Archived to 2026-10-30-1200-c. The move is left uncommitted for you to review.');
   const refused = readAction('archive', 'mod-y', { code: 1, stdout: JSON.stringify({ result: 'refused', synced: false, problems: SYNC_CONFLICT.problems.map((p) => `specs: ${p}`) }), stderr: 'REFUSED' }, '/r');
-  assert.deepEqual([refused.ok, refused.summary, refused.lines.length], [false, 'Not archived: 2 sync conflicts.', 2]);
+  assert.deepEqual([refused.ok, refused.summary, refused.lines.length], [false, 'Not archived: 2 problems, nothing was written.', 2]);
   const invalid = readAction('validate', 'c', { code: 1, stdout: '{"items":[{"target":"c","valid":false,"issues":[{"level":"error","file":"changes/c/specs/a.md","line":7,"message":"requirement \\"Login\\" has no scenario"}]}],"valid":false}', stderr: '' }, '/r');
   assert.deepEqual([invalid.summary, invalid.lines[0]?.file, invalid.lines[0]?.line, invalid.lines[0]?.requirement], ['Not valid: 1 error.', '/r/changes/c/specs/a.md', 7, 'Login']);
   assert.equal(readAction('validate', 'c', { code: 0, stdout: '{"items":[],"valid":true}', stderr: '' }, '/r').summary, 'Valid.');

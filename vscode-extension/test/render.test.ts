@@ -188,8 +188,8 @@ test('button audit: each view shows its actions only when they apply, with at mo
   assert.ok(!ready.includes('data-cli="sync"'), 'synced: no Sync');
   assert.equal(primaries(ready), 1);
   const unsynced = renderPage({ ...data, dashboard: { sync: { ok: false, problems: ['x'], warnings: [] } } }, 'N', 'x');
-  assert.match(markup(unsynced), /class="btn cli primary" data-cli="sync"/);
-  assert.match(markup(unsynced), /class="btn cli" disabled title="Sync first/);
+  assert.match(markup(unsynced), /class="btn cli primary" data-cli="archive"/, 'not synced: Archive merges, so it is still the next step');
+  assert.match(markup(unsynced), /class="btn cli" data-cli="sync"/);
   assert.equal(primaries(unsynced), 1);
   const demo = markup(await page({ page: 'change', root, name: 'demo' }));
   assert.ok(!demo.includes('data-cli="sync"') && !demo.includes('data-cli="archive"'), 'open tasks: no Sync or Archive yet');

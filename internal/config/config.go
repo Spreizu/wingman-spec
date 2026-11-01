@@ -32,6 +32,7 @@ type Config struct {
 	AnchorFit       string              `yaml:"anchor_fit" json:"anchor_fit"`
 	AnchorMax       int                 `yaml:"anchor_max" json:"anchor_max"`
 	AnchorMany      []string            `yaml:"anchor_many" json:"anchor_many,omitempty"`
+	TestFiles       []string            `yaml:"test_files" json:"test_files,omitempty"`
 	TestEvidence    string              `yaml:"test_evidence" json:"test_evidence"`
 	AnchorStale     string              `yaml:"anchor_stale" json:"anchor_stale"`
 	Parallel        int                 `yaml:"parallel" json:"parallel"`
@@ -56,6 +57,7 @@ type Commands struct {
 	TestOne    string `yaml:"test_one" json:"test_one,omitempty"`
 	TestRun    string `yaml:"test_run" json:"test_run,omitempty"`
 	CheckLevel string `yaml:"check_level" json:"check_level,omitempty"`
+	JUnit      string `yaml:"junit" json:"junit,omitempty"`
 }
 
 // Visual is the `visual:` section. `visual: off` sets Off.
@@ -181,7 +183,7 @@ func parse(file string, b []byte) (layer, error) {
 var known = map[string]bool{
 	"context": true, "language": true, "commands": true, "traceability": true, "anchor_placement": true,
 	"anchor_guard": true, "anchor_fit": true, "anchor_max": true, "anchor_many": true, "test_evidence": true,
-	"anchor_stale": true, "parallel": true, "visual": true, "rules": true, "specs": true, "specs_remote": true, "repos": true,
+	"anchor_stale": true, "test_files": true, "parallel": true, "visual": true, "rules": true, "specs": true, "specs_remote": true, "repos": true,
 }
 
 var enums = map[string][]string{
@@ -254,6 +256,8 @@ func (c *Config) applyScalar(k string, n *yaml.Node) error {
 		return positive(n, &c.Parallel)
 	case "anchor_many":
 		return n.Decode(&c.AnchorMany)
+	case "test_files":
+		return n.Decode(&c.TestFiles)
 	case "rules":
 		return strict(n, &c.Rules)
 	case "specs":
@@ -290,7 +294,7 @@ var checkLevels = []string{"targeted", "group", "task", "finish"}
 
 func (c *Config) applyCommands(file string, n *yaml.Node) error {
 	if n.Kind != yaml.MappingNode {
-		return errors.New("write a map: test, typecheck, lint, targeted, test_one, test_run, check_level")
+		return errors.New("write a map: test, typecheck, lint, targeted, test_one, test_run, check_level, junit")
 	}
 	var cmds Commands
 	if err := strict(n, &cmds); err != nil {
@@ -315,6 +319,7 @@ func (c *Config) applyCommands(file string, n *yaml.Node) error {
 		return fmt.Errorf("commands.check_level %q is not one of %s", cmds.CheckLevel, strings.Join(checkLevels, ", "))
 	}
 	set("check_level", &c.Commands.CheckLevel, cmds.CheckLevel)
+	set("junit", &c.Commands.JUnit, cmds.JUnit)
 	return nil
 }
 

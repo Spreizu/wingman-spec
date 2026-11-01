@@ -3,6 +3,7 @@ package quality
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -90,5 +91,47 @@ func TestSourceTextFindings(t *testing.T) {
 		case tc.want != "" && (len(got) == 0 || !strings.Contains(got[0].Text, tc.want)):
 			t.Errorf("%s: want %q, got %+v", tc.name, tc.want, got)
 		}
+	}
+}
+
+// A visual scenario with a non-default state needs design.md ## Testing approach (error), naming the scenario (warning).
+func TestReachLint(t *testing.T) {
+	dir := t.TempDir()
+	vm := map[string]VisualScenario{
+		"cart/empty":  {States: []VisualState{{Name: "empty"}}},
+		"cart/plain":  {States: []VisualState{{Name: "default"}}},
+		"cart/loaded": {States: []VisualState{{Name: "many items"}}},
+	}
+	if fs := ReachLint(dir, vm); fs != nil {
+		t.Errorf("no design.md (fast path): want nothing, got %v", fs)
+	}
+	write(t, filepath.Join(dir, "design.md"), "## Decisions\nOne.\n")
+	if fs := ReachLint(dir, vm); errorsOf(fs) != 1 || !strings.Contains(fs[0].Text, "cart/empty, cart/loaded") || strings.HasPrefix(fs[0].Text, "design.md") {
+		t.Errorf("no Testing approach: want one error naming both scenarios, got %v", fs)
+	}
+	write(t, filepath.Join(dir, "design.md"), "## Decisions\nOne.\n\n## Testing approach\nThe empty cart comes from the seed route.\n")
+	fs := ReachLint(dir, vm)
+	if len(fs) != 1 || fs[0].Severity != "warning" || fs[0].Line != 4 || !strings.Contains(fs[0].Text, "cart/loaded") {
+		t.Errorf("want one warning for cart/loaded at line 4, got %v", fs)
+	}
+	if fs := ReachLint(dir, map[string]VisualScenario{"cart/plain": vm["cart/plain"]}); fs != nil {
+		t.Errorf("only default states: want nothing, got %v", fs)
+	}
+}
+
+// test_files globs add files the built-in detection misses (** matches no directory too); a !glob drops files.
+func TestListTestFilesGlobs(t *testing.T) {
+	dir := t.TempDir()
+	for _, f := range []string{"src/a.test.js", "checks/flow.js", "checks/deep/more.js", "src/a.js", "tests/fixture/data.js", "e2e1.js"} {
+		write(t, filepath.Join(dir, f), "x\n")
+	}
+	got := ListTestFiles(dir, []string{"checks/**/*.js", "e2e?.js", "!tests/fixture/**"})
+	slices.Sort(got)
+	want := []string{"checks/deep/more.js", "checks/flow.js", "e2e1.js", "src/a.test.js"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got := ListTestFiles(dir, nil); !slices.Contains(got, "tests/fixture/data.js") || slices.Contains(got, "checks/flow.js") {
+		t.Errorf("without globs: the built-in detection only, got %v", got)
 	}
 }

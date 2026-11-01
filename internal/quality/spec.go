@@ -804,3 +804,43 @@ func AriaLabelFindings(abs, rel string) []AriaFinding {
 	}
 	return out
 }
+
+var testingSection = regexp.MustCompile(`(?i)^testing approach\b`)
+
+// ReachLint checks the full path (design.md exists): a change whose visual scenarios have states needs a **Testing
+// approach** section in design.md (error), and that section names each such scenario (its id or slug) with how its
+// states are reached (warning).
+func ReachLint(changeDir string, vm map[string]VisualScenario) []Finding {
+	design, ok := readIf(filepath.Join(changeDir, "design.md"))
+	if !ok {
+		return nil
+	}
+	var need []string
+	for id, s := range vm {
+		if slices.ContainsFunc(s.States, func(st VisualState) bool { return !strings.EqualFold(st.Name, "default") }) {
+			need = append(need, id)
+		}
+	}
+	if len(need) == 0 {
+		return nil
+	}
+	slices.Sort(need)
+	sec := strings.ToLower(Section(StripComments(design), testingSection))
+	if strings.TrimSpace(sec) == "" {
+		return []Finding{{File: "design.md", Line: 1, Severity: "error", Kind: "visual-reach", Text: fmt.Sprintf("no ## Testing approach: say how each visual state is reached (role, seed data or route) for %s", strings.Join(need, ", "))}}
+	}
+	line := 1
+	for i, l := range strings.Split(design, "\n") {
+		if h2RE.MatchString(l) && testingSection.MatchString(strings.TrimSpace(strings.TrimPrefix(l, "##"))) {
+			line = i + 1
+		}
+	}
+	var out []Finding
+	for _, id := range need {
+		_, slug, _ := strings.Cut(id, "/")
+		if !strings.Contains(sec, strings.ToLower(id)) && !strings.Contains(sec, slug) && !strings.Contains(sec, strings.ReplaceAll(slug, "-", " ")) {
+			out = append(out, Finding{File: "design.md", Line: line, Severity: "warning", Kind: "visual-reach", Text: fmt.Sprintf("## Testing approach does not name visual scenario %s: say how its states are reached (role, seed data, route, or that the live app shows them)", id)})
+		}
+	}
+	return out
+}

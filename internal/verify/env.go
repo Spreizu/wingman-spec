@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Spreizu/wingman-spec/internal/quality"
+
 	"github.com/Spreizu/wingman-spec/internal/change"
 	"github.com/Spreizu/wingman-spec/internal/config"
 	"github.com/Spreizu/wingman-spec/internal/gitx"
@@ -487,3 +489,6 @@ func filesOf(details []string) []string {
 	}
 	return out
 }
+
+// testFiles lists the code root's test files (the built-in forms plus the config's `test_files:`).
+func (e *Env) testFiles() []string { return quality.ListTestFiles(e.code, e.Cfg.TestFiles) }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -82,7 +83,8 @@ func (e *Env) runCmd(cmd, dir string, limit int, label string) Result {
 	defer cancel()
 	c := exec.Command("sh", "-c", cmd)
 	c.Dir = dir
-	c.Env = os.Environ()
+	// PWDEBUG makes Playwright open a headed browser with the inspector and wait: checks stay headless
+	c.Env = slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "PWDEBUG=") })
 	setGroup(c)
 	var out capture
 	c.Stdout, c.Stderr = &out, &out

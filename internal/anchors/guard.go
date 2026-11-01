@@ -325,12 +325,17 @@ func InFiles(patterns []string, f string) bool {
 	return false
 }
 
-// GlobRE compiles a * / ** path glob.
+// GlobRE compiles a `*` / `**` / `?` path glob (`**/` also matches no directory).
 func GlobRE(p string) *regexp.Regexp {
 	var b strings.Builder
 	b.WriteString("^")
 	for i := 0; i < len(p); i++ {
 		switch {
+		case strings.HasPrefix(p[i:], "**/"):
+			b.WriteString("(?:.*/)?")
+			i += 2
+		case p[i] == '?':
+			b.WriteString("[^/]")
 		case strings.HasPrefix(p[i:], "**"):
 			b.WriteString(".*")
 			i++

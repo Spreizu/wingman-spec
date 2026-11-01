@@ -197,7 +197,7 @@ func (e *Env) targetedTests(changeDir string, st *State, testCmd string) targete
 	if tpl == "" {
 		return targeted{why: why}
 	}
-	all := quality.ListTestFiles(e.code)
+	all := e.testFiles()
 	changed := e.changedTestFiles(e.changeBase())
 	if st.lane != nil { // in a wave: only this task's tests; the other tasks' tests may be half-written
 		mine := filesOf(st.Task.Details)
@@ -622,7 +622,7 @@ func (e *Env) qualityChecks(changeDir string, st *State) outcome {
 	}
 	if slices.ContainsFunc(st.members(), func(m Member) bool { return specLineOf(m) != "" }) {
 		scens := quality.SpecScenarios(filepath.Join(changeDir, "specs"))
-		res := quality.Trace(scens, quality.TraceTags(quality.ListTestFiles(e.code), e.code), !e.Cfg.Visual.Off)
+		res := quality.Trace(scens, quality.TraceTags(e.testFiles(), e.code), !e.Cfg.Visual.Off)
 		refs := specRefsOf(st, scens)
 		missing := map[string]bool{}
 		for _, s := range res.Missing {
@@ -976,7 +976,7 @@ func (e *Env) runChecks(changeDir, run string, st *State, tinfo CmdInfo, o *outc
 		}
 		o.check(x)
 		if r.RC != 0 {
-			text := failText(c.name, r) + "\n" + r.Tail
+			text := e.failReport(c.name, r, tailMax)
 			if st.lane != nil && c.name != "done_when" && !e.blameWave(st, text, o) {
 				continue // the failure names only files of tasks that passed earlier in the wave: they are reopened
 			}

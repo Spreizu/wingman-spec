@@ -7,7 +7,7 @@ import (
 )
 
 // Synced reports what of a delta the living spec does not show yet: an ADDED or MODIFIED block that differs, a
-// REMOVED requirement still present, a RENAMED one under its old name. No problems means the delta is merged.
+// REMOVED requirement still present, a RENAMED one under its old name or missing under its new one. No problems means the delta is merged.
 func Synced(living string, d *Delta) []Problem {
 	if strings.TrimSpace(living) == "" {
 		if d.Empty() {
@@ -39,7 +39,8 @@ func Synced(living string, d *Delta) []Problem {
 		}
 	}
 	for _, rn := range d.Renamed {
-		if _, ok := find(rn.From); ok {
+		_, old := find(rn.From)
+		if _, renamed := find(rn.To); old || !renamed {
 			probs = append(probs, Problem{rn.Line, fmt.Sprintf("not merged: %q is not renamed to %q yet", rn.From, rn.To)})
 		}
 	}

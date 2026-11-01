@@ -61,6 +61,10 @@ expect "an unchanged plan records no new decision" '$V finish demo >/dev/null 2>
 # parallel appends (8 writer processes x 200 events = 1600 whole lines): go test ./internal/timeline -run TestParallelAppends
 
 echo "== archive keeps the timeline"
+# archive needs a passing finish on this tree: approve the Why, tag the tests, reset the spent attempts
+printf '\nOwner approval: the owner, 2026-10-25\n' >> "$C/proposal.md"
+mkdir -p test; printf 'test("[demo/greet] greets", () => {});\ntest("[demo/greet-by-name] greets by name", () => {});\n' > test/demo.test.js
+rm -f .wingman-spec/runs/demo/finish.json; $V finish demo >/dev/null 2>&1
 $V sync demo >/dev/null 2>&1
 expect "sync is recorded" 'tail -1 "$TLF" | grep -q "\"event\":\"sync\",.*\"ok\":true"'
 git add -A >/dev/null; git commit -qm built >/dev/null

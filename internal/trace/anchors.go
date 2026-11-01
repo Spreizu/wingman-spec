@@ -169,7 +169,7 @@ type Facts struct {
 // AnchorFacts matches the markers and test tags of the code root against reqs.
 func (c Ctx) AnchorFacts(reqs *Reqs) Facts {
 	f := Facts{Requirements: map[string]*ReqAnchors{}, Markers: c.ScanAnchors(nil)}
-	f.Tags = quality.TraceTags(quality.ListTestFiles(c.R.Code), c.R.Code)
+	f.Tags = quality.TraceTags(quality.ListTestFiles(c.R.Code, c.Cfg.TestFiles), c.R.Code)
 	sc := scenarioIndex(reqs)
 	for _, k := range reqs.keys {
 		f.Requirements[k] = &ReqAnchors{Code: map[string]bool{}, Tests: map[string]bool{}, Why: reqs.m[k].WhyText()}

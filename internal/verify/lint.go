@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Spreizu/wingman-spec/internal/change"
 	"github.com/Spreizu/wingman-spec/internal/quality"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
 	"github.com/Spreizu/wingman-spec/internal/trace"
@@ -232,7 +233,7 @@ func (e *Env) planProblems(changeDir string) []quality.Finding {
 	if err != nil {
 		return out
 	}
-	opts := quality.PlanOpts{}
+	opts := quality.PlanOpts{Files: trace.Mode(e.Cfg)}
 	if p := filepath.Join(changeDir, "proposal.md"); exists(p) {
 		opts.Size = quality.ReadProposalSize(readText(p)).Size
 		if opts.Size != "" {
@@ -364,17 +365,35 @@ func (e *Env) planReport(changeDir string, vl vlint) planRep {
 			p.File = filepath.Join(changeDir, p.File)
 		}
 	}
-	ux := pf(append(quality.UXLint(changeDir, vids), quality.VisualGapLint(changeDir, ui)...), inChange)
+	ux := pf(slices.Concat(quality.UXLint(changeDir, vids), quality.VisualGapLint(changeDir, ui), quality.ReachLint(changeDir, vm)), inChange)
+	val := e.validateFindings()
 	var plan []PlanFinding
 	if trace.IsSpecOnly(changeDir) {
-		plan = slices.Concat(pf(nr.Problems, nil), inv, purpose, ux)
+		plan = slices.Concat(val, pf(nr.Problems, nil), inv, purpose, ux)
 	} else {
-		plan = slices.Concat(pf(sz.Problems, nil), pf(nr.Problems, nil), pf(e.planProblems(changeDir), nil), inv, pf(edgeProbs, inChange), purpose, ux, pf(sliceProblems(changeDir), nil))
+		plan = slices.Concat(val, pf(sz.Problems, nil), pf(nr.Problems, nil), pf(e.planProblems(changeDir), nil), inv, pf(edgeProbs, inChange), purpose, ux, pf(sliceProblems(changeDir), nil))
 	}
 	for i := range plan {
 		plan[i].File = e.findingFile(changeDir, plan[i].File)
 	}
 	return planRep{sz, edgeItems, nr, list(plan)}
+}
+
+// validateFindings are `validate <change>` as plan findings (it also records the change's spec base).
+func (e *Env) validateFindings() []PlanFinding {
+	rep, err := change.Validate(e.R, e.O.Change)
+	if err != nil {
+		return []PlanFinding{{Severity: "error", Kind: "validate", Text: err.Error()}}
+	}
+	var out []PlanFinding
+	for _, i := range rep.Issues {
+		f := i.File
+		if !filepath.IsAbs(f) {
+			f = filepath.Join(e.R.Code, f)
+		}
+		out = append(out, PlanFinding{File: f, Line: i.Line, Severity: string(i.Level), Kind: "validate", Text: i.String()})
+	}
+	return out
 }
 
 // findingFile is the file of a lint finding as every lint output shows it: relative to the code root, with forward
@@ -407,6 +426,28 @@ func (e *Env) Lint() error {
 	if err != nil {
 		return err
 	}
+	x, ok, located := e.lint(changeDir)
+	if e.O.Text {
+		for _, l := range located {
+			fmt.Fprintln(e.Out, l)
+		}
+		verdict := "FAILED"
+		if ok {
+			verdict = "ok"
+		}
+		fmt.Fprintf(e.Out, "lint %s: %s\n", e.O.Change, verdict)
+	} else {
+		e.print(x)
+	}
+	if ok {
+		return nil
+	}
+	return quit(Fail)
+}
+
+// lint is the planning lint of a change: its JSON, whether it passes, and every finding as one located line
+// ("file:line: severity: text", errors first).
+func (e *Env) lint(changeDir string) (*Obj, bool, []string) {
 	files := []string{tasksFile(changeDir)}
 	bad := e.lintReport(files)
 	vl := e.visualLint(changeDir)
@@ -439,13 +480,47 @@ func (e *Env) Lint() error {
 	for _, x := range pr.edge {
 		edge = append(edge, O("text", x.Text, "scenarios", list(x.IDs)))
 	}
-	e.print(O("ok", ok, "traceability", pr.why.mode, "why_owner_approval", approvals,
-		"size", O("declared", orNil(sz.Declared), "required", orNil(sz.Required), "task_cap", capOf(size)),
-		"edge_cases", edge, "problems", bad, "visual", list(vl.problems), "visual_scenarios", ids(vl.scenarios), "plan", pr.plan, "config", config))
-	if ok {
-		return nil
+	var located [3][]string // error, warning, info
+	at := func(sev, file string, line int, text string) {
+		loc := file
+		if line > 0 {
+			loc = fmt.Sprintf("%s:%d", file, line)
+		}
+		// most texts already start with a short file:line; drop it for the full one
+		if i := strings.Index(text, ": "); i > 0 && strings.Contains(text[:i], ":") && !strings.Contains(text[:i], " ") {
+			text = text[i+2:]
+		}
+		if loc != "" {
+			loc += ": "
+		}
+		k := map[string]int{"error": 0, "warning": 1}[sev]
+		if sev != "error" && sev != "warning" {
+			k = 2
+		}
+		located[k] = append(located[k], loc+sev+": "+text)
 	}
-	return quit(Fail)
+	for _, a := range bad {
+		at("error", a.File, a.Line, a.Kind+" checkbox: "+a.Text)
+	}
+	for _, c := range config {
+		at("error", "wingman-spec.yaml", 0, c)
+	}
+	for _, v := range vl.problems {
+		f, _ := v["file"].(string)
+		t, _ := v["text"].(string)
+		line, _ := v["line"].(int)
+		if n, ok := v["line"].(float64); ok {
+			line = int(n)
+		}
+		at(v.severity(), f, line, t)
+	}
+	for _, p := range pr.plan {
+		at(p.Severity, p.File, p.Line, p.Text)
+	}
+	x := O("ok", ok, "traceability", pr.why.mode, "why_owner_approval", approvals,
+		"size", O("declared", orNil(sz.Declared), "required", orNil(sz.Required), "task_cap", capOf(size)),
+		"edge_cases", edge, "problems", bad, "visual", list(vl.problems), "visual_scenarios", ids(vl.scenarios), "plan", pr.plan, "config", config)
+	return x, ok, slices.Concat(located[0], located[1], located[2])
 }
 
 // Size compares the declared size with what the change needs.

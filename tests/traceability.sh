@@ -28,7 +28,7 @@ for h in .cursor/commands .claude/commands .agents/skills; do
   f="$h/spec-garden.md"; [ "$h" = .agents/skills ] && f=".agents/skills/spec-garden/SKILL.md"
   expect "spec-garden is installed for $h" 'grep -q "drift decide" "$f"'
   f="$h/spec-archive.md"; [ "$h" = .agents/skills ] && f=".agents/skills/spec-archive/SKILL.md"
-  expect "spec-archive runs /spec-sync first and archives through the CLI ($h)" 'grep -q "Always sync first" "$f" && grep -q "wingman-spec archive" "$f"'
+  expect "spec-archive archives through the CLI, which gates and syncs ($h)" 'grep -q "wingman-spec archive" "$f" && ! grep -q "Always sync first" "$f"'
 done
 
 mk() { # mk <spec requirement block(s)>: writes change todo
@@ -118,33 +118,40 @@ expect "finish fails a requirement without a code anchor (exit 1)" '[ $rc = 1 ] 
 rm -rf .wingman-spec/runs
 printf '// @spec todo/add-a-todo\nexports.add = () => 0;\n' > src/todo.js
 rc=0; $V finish todo > "$T/f.json" 2>/dev/null || rc=$?
-expect "finish passes with anchors and tells the user to run /spec-archive (it syncs first), not to sync by hand" '[ $rc = 0 ] && [ "$(J "$T/f.json" result)" = finished ] && grep -q "Run /spec-archive todo; it syncs first" "$T/f.json" && ! grep -qi "mandatory" "$T/f.json"'
+expect "finish passes with anchors and tells the user to run /spec-archive (the gate re-checks, then it syncs), not to sync by hand" '[ $rc = 0 ] && [ "$(J "$T/f.json" result)" = finished ] && grep -q "Run /spec-archive todo; the archive gate checks this finish still holds" "$T/f.json" && ! grep -qi "mandatory" "$T/f.json"'
 printf '// @spec todo/ghost\n' > src/g.js; rm -rf .wingman-spec/runs
 rc=0; $V finish todo > "$T/f.json" 2>/dev/null || rc=$?
 expect "finish fails an unresolved marker" '[ $rc = 1 ]'
 rm -f src/g.js; rm -rf .wingman-spec/runs
 
-echo "== sync before archive"
+echo "== the archive gate"
 rc=0; $V archive todo > "$T/ar.json" 2> "$T/ar.err" || rc=$?
-expect "archive refuses an unsynced change (exit 1, NOT SYNCED) and leaves it in place" '[ $rc = 1 ] && grep -q "NOT SYNCED" "$T/ar.err" && [ -d "$C" ]'
+expect "archive refuses without a passing finish (exit 1), lists each failed condition and writes nothing" '[ $rc = 1 ] && grep -q "finish: finish has not passed" "$T/ar.err" && [ -d "$C" ] && [ ! -e .wingman-spec/specs/todo.md ]'
+expect "the refusal is JSON with every gate check" '[ "$(J "$T/ar.json" result)" = refused ] && for k in blocked tasks findings finish lint merge; do grep -q "\"check\": \"$k\"" "$T/ar.json" || exit 1; done'
 WINGMAN_SPEC_TRACEABILITY=off $V archive todo >/dev/null 2>"$T/ar.err"; rc=$?
-expect "the refusal also holds with traceability off (specs are not merged)" '[ $rc = 1 ] && [ -d "$C" ]'
+expect "the refusal also holds with traceability off" '[ $rc = 1 ] && [ -d "$C" ]'
+mkdir -p "$C/adrs"; printf 'No decision here.\n' > "$C/adrs/none.md"; printf -- '---\ntitle: Skip\nstatus: None\ndate: 2026-10-25\n---\nNothing.\n' > "$C/adrs/skip.md"
+$V finish todo > "$T/f.json" 2>/dev/null; rc=$?
+expect "finish passes again (it records the tree it checked)" '[ $rc = 0 ] && grep -q "\"gate\"" .wingman-spec/runs/todo/finished.json'
+printf '// edited after finish\n' >> src/todo.js
+rc=0; $V archive todo > "$T/ar.json" 2> "$T/ar.err" || rc=$?
+expect "a code edit after finish refuses the archive: finish must hold on this tree" '[ $rc = 1 ] && grep -q "changed since finish passed" "$T/ar.err" && [ -d "$C" ]'
+sed -i '$d' src/todo.js
+printf -- '---\ntitle: Use a list\nstatus: Accepted\ndate: 2026-10-25\nchange: todo\n---\nWe keep an array.\n' > "$C/adrs/use-a-list.md"
+rc=0; $V archive todo > "$T/ar.json" 2> "$T/ar.err" || rc=$?
+expect "an ADR added after finish changes the plan: archive refuses until finish runs again" '[ $rc = 1 ] && grep -q "changed since finish passed" "$T/ar.err" && [ ! -d .wingman-spec/adrs ]'
+rm "$C/adrs/use-a-list.md"
 mkdir -p .wingman-spec/specs; sed 's/^## ADDED/## Requirements/' "$C/specs/todo.md" > .wingman-spec/specs/todo.md
 cp .wingman-spec/specs/todo.md "$T/merged.md"
 rc=0; $V sync todo --check > "$T/sc.json" || rc=$?
-expect "specs merged and nothing else to do: sync --check says synced" '[ $rc = 0 ]'
-expect "sync --check is read-only: synced, and it writes no file" '[ "$(J "$T/sc.json" synced)" = true ] && cmp -s "$T/merged.md" .wingman-spec/specs/todo.md && [ -z "$(git status --porcelain -- . ":!.wingman-spec/specs/todo.md" ":!.wingman-spec/changes" ":!src" ":!test")" ]'
+expect "the living spec already says what the delta adds: sync --check reports it synced" '[ $rc = 0 ] && ! grep -q "specs/todo.md" "$T/sc.json"'
+expect "sync --check is read-only: it writes no file" 'cmp -s "$T/merged.md" .wingman-spec/specs/todo.md && [ ! -d .wingman-spec/adrs ]'
 expect "the merged living specs still validate and keep the Why line" '$WS validate --specs >/dev/null 2>&1 && grep -q "^Why: A person wants" .wingman-spec/specs/todo.md'
 rc=0; $V intents todo >/dev/null 2>&1 || rc=$?
 expect "there is no intents command any more (exit 2)" '[ $rc = 2 ]'
-mkdir -p "$C/adrs"; printf -- '---\ntitle: Use a list\nstatus: Accepted\ndate: 2026-10-25\nchange: todo\n---\nWe keep an array.\n' > "$C/adrs/use-a-list.md"
-printf 'No decision here.\n' > "$C/adrs/none.md"; printf -- '---\ntitle: Skip\nstatus: None\ndate: 2026-10-25\n---\nNothing.\n' > "$C/adrs/skip.md"
 rc=0; $V archive todo > "$T/ar.json" 2> "$T/ar.err" || rc=$?
-expect "archive refuses while an ADR is not promoted" '[ $rc = 1 ] && grep -q "NOT PROMOTED" "$T/ar.err" && [ -d "$C" ]'
-expect "a none record is never counted: by file name (none.md) or by status (None), only the real ADR is named" '[ $(grep -c "NOT PROMOTED" "$T/ar.err") = 1 ] && grep -q "use-a-list.md: NOT PROMOTED" "$T/ar.err" && ! grep -q "none.md\|skip.md" "$T/ar.err"'
-mkdir -p .wingman-spec/adrs; printf -- '---\ntitle: Use a list\nstatus: Accepted\ndate: 2026-10-25\nchange: todo\nsource: todo/use-a-list\n---\nWe keep an array.\n' >  .wingman-spec/adrs/0001-use-a-list.md
-rc=0; $V archive todo > "$T/ar.json" 2> "$T/ar.err" || rc=$?
-expect "archive succeeds once synced, through the CLI" '[ $rc = 0 ] && [ "$(J "$T/ar.json" result)" = archived ] && [ ! -d "$C" ] && ls .wingman-spec/archive | grep -q todo'
+expect "archive passes the gate, merges (the spec is unchanged) and archives in one step" '[ $rc = 0 ] && [ "$(J "$T/ar.json" result)" = archived ] && [ ! -d "$C" ] && ls .wingman-spec/archive | grep -q todo && cmp -s "$T/merged.md" .wingman-spec/specs/todo.md'
+expect "a none record is never promoted: by file name (none.md) or by status (None)" '[ ! -d .wingman-spec/adrs ] || [ -z "$(ls .wingman-spec/adrs)" ]'
 git add -A; git commit -qm synced
 rc=0; $V drift > "$T/d.json" || rc=$?
 expect "after a proper sync + archive the drift report is clean (exit 0)" '[ $rc = 0 ] && [ "$(J "$T/d.json" ok)" = true ]'

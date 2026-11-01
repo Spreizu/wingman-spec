@@ -21,7 +21,7 @@ flowchart LR
 1. **Propose.** `/spec-propose <change>` writes the proposal, specs with scenarios, design, ADRs and a test-first task plan, then validates them.
 2. **Apply.** `/spec-apply <change>` hands each task (or each group, or a wave of up to 3 independent tasks) to a fresh subagent. `wingman-spec check` accepts a task only when its tests pass and only its box changed; UI tasks also get a browser check.
 3. **Finish.** `wingman-spec finish` runs the full test suite and every declared scenario once more, and lists what blocks the archive.
-4. **Archive.** `/spec-archive` merges the delta specs into the living specs, promotes the ADRs (`wingman-spec sync`) and archives the change.
+4. **Archive.** `/spec-archive` merges the delta specs into the living specs, promotes the ADRs and archives the change, once `wingman-spec archive`'s gate passes.
 
 `@spec` markers in code and tests anchor each requirement. `wingman-spec drift` lists requirements without code or tests and code that changed without its requirement.
 

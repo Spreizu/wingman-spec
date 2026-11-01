@@ -1,8 +1,8 @@
 ---
-description: "Archive a finished wingman-spec change: sync its specs and ADRs, then archive through the CLI."
+description: "Archive a finished wingman-spec change through the CLI: it gates, merges the specs and ADRs, then archives."
 argument-hint: "<change>"
 ---
-Archive a finished change. It always syncs first, so ADR promotion and the spec merge cannot be skipped.
+Archive a finished change with one command; the CLI checks that it is done, merges it and moves it.
 
 {{> specs-root}}
 
@@ -10,26 +10,21 @@ Archive a finished change. It always syncs first, so ADR promotion and the spec 
 
 ## Steps
 
-1. **Check the change is active.** `changes/<name>/` must exist in the specs root. If the name is already under `archive/`, say so and stop. If `BLOCKED.md` exists, show it and stop; run `/spec-fix` first.
+1. **Owner approval.** Run `.wingman-spec/bin/wingman-spec lint <name>`. If it lists `why_owner_approval` and the proposal has no `Owner approval:` line, stop and ask the owner. Never write that line yourself.
 
-2. **Check tasks.** If `tasks.md` still has a `- [ ]`, stop and tell the user to finish `/spec-apply` (or `/spec-fix`) first.
+2. **Archive.** Run `.wingman-spec/bin/wingman-spec archive <name>`. It refuses with exit 1, writes nothing and lists every failed check (`blocked`, `tasks`, `findings`, `finish`, `lint`, `merge`). Fix what it reports and run it again. An open task goes through `/spec-apply`, a stale finish through `wingman-spec finish <name>`, a merge conflict through `/spec-sync <name>`. Never move the folder by hand.
 
-3. **Always sync first.** Run the `/spec-sync <name>` steps inline, even when you think nothing changed: the merge is idempotent. If it reports a problem (a merge conflict, an ADR that cannot be promoted, a rewritten Why or a removed requirement without the owner's approval), stop and report it.
-
-4. **Archive.** Run `.wingman-spec/bin/wingman-spec archive <name>`. It re-checks that the change is finished and fully synced, refuses with exit 1 and the reasons if not, and moves the change to `archive/YYYY-MM-DD-HHMM-<name>/` with its timeline. If it refuses, fix what it lists through `/spec-sync`; never move the folder by hand.
-
-5. **Confirm.** `archive/<dated-name>/` exists and `changes/<name>/` is gone. Run `.wingman-spec/bin/wingman-spec drift --text` and mention any gap that belongs to this change.
+3. **Confirm.** Run `.wingman-spec/bin/wingman-spec drift --text` and mention any gap that belongs to this change.
 
 ## Summarize
 
 ```
 ## Archived: <name>
-Location: archive/<dated-name>/
-Sync: specs merged, ADRs promoted, just before archiving
+Location: <dir from the output>
+Merged: <the specs and ADRs from the output>
 Owner approval: <none | the requirements whose Why was rewritten or that were removed, with the approval line>
 ```
 
 **Guardrails**
-- Never edit `specs/` or `adrs/` by hand here; `wingman-spec sync` writes them.
-- Never archive when the sync reports a problem, and never move a change folder yourself.
+- Never edit `specs/` or `adrs/` by hand; the archive writes them.
 - Do not un-archive or invent a follow-up change here.

@@ -179,18 +179,38 @@ func (a *app) verifyCmds() []*cobra.Command {
 		})
 	appMap := a.vcmd("app-map <change>", "The two-line app map of a Size S change (--apply writes app-map.md)", one, 0, (*verify.Env).AppMap,
 		func(f *pflag.FlagSet, o *verify.Options) { f.BoolVar(&o.Apply, "apply", false, "write app-map.md") })
+	var only string
+	runChecks := a.vcmd("run-checks [<change>]", "Run lint, typecheck and test (and the change's visual check) in full; logs to files, a parsed summary", opt, fRun, func(e *verify.Env) error {
+		for s := range strings.SplitSeq(only, ",") {
+			if s = strings.TrimSpace(s); s != "" {
+				e.O.Select = append(e.O.Select, s)
+			}
+		}
+		return e.RunChecks()
+	}, func(f *pflag.FlagSet, o *verify.Options) {
+		f.BoolVar(&o.Text, "text", false, "the summary as text instead of JSON")
+		f.StringVar(&only, "only", "", "only these checks: lint,typecheck,test,visual")
+	})
 	return []*cobra.Command{
 		a.vcmd("next <change>", "Hand out the next task (or parallel batch) as a packet for one implementer subagent", one, run|fNext, (*verify.Env).Next),
 		a.vcmd("check <change>", "Verify the task in progress: done-when, tests, validate, visual, quality; tick it on pass", one, run|fCheck, (*verify.Env).Check),
 		a.vcmd("review <change>", "Record the visual reviewer's reply for the task in progress", one, run|fReview, (*verify.Env).Review),
 		a.vcmd("finish <change>", "Close-out once every task is ticked: full commands, validate, visual, trace, anchors, test evidence", one, run, (*verify.Env).Finish),
-		a.vcmd("lint <change>", "Planning lint of a change (no command runs)", one, run, (*verify.Env).Lint),
+		a.vcmd("lint <change>", "Validate the plan: proposal, delta specs, tasks, design (no command runs)", one, run, (*verify.Env).Lint,
+			func(f *pflag.FlagSet, o *verify.Options) {
+				f.BoolVar(&o.Text, "text", false, "one file:line finding per line instead of JSON")
+			}),
 		a.vcmd("size <change>", "Declared size against what the change needs", one, 0, (*verify.Env).Size),
 		appMap,
 		a.vcmd("visual <change>", "The implementer's visual self-check (the task in progress, or --scenario ids)", one, run|fVisual, (*verify.Env).Visual),
 		a.vcmd("doctor", "Check the setup: test command, visual config, Playwright, Chromium, axe, roles, local credentials", cobra.NoArgs, run, (*verify.Env).Doctor),
 		a.vcmd("design-system", "What the project already has to build a design with (tokens, components, variants)", cobra.NoArgs, 0, (*verify.Env).DesignSystem),
 		anchors, drift, guard,
+		a.vcmd("trace [<change>]", "Link scenarios to tests: scenarios no test tags (the change's, or all living) and tags naming no scenario", opt, 0, (*verify.Env).Trace,
+			func(f *pflag.FlagSet, o *verify.Options) {
+				f.BoolVar(&o.Text, "text", false, "one file:line finding per line instead of JSON")
+			}),
+		runChecks,
 		a.vcmd("problems [<change>]", "Every finding as one located list, for editors (read-only)", opt, 0, (*verify.Env).Problems),
 	}
 }

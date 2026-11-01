@@ -171,11 +171,7 @@ func (e *Env) Finish() error {
 		}
 		o.check(x)
 		if r.RC != 0 {
-			t := r.Tail
-			if len(t) > 1500 {
-				t = t[len(t)-1500:]
-			}
-			o.fail(failText(j.name, r) + "\n" + t)
+			o.fail(e.failReport(j.name, r, 1500))
 		}
 	}
 	switch {
@@ -193,7 +189,7 @@ func (e *Env) Finish() error {
 	tq0 := time.Now()
 	scens := quality.SpecScenarios(filepath.Join(changeDir, "specs"))
 	res := runstate.Timed("scan: traceability", func() quality.TraceResult {
-		return quality.Trace(scens, quality.TraceTags(quality.ListTestFiles(e.code), e.code), !e.Cfg.Visual.Off)
+		return quality.Trace(scens, quality.TraceTags(e.testFiles(), e.code), !e.Cfg.Visual.Off)
 	})
 	var untested []string
 	for _, s := range res.Missing {
@@ -225,7 +221,7 @@ func (e *Env) Finish() error {
 	}
 	stFiles := touched
 	if stFiles == nil {
-		stFiles = quality.ListTestFiles(e.code)
+		stFiles = e.testFiles()
 	}
 	var bad, allowed []string
 	runstate.Timed("scan: source-text tests", func() bool { bad, allowed = e.sourceTextCheck(stFiles); return true })
@@ -296,7 +292,7 @@ func (e *Env) Finish() error {
 		fp := runstate.Fingerprinted(e.code, true)
 		var rr runstate.Run
 		runstate.ReadJSON(filepath.Join(run, "run.json"), &rr)
-		rec := runstate.Record{At: runstate.Now(), Run: filepath.Base(run), Session: rr.Session, Head: fp.Head, Branch: fp.Branch, Tree: fp.Tree, Worktree: e.code}
+		rec := runstate.Record{At: runstate.Now(), Run: filepath.Base(run), Session: rr.Session, Head: fp.Head, Branch: fp.Branch, Tree: fp.Tree, Gate: runstate.GateTree(e.code), Worktree: e.code}
 		_ = runstate.WriteJSON(filepath.Join(base, "finished.json"), rec)
 		var appr any = Skip
 		var akeys []string
@@ -308,7 +304,7 @@ func (e *Env) Finish() error {
 			}
 			appr = xs
 		}
-		next := fmt.Sprintf("commit, then tell the user: Run /spec-archive %s; it syncs first (specs, ADRs) and stops if the sync finds a problem.", e.O.Change)
+		next := fmt.Sprintf("commit, then tell the user: Run /spec-archive %s; the archive gate checks this finish still holds, then syncs the specs and ADRs.", e.O.Change)
 		if len(akeys) > 0 {
 			next += " This change rewrites a Why or removes a requirement: the owner must approve it (" + strings.Join(akeys, ", ") + ")."
 		}

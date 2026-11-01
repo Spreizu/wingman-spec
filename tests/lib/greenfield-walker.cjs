@@ -40,7 +40,6 @@ const handlers = {
   'approve-understood': () => cli(['greenfield', 'approve', 'understood', '--by', 'Carl Client']),
   'propose-foundation': () => { copy('changes/foundation', 'changes/foundation'); fs.copyFileSync(path.join(fx, 'glossary.md'), P('glossary.md')); },
   'finish-foundation': () => { fs.copyFileSync(path.join(fx, 'glossary.md'), P('glossary.md')); },
-  'sync-foundation': () => cli(['sync', 'foundation']),
   'archive-foundation': () => cli(['archive', 'foundation']),
   'describe-sandbox': () => copy('greenfield/capabilities', 'greenfield/capabilities'),
   'propose-capability': (st) => {
@@ -48,7 +47,6 @@ const handlers = {
     if (sloppy && name === 'billing' && !sloppyDone.has(name)) { sloppyDone.add(name); const f = P(`changes/${name}/specs/${name}.md`); wr(f, rd(f).replace(/#### Scenario: Failure:[^\n]*\n(?:(?!#{3,4} )[^\n]*\n?)*/g, '')); }
   },
   'finish-capability': (st) => { const name = capOf(st); report.recovered_mistakes++; copy(`changes/${name}`, `changes/${name}`); },
-  'sync-capability': (st) => cli(['sync', capOf(st)]),
   'archive-capability': (st) => cli(['archive', capOf(st)]),
   'review-spec': () => { cli(['greenfield', 'review', 'spec', '--packet', '--out', `${S}/runs/greenfield/spec-packet.md`]); cli(['greenfield', 'review', 'spec', '--reply', path.join(fx, 'replies/spec.txt')]); },
   'signoff-spec': () => cli(['greenfield', 'approve', 'spec', '--by', 'Carl Client']),

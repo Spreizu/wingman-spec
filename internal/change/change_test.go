@@ -1,7 +1,6 @@
 package change
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -61,14 +60,8 @@ func TestLifecycle(t *testing.T) {
 	if len(ls) != 1 || ls[0].CompletedTasks != 1 || ls[0].TotalTasks != 2 || ls[0].Status != "in-progress" {
 		t.Errorf("list = %+v", ls)
 	}
-	_, err = Archive(r, "add-notes", time.Now())
-	if ref, ok := errors.AsType[*Refused](err); !ok || len(ref.Tasks) != 1 {
-		t.Fatalf("archive with an open task: %v", err)
-	}
-	put(t, filepath.Join(dir, "tasks.md"), "## 1. Notes\n\n- [x] 1.1 Save\n")
-	_, err = Archive(r, "add-notes", time.Now())
-	if ref, ok := errors.AsType[*Refused](err); !ok || len(ref.Problems) != 2 {
-		t.Fatalf("archive before sync: %v %+v", err, ref)
+	if probs, err := SyncCheck(r, "add-notes"); err != nil || len(probs) != 2 {
+		t.Fatalf("sync check before sync: %v %v", err, probs)
 	}
 	res, err := Sync(r, "add-notes", false)
 	if err != nil || len(res.Problems) > 0 || res.Capabilities[0].Action != "created" || res.ADRs[0].File != "0001-store.md" {

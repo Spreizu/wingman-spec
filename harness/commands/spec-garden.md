@@ -35,7 +35,7 @@ Spec gardening. Specs and code drift apart: a requirement nobody implemented, co
 
 3. **Decide per gap.** Recommend one outcome with your reason. The user confirms before anything is written.
    - **fix the code or the test (redo)**: the requirement is right; the code or test is missing or wrong. Fix it test-first: add tasks to a new change (`garden-<YYYY-MM-DD>`, or the open change that owns it) and run `/spec-apply`. For a one-line fix use `/spec-fix`. Nothing is recorded; the gap disappears once the anchors exist.
-   - **amend the requirement**: the requirement is wrong, obsolete or renamed. Change the living spec through a change `garden-<YYYY-MM-DD>` with MODIFIED/REMOVED/RENAMED deltas, keep the `Why:` lines valid, then `/spec-sync`. Never write `specs/` by hand. **An amendment that rewrites a requirement's Why or removes a requirement needs the owner's approval**: show the old and new wording, and add the `Owner approval:` line to the proposal only after they agree. Never remove a requirement on your own.
+   - **amend the requirement**: the requirement is wrong, obsolete or renamed. Change the living spec through a change `garden-<YYYY-MM-DD>` with MODIFIED/REMOVED/RENAMED deltas, keep the `Why:` lines valid, then `/spec-archive` it. Never write `specs/` by hand. **An amendment that rewrites a requirement's Why or removes a requirement needs the owner's approval**: show the old and new wording, and add the `Owner approval:` line to the proposal only after they agree. Never remove a requirement on your own.
    - **accept**: only for `unanchored-requirement`, `untested-requirement` and `stale-anchor`, when the difference is fine. Examples: legacy code that predates anchors, a requirement implemented elsewhere or intentionally unanchored, a changed unit whose requirement still holds.
    Every other gap is fixed or removed, never accepted:
    - `orphan-anchor`, `stale-test-tag`: retarget or delete the marker or tag.
@@ -49,7 +49,7 @@ Spec gardening. Specs and code drift apart: a requirement nobody implemented, co
    - A later change that MODIFIES the requirement drops the line; accept again if the gap is still real.
    - Accepting a `stale-anchor` writes the same line. Once committed, the requirement text is newer than the code until that unit changes again.
 
-5. **Realign and re-check.** For redo and amend gaps, create or extend the garden change with short `/spec-propose` style artifacts; it is a follow-up, not a new product. Run `/spec-apply`, then `/spec-sync` and `W drift` again. Report what is still open.
+5. **Realign and re-check.** For redo and amend gaps, create or extend the garden change with short `/spec-propose` style artifacts; it is a follow-up, not a new product. Run `/spec-apply`, then `/spec-archive` and `W drift` again. Report what is still open.
 
 ## Summarize
 
@@ -58,7 +58,7 @@ Spec gardening. Specs and code drift apart: a requirement nobody implemented, co
 - <gap-key>: accepted (<note>) | fixed in <change> | amended in <change>
 Mechanical (marker fixed): <n>
 Still open: <n>   Owner approval: <none | requirements>
-Next: <the /spec-apply or /spec-sync to run>
+Next: <the /spec-apply or /spec-archive to run>
 ```
 
 **Guardrails**

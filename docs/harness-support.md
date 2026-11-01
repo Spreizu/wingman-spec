@@ -104,8 +104,8 @@ itself is harness-independent: the main agent orchestrates, a subagent implement
 
 Everything is in the CLI (`anchors`, `drift`, `guard`, `sync`, `archive`) and in the generated
 command bodies, so Claude Code, Cursor and Codex get the same behaviour. `/spec-garden` is one more command rendered like the others
-(`.cursor/commands/`, `.claude/commands/`, `.agents/skills/spec-garden/`). `/spec-archive` syncs first and calls
-`wingman-spec archive` in all three, and the implementer subagent writes `@spec` comments in all three. Nothing about the layer needs a hook. Gaps:
+(`.cursor/commands/`, `.claude/commands/`, `.agents/skills/spec-garden/`). `/spec-archive` calls `wingman-spec archive`
+(gate, merge, move) in all three, and the implementer subagent writes `@spec` comments in all three. Nothing about the layer needs a hook. Gaps:
 - A change folder moved to `archive/` by hand is not stopped on any harness; drift reports it later (`unsynced-archive`).
 - The agent writes the owner-approval line after the owner agreed; the CLI cannot verify it.
 

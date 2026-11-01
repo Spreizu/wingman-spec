@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/Spreizu/wingman-spec/internal/gitx"
-	"github.com/Spreizu/wingman-spec/internal/quality"
 	"github.com/Spreizu/wingman-spec/internal/runstate"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
 	"github.com/Spreizu/wingman-spec/internal/testpaths"
@@ -74,7 +73,7 @@ func (e *Env) reviewProof(changeDir string, st *State, tinfo CmdInfo, o *outcome
 	}
 	var proven, untestable, tests []string
 	bySlug := map[string][]string{}
-	all := quality.ListTestFiles(e.code)
+	all := e.testFiles()
 	for _, f := range fixes {
 		if f.untestable != "" {
 			untestable = append(untestable, f.slug+": "+f.untestable)

@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Spreizu/wingman-spec/internal/anchors"
+
 	"github.com/Spreizu/wingman-spec/internal/spec"
 	"github.com/Spreizu/wingman-spec/internal/testpaths"
 )
@@ -37,7 +39,20 @@ func GitFiles(root string, args ...string) []string {
 
 // ListTestFiles lists the test files of the code repo (tracked and untracked, git-ignored skipped; without git a walk).
 // skip names top-level directories that hold no code (the specs folders of a specs repo).
-func ListTestFiles(root string, skip ...string) []string {
+//
+// globs is the config's `test_files:`: a path glob (`*`, `**`) adds the files it matches, `!glob` drops them.
+func ListTestFiles(root string, globs []string, skip ...string) []string {
+	var add, drop []*regexp.Regexp
+	for _, g := range globs {
+		if rest, ok := strings.CutPrefix(g, "!"); ok {
+			drop = append(drop, anchors.GlobRE(rest))
+		} else {
+			add = append(add, anchors.GlobRE(g))
+		}
+	}
+	match := func(res []*regexp.Regexp, f string) bool {
+		return slices.ContainsFunc(res, func(re *regexp.Regexp) bool { return re.MatchString(f) })
+	}
 	files := GitFiles(root, "ls-files", "-co", "--exclude-standard")
 	if files == nil {
 		_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -58,7 +73,7 @@ func ListTestFiles(root string, skip ...string) []string {
 	var out []string
 	for _, f := range files {
 		top, _, _ := strings.Cut(f, "/")
-		if top == "node_modules" || top == ".wingman-spec" || slices.Contains(skip, top) || strings.Contains("/"+f, "/node_modules/") || !testpaths.IsTestFile(f) {
+		if top == "node_modules" || top == ".wingman-spec" || slices.Contains(skip, top) || strings.Contains("/"+f, "/node_modules/") || !testpaths.IsTestFile(f) && !match(add, f) || match(drop, f) {
 			continue
 		}
 		if _, err := os.Stat(filepath.Join(root, f)); err == nil {

@@ -1,0 +1,5 @@
+--- FAIL: TestB (0.00s)
+    x_test.go:4: want 1 got 2
+FAIL
+FAIL	x	0.002s
+FAIL

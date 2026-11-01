@@ -1,0 +1,9 @@
+
+/work/app/src/lint.js
+  1:1  warning  Unexpected var, use let or const instead  no-var
+  1:5  error    'a' is assigned a value but never used    no-unused-vars
+  2:7  error    'b' is assigned a value but never used    no-unused-vars
+
+✖ 3 problems (2 errors, 1 warning)
+  0 errors and 1 warning potentially fixable with the `--fix` option.
+

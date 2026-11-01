@@ -135,7 +135,19 @@ func ForgetTrees() {
 }
 
 // NotCode is run state and the plan's ticks: they change between check and finish without touching code.
-var NotCode = regexp.MustCompile(`(^|/)\.wingman-spec/(runs|bin|cache|local)/|(^|/)changes/[^/]+/(tasks|progress)\.md$`)
+var NotCode = regexp.MustCompile(NotBase.String() + `|(^|/)\.wingman-spec/(runs|bin|cache|local)/|(^|/)changes/[^/]+/(tasks|progress)\.md$`)
+
+// NotBase is the merge base the CLI pins on a change's first lint (changes/<change>/spec-base.json): derived state that
+// no fingerprint counts.
+var NotBase = regexp.MustCompile(`(^|/)changes/[^/]+/spec-base\.json$`)
+
+// NotGate is NotCode plus what sync and lint write after finish (the living specs, ADRs, archived changes and a
+// change's spec-base.json): the archive gate compares the rest with what finish saw.
+var NotGate = regexp.MustCompile(NotCode.String() + `|(^|/)\.wingman-spec/(specs|adrs|archive)/`)
+
+// GateTree is the working-tree hash the archive gate compares with the one finish recorded ("" outside git). Untracked
+// files are hashed by content (WorkTree uses stat data), so committing after finish keeps the same hash.
+func GateTree(dir string) string { return IndexTree(dir, NotGate, "add", "-A") }
 
 // NotApp is NotCode plus tests and Markdown: what the pages are not built from (the visual cache key).
 var NotApp = regexp.MustCompile(NotCode.String() + `|(^|/)(tests?|__tests__|e2e|spec)/|\.(test|spec)\.[^/]+$|\.mdx?$`)
@@ -249,7 +261,7 @@ func Fingerprinted(dir string, withTree bool) Fingerprint {
 	b, _ := gitx.Run(dir, nil, "rev-parse", "--abbrev-ref", "HEAD")
 	fp := Fingerprint{Head: head, Branch: b}
 	if withTree {
-		fp.Tree = WorkTree(dir, nil)
+		fp.Tree = WorkTree(dir, NotBase)
 	}
 	return fp
 }
@@ -496,6 +508,7 @@ type Record struct {
 	Head      string `json:"head"`
 	Branch    string `json:"branch"`
 	Tree      string `json:"tree,omitempty"`
+	Gate      string `json:"gate,omitempty"` // GateTree when finish passed (finished.json)
 	Worktree  string `json:"worktree"`
 	FilesHash string `json:"files_hash,omitempty"`
 }

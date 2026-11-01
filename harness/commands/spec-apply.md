@@ -24,7 +24,7 @@ You do not implement tasks yourself (except when no subagent can run); you dispa
    - `3`: `BLOCKED.md`. Show it, suggest `/spec-fix`, stop.
    - `4`: the finish attempts are used up. Stop and report the failures.
 
-   Then tell the user: "Run `/spec-archive <change>`; it syncs the specs and ADRs and stops on a problem." Include the number of rejected attempts from the run's timeline.
+   Then tell the user: "Run `/spec-archive <change>`; it gates, merges the specs and ADRs, and stops on a problem." Include the number of rejected attempts from the run's timeline.
 
 **Per-task discipline** (carried by the `spec-implementer` subagent):
 - every implementation task: `test-driven-development`, then `ponytail` (full, YAGNI);

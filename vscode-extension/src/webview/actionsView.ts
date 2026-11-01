@@ -19,7 +19,7 @@ export function actionResult(r: ActionResult): string {
   const groups = new Map<string, ActionLine[]>();
   for (const l of r.lines) groups.set(l.requirement ?? '', [...(groups.get(l.requirement ?? '') ?? []), l]);
   const lists = [...groups].map(([req, ls]) => `${req ? `<div class="req">Requirement: ${esc(req)}</div>` : ''}<ul>${ls.map(line).join('')}</ul>`).join('');
-  const resolve = !r.ok && (r.action === 'sync' || r.action === 'archive') && r.change && r.lines.length ? `<div class="row" style="margin-top:8px">${agentButton(`/spec-sync ${r.change}`, 'Resolve with agent')}</div>` : '';
+  const resolve = !r.ok && (r.action === 'sync' || r.action === 'archive') && r.change && r.lines.length ? `<div class="row" style="margin-top:8px">${agentButton(`/spec-${r.action} ${r.change}`, 'Resolve with agent')}</div>` : '';
   return `<div class="result tone-${r.ok ? 'ok' : 'bad'}" role="status"><span class="${r.ok ? 'muted' : ''}">${esc(r.summary)}</span>${lists}${resolve}</div>`;
 }
 

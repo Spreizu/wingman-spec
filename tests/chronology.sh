@@ -30,13 +30,17 @@ People want a list.
 
 ## What Changes
 - A list.
+
+## Edge cases
+- none named
 MD
 printf '## Requirements\n\n### Requirement: Keep\nThe system SHALL keep a list.\nWhy: The owner wants it to work, so that people can rely on it.\n\n#### Scenario: Kept\n- **WHEN** x\n- **THEN** y\n' > .wingman-spec/specs/todo.md
 cp .wingman-spec/specs/todo.md .wingman-spec/changes/alpha/specs/todo.md; sed -i 's/^## Requirements/## ADDED/' .wingman-spec/changes/alpha/specs/todo.md
-printf '## 1. A\n\n- [x] 1.1 Done\n' > .wingman-spec/changes/alpha/tasks.md
+printf '## 1. A\n\n- [x] 1.1 Done\n  - Files: src/list.js\n' > .wingman-spec/changes/alpha/tasks.md
 mkdir -p src tests; printf '/**\n * Keeps the list.\n * @spec todo/keep\n */\nexport function keepList(items) {\n  return items.slice();\n}\n' > src/list.js
 printf 'import { test } from "node:test";\ntest("[todo/kept] kept", () => {});\n' > tests/list.test.js
 git add -A && git commit -qm init
+$V finish alpha >/dev/null 2>&1 # archive needs a passing finish on this tree
 before=$(date +%s)
 rc=0; $V archive alpha > "$T/ar.json" 2> "$T/ar.err" || rc=$?
 AD=$(ls -d .wingman-spec/archive/*-alpha 2>/dev/null | head -1)

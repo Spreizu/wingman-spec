@@ -38,7 +38,7 @@ func TestMerge(t *testing.T) {
 	if len(delta.Problems) > 0 {
 		t.Fatalf("delta problems: %v", delta.Problems)
 	}
-	got, err := Merge("demo", living, delta)
+	got, err := Merge("demo", living, delta, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestMergeConflicts(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := Merge("demo", living, ParseDelta(tt.delta))
+			_, err := Merge("demo", living, ParseDelta(tt.delta), nil)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("err = %v, want it to contain %q", err, tt.want)
 			}
@@ -100,17 +100,17 @@ func TestMergeConflicts(t *testing.T) {
 
 func TestMergeNewCapability(t *testing.T) {
 	d := ParseDelta("## Purpose\nLists items.\n\n## ADDED\n### Requirement: List\nThe system SHALL list.\n\n#### Scenario: one\n- **WHEN** a\n- **THEN** b\n")
-	got, err := Merge("items", "", d)
+	got, err := Merge("items", "", d, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(got, "# items\n\n## Purpose\nLists items.\n\n## Requirements\n\n### Requirement: List\n") {
 		t.Errorf("got:\n%s", got)
 	}
-	if got, err := Merge("items", "", ParseDelta("## ADDED\n### Requirement: L\nThe system SHALL l.\n")); err != nil || !strings.Contains(got, PurposePlaceholder) {
+	if got, err := Merge("items", "", ParseDelta("## ADDED\n### Requirement: L\nThe system SHALL l.\n"), nil); err != nil || !strings.Contains(got, PurposePlaceholder) {
 		t.Errorf("a new capability without ## Purpose: want the placeholder, got %v\n%s", err, got)
 	}
-	if _, err := Merge("items", "", ParseDelta("## MODIFIED\n### Requirement: L\nThe system SHALL l.\n")); err == nil {
+	if _, err := Merge("items", "", ParseDelta("## MODIFIED\n### Requirement: L\nThe system SHALL l.\n"), nil); err == nil {
 		t.Error("MODIFIED on a new capability merged")
 	}
 }
@@ -136,7 +136,7 @@ func TestSynced(t *testing.T) {
 	if p := Synced(living, d); len(p) != 2 {
 		t.Fatalf("before merge: %v", p)
 	}
-	merged, err := Merge("c", living, d)
+	merged, err := Merge("c", living, d, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

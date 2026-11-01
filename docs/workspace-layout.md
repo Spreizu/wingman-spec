@@ -13,6 +13,8 @@ keeps its specs next to the code in `.wingman-spec/` and needs nothing on this p
     wingman-spec.yaml             shared settings: context, rules, defaults for the commands
     specs/ changes/ archive/ adrs/    specs, changes, archive and ADRs of ALL code repos
     runs/                         run state of the apply loop (ignores itself, never committed)
+                                  (runs/<change>/checks/: the run-checks logs)
+    changes/<change>/spec-base.json   the living text the change was planned against (committed with the change)
   web/  api/  mobile/             the code repos (separate git repos)
     .wingman-spec/wingman-spec.yaml   the link `specs: ../specs` + THIS repo's own commands
     .wingman-spec/bin/wingman-spec    the shim the agents call (gitignored)

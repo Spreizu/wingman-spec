@@ -269,7 +269,7 @@ export function buildDashboard(a: DashboardArgs): Dashboard {
 
   // Sync and Archive are buttons that run the CLI (model/cliActions.ts); a sync conflict is handed to the agent from their answer.
   const unsynced = blocking.find((b) => b.id === 'unsynced-specs');
-  if (unsynced) unsynced.detail = [...unsynced.detail, blocking.length === 1 ? 'Sync merges them; then Archive.' : 'Sync merges them once the other items are done.'];
+  if (unsynced) unsynced.detail = [...unsynced.detail, blocking.length === 1 ? 'Archive merges them.' : 'Archive merges them once the other items are done.'];
 
   const reviewTasks = rows.filter((r) => r.isReview);
   return {

@@ -90,7 +90,7 @@ test('not synced yet: no agent step is offered (Sync and Archive are CLI buttons
   const only = buildDashboard({ change: changeOf(tasks), inputs: { sync }, cmd });
   assert.deepEqual(only.blocking.map((b) => b.id), ['unsynced-specs']);
   assert.deepEqual(only.blocking[0]!.todo, []);
-  assert.match(only.blocking[0]!.detail.join(' '), /Sync merges them; then Archive/);
+  assert.match(only.blocking[0]!.detail.join(' '), /Archive merges them\./);
   const adrOnly = buildDashboard({ change: changeOf(tasks, { adrsSynced: false }), inputs: {}, cmd });
   assert.deepEqual(adrOnly.blocking[0]!.todo, []);
   const more = buildDashboard({ change: changeOf([task('1.1', 'A', false)]), inputs: { sync }, cmd });

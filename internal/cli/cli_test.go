@@ -74,9 +74,16 @@ func TestWorkflow(t *testing.T) {
 	if r := run(t, dir, "sync", "add-notes", "--check"); r.code != ExitFail {
 		t.Errorf("sync --check before = %+v", r)
 	}
-	if r := run(t, dir, "archive", "add-notes"); r.code != ExitFail || !strings.Contains(r.err, "NOT SYNCED") {
-		t.Errorf("archive before sync = %+v", r)
+	if r := run(t, dir, "archive", "add-notes"); r.code != ExitFail || !strings.Contains(r.err, "finish: finish has not passed") || !strings.Contains(r.err, "lint: ") {
+		t.Errorf("archive before finish = %+v", r)
 	}
+	if _, err := os.Stat(filepath.Join(dir, ".wingman-spec", "specs", "notes.md")); err == nil {
+		t.Fatal("a refused archive wrote the living spec")
+	}
+	// a spec-only change has no code to finish; the rest of the gate still holds
+	put(t, cfgFile, strings.Replace(strings.Replace(string(b), "traceability: on", "traceability: off", 1), "test: <fill in>", "test: none", 1))
+	put(t, filepath.Join(ch, "proposal.md"), "Size: S\nRisk: none\nKind: spec-only\n\n## Why\nx\n\n## What Changes\n- y\n\n## Edge cases\n- none named\n")
+	put(t, filepath.Join(ch, "tasks.md"), "## 1. Notes\n\n- [x] 1.1 Save\n  - Files: .wingman-spec/changes/add-notes/specs/notes.md\n")
 	if r := run(t, dir, "sync", "add-notes"); r.code != 0 || !strings.Contains(r.out, "created") {
 		t.Fatalf("sync = %+v", r)
 	}

@@ -46,8 +46,9 @@ export function actionArgs(action: CliAction, change?: string): string[] {
 const btn = (action: CliAction, reason?: string): ActionButton => ({ action, label: LABEL[action], enabled: !reason, ...(reason ? { reason } : {}) });
 
 /** The change page's buttons. Shown only when they make sense: Validate once there is a proposal, Sync and Archive once
- * every task is done (Sync not after it is synced). A shown button is disabled, with its reason, while a blocker holds;
- * on a complete change the first enabled of Sync and Archive is the primary action. */
+ * every task is done (Sync not after it is synced). A shown button is disabled, with its reason, while a blocker holds.
+ * Archive runs the CLI's archive gate and merges the specs itself, so it does not wait for Sync; on a complete change
+ * it is the primary action when enabled, else Sync. */
 export function changeActions(a: { change: Change; dashboard?: Dashboard; inputs?: DashboardInputs; trusted: boolean; running?: boolean }): ActionButton[] {
   const { change, dashboard, inputs } = a;
   const off = !a.trusted ? 'The workspace is not trusted, so the CLI is not run.' : a.running ? 'Another action is running.' : undefined;
@@ -57,16 +58,14 @@ export function changeActions(a: { change: Change; dashboard?: Dashboard; inputs
   const sync = inputs?.sync;
   const syncReason = tasksReason ?? (inputs?.unavailable ? `Sync state unknown: ${inputs.unavailable}.` : !sync ? 'Checking the sync state...' : sync.ok ? 'Already synced.' : undefined);
   const others = (dashboard?.blocking ?? []).filter((b) => b.id !== 'unsynced-specs');
-  const archiveReason =
-    tasksReason ??
-    (inputs?.unavailable ? `Sync state unknown: ${inputs.unavailable}.` : !sync ? 'Checking the sync state...' : !sync.ok ? 'Sync first: the specs or ADRs are not merged.' : others.length ? `${others.length} item${others.length === 1 ? ' blocks' : 's block'} the archive (listed below).` : undefined);
+  const archiveReason = tasksReason ?? (others.length ? `${others.length} item${others.length === 1 ? ' blocks' : 's block'} the archive (listed below).` : undefined);
   const shown = [
     ...(hasProposal ? [btn('validate', off)] : []),
     btn('status', off),
     ...(tasksReason || sync?.ok ? [] : [btn('sync', off ?? syncReason)]),
     ...(tasksReason ? [] : [btn('archive', off ?? archiveReason)]),
   ];
-  const next = change.state === 'complete' ? shown.find((b) => (b.action === 'sync' || b.action === 'archive') && b.enabled) : undefined;
+  const next = change.state === 'complete' ? (shown.find((b) => b.action === 'archive' && b.enabled) ?? shown.find((b) => b.action === 'sync' && b.enabled)) : undefined;
   return shown.map((b) => (b === next ? { ...b, primary: true } : b));
 }
 
@@ -143,7 +142,7 @@ export function readAction(action: CliAction, change: string | undefined, r: { c
         return { ...base, ok: true, summary: `Archived to ${dir.split(/[\\/]/).pop() ?? dir}. The move is left uncommitted for you to review.`, lines: lines(j['warnings'], 'warning') };
       }
       const problems = lines(j['problems'], 'error');
-      return { ...base, ok: false, summary: `Not archived: ${problems.length ? plural(problems.length, 'sync conflict') : str(j['result']) ?? 'refused'}.`, lines: problems };
+      return { ...base, ok: false, summary: `Not archived: ${problems.length ? plural(problems.length, 'problem') : str(j['result']) ?? 'refused'}, nothing was written.`, lines: problems };
     }
     case 'doctor': {
       const problems = lines(j['problems'], 'error');

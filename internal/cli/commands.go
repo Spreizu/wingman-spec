@@ -497,11 +497,11 @@ func (a *app) validateCmd() *cobra.Command {
 }
 
 func (a *app) syncCmd() *cobra.Command {
-	var check, dry bool
+	var check, dry, rebase bool
 	var c *cobra.Command
 	c = &cobra.Command{
 		Use:   "sync <change>",
-		Short: "Merge the change's delta specs into the living specs and promote its ADRs (--check: report only)",
+		Short: "Merge the change's delta specs into the living specs and promote its ADRs (--check: report only; archive runs it)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			r, err := a.root()
@@ -510,6 +510,14 @@ func (a *app) syncCmd() *cobra.Command {
 			}
 			if check {
 				return a.syncCheck(c, args[0])
+			}
+			if rebase {
+				moved, err := change.Rebase(r, args[0])
+				if err != nil {
+					return fail(ExitUsage, "%v", err)
+				}
+				a.recordRebase(c, args[0], moved)
+				return a.printJSON(map[string]any{"change": args[0], "rebased": moved, "next": "the base is recorded again from the living specs; run `wingman-spec archive " + args[0] + "`"})
 			}
 			start := time.Now()
 			res, err := change.Sync(r, args[0], dry)
@@ -531,11 +539,20 @@ func (a *app) syncCmd() *cobra.Command {
 	}
 	c.Flags().BoolVar(&check, "check", false, "report what is not merged or promoted; write nothing")
 	c.Flags().BoolVar(&dry, "dry-run", false, "show what sync would do; write nothing")
+	c.Flags().BoolVar(&rebase, "rebase", false, "after updating the delta for what another change merged: record the living specs as the base again (merges nothing)")
 	return c
 }
 
+// recordRebase writes the rebase event (which requirements' base moved) to the change's timeline.
+func (a *app) recordRebase(c *cobra.Command, name string, moved []string) {
+	if e, err := a.env(c, newVflags(), "sync", name); err == nil {
+		ok := true
+		e.Record(timeline.Event{Event: "rebase", OK: &ok, Summary: fmt.Sprintf("spec base recorded again (%d moved)", len(moved)), Details: map[string]any{"moved": moved}})
+	}
+}
+
 func (a *app) archiveCmd() *cobra.Command {
-	return a.vcmd("archive <change>", "Move a finished, fully synced change to archive/YYYY-MM-DD-HHMM-<change> (keeps its timeline)", cobra.ExactArgs(1), 0, (*verify.Env).Archive)
+	return a.vcmd("archive <change>", "Gate (tasks, findings, finish on this tree, lint, a clean merge), sync, then move the change to archive/YYYY-MM-DD-HHMM-<change>", cobra.ExactArgs(1), 0, (*verify.Env).Archive)
 }
 
 // recordSync writes the sync event to the change's timeline (a record, never a gate).

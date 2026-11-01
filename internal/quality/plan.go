@@ -52,6 +52,7 @@ type PlanResult struct {
 type PlanOpts struct {
 	Size   string // from proposal.md
 	Review *bool  // whether a final review is required (nil: Size != S)
+	Files  string // the traceability level for the Files: rule: "" or "on" an error, "warn" a warning, "off" skipped
 }
 
 var sourceTextTestFirst = regexp.MustCompile(`(?i)\?raw\b|\bas text\b|readFileSync|\bregex(es)?\b[^.]*\.(vue|css|scss|svelte)\b`)
@@ -198,12 +199,49 @@ func PlanLint(text string, o PlanOpts) PlanResult {
 	if size != "S" {
 		out = append(out, serialGroups(p)...)
 	}
+	out = append(out, idLint(p, impl, o.Files)...)
 	for _, t := range impl {
 		if sourceTextTestFirst.MatchString(t.Details["test first"]) {
 			out = append(out, Finding{Line: t.Line, Severity: "warning", Kind: "source-text", Text: t.Label + ": Test first reads source code as text; test the rendered behaviour instead and put layout in a ```visual scenario (the verifier rejects source-text tests)"})
 		}
 	}
 	return PlanResult{Size: p.Size, ImplementationTasks: len(impl), ReviewTasks: len(reviews), CloseoutTasks: closeouts, Problems: out}
+}
+
+// idLint: task labels are unique, every After: names a known earlier label, and every implementation task lists its
+// Files: (the waves and the scope check read them; traceability off drops that rule, warn makes it a warning).
+func idLint(p *tasks.Plan, impl []*tasks.Task, files string) []Finding {
+	var out []Finding
+	seen := map[string]int{}
+	for _, t := range p.All() {
+		if t.Label == "" {
+			continue
+		}
+		if first, ok := seen[t.Label]; ok {
+			out = append(out, Finding{Line: t.Line, Severity: "error", Kind: "task-id", Text: fmt.Sprintf("task label %s is used twice (first on line %d): number the tasks uniquely", t.Label, first)})
+			continue
+		}
+		seen[t.Label] = t.Line
+	}
+	for _, t := range p.All() {
+		for _, a := range t.After() {
+			switch first, ok := seen[a]; {
+			case a == t.Label:
+				out = append(out, Finding{Line: t.Line, Severity: "error", Kind: "task-after", Text: fmt.Sprintf("%s: After: names the task itself", taskID(t))})
+			case !ok:
+				out = append(out, Finding{Line: t.Line, Severity: "error", Kind: "task-after", Text: fmt.Sprintf("%s: After: names %s, which is no task label of this plan", taskID(t), a)})
+			case first > t.Line:
+				out = append(out, Finding{Line: t.Line, Severity: "error", Kind: "task-after", Text: fmt.Sprintf("%s: After: names %s, which comes later in the plan: a task can only wait for an earlier one", taskID(t), a)})
+			}
+		}
+	}
+	sev := map[string]string{"": "error", "on": "error", "warn": "warning"}[files]
+	for _, t := range impl {
+		if len(t.Files) == 0 && sev != "" {
+			out = append(out, Finding{Line: t.Line, Severity: sev, Kind: "task-files", Text: fmt.Sprintf("%s: no `Files:` line: list the files the task creates or changes", taskID(t))})
+		}
+	}
+	return out
 }
 
 // serialGroups warns about a group of three or more implementation tasks where no two can run in the same parallel

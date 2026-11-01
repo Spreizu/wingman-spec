@@ -102,8 +102,12 @@ func Change(changeDir, livingDir string, rel func(string) string) (*Report, erro
 	case !none && len(deltas) == 0 && pb != nil:
 		r.add(rel(ppath), 0, "no delta specs: write specs/<capability>.md, or add the line `Specs: none` for a change without behavior changes")
 	}
+	bases, err := spec.ReadBases(changeDir)
+	if err != nil {
+		r.add(rel(filepath.Join(changeDir, spec.BaseFile)), 0, "%s: fix or delete it (lint records it again)", err)
+	}
 	for _, d := range deltas {
-		if err := delta(r, d, livingDir, rel); err != nil {
+		if err := delta(r, d, livingDir, bases, rel); err != nil {
 			return nil, err
 		}
 	}
@@ -122,7 +126,7 @@ func proposal(r *Report, file, src string) {
 	}
 }
 
-func delta(r *Report, path, livingDir string, rel func(string) string) error {
+func delta(r *Report, path, livingDir string, bases map[string]spec.Base, rel func(string) string) error {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -139,7 +143,6 @@ func delta(r *Report, path, livingDir string, rel func(string) string) error {
 	for _, req := range slices.Concat(d.Added, d.Modified) {
 		requirement(r, file, req)
 	}
-	dup := dupes(r, file, d)
 	livingPath := filepath.Join(livingDir, capability+".md")
 	lb, err := os.ReadFile(livingPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -149,13 +152,15 @@ func delta(r *Report, path, livingDir string, rel func(string) string) error {
 		if d.Purpose != "" && len(strings.TrimSpace(comment.ReplaceAllString(d.Purpose, ""))) < MinPurpose {
 			r.add(file, 0, "## Purpose is shorter than %d characters: write one or two sentences on what %s is for", MinPurpose, capability)
 		}
-	} else if d.Purpose != "" {
-		r.add(file, 0, "%s already exists (%s): remove ## Purpose from the delta", capability, rel(livingPath))
 	}
-	if len(d.Problems) > 0 || dup {
+	if len(d.Problems) > 0 {
 		return nil
 	}
-	if _, err := spec.Merge(capability, string(lb), d); err != nil {
+	var base *spec.Base
+	if b, ok := bases[capability]; ok {
+		base = &b
+	}
+	if _, err := spec.Merge(capability, string(lb), d, base); err != nil {
 		me, ok := errors.AsType[*spec.MergeError](err)
 		if !ok {
 			return err
@@ -183,35 +188,6 @@ func requirement(r *Report, file string, req spec.Requirement) {
 	if len(req.Scenarios) == 0 {
 		r.add(file, req.Line, "requirement %q has no `#### Scenario:`", req.Name)
 	}
-	seen := map[string]int{}
-	for _, s := range req.Scenarios {
-		k := spec.Slug(s.Name)
-		if first, ok := seen[k]; ok {
-			r.add(file, s.Line, "scenario %q repeats the one on line %d", s.Name, first)
-		}
-		seen[k] = s.Line
-	}
-}
-
-func dupes(r *Report, file string, d *spec.Delta) bool {
-	seen := map[string]int{}
-	found := false
-	note := func(name string, line int) {
-		k := spec.Key(name)
-		if first, ok := seen[k]; ok {
-			r.add(file, line, "requirement %q is named twice in this delta (first on line %d)", name, first)
-			found = true
-			return
-		}
-		seen[k] = line
-	}
-	for _, x := range slices.Concat(d.Added, d.Modified, d.Removed) {
-		note(x.Name, x.Line)
-	}
-	for _, rn := range d.Renamed {
-		note(rn.From, rn.Line)
-	}
-	return found
 }
 
 // Living validates every living spec in livingDir.

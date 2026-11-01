@@ -205,7 +205,7 @@ func (p *Project) phaseFoundation() *step {
 		return &step{Phase: ph, Step: "repair-foundation", Do: "The foundation was archived but is incomplete. Amend it with a new spec-only change (/spec-propose foundation-fix).", Problems: probs}
 	}
 	if cs.Exists && p.hasLiving(NFRCap) {
-		return &step{Phase: ph, Step: "archive-foundation", Do: "The foundation is synced. Archive it: " + run("archive foundation") + ".", Run: run("archive foundation")}
+		return &step{Phase: ph, Step: "archive-foundation", Do: "The foundation is merged. Archive it: " + run("archive foundation") + ".", Run: run("archive foundation")}
 	}
 	if !cs.Exists {
 		return &step{Phase: ph, Step: "propose-foundation", Do: fmt.Sprintf(`Create the spec-only change "foundation" (/spec-propose foundation, proposal line "Kind: spec-only"): the %s capability with measurable targets, the fixed ADRs (technology, hosting, auth, integration style), and %s. No code tasks: tasks.md is one ticked line.`, NFRCap, p.Rel(p.path("glossary.md"))), Run: run("new foundation")}
@@ -213,7 +213,7 @@ func (p *Project) phaseFoundation() *step {
 	if !cs.Complete {
 		return &step{Phase: ph, Step: "finish-foundation", Do: "Finish the foundation change.", Problems: append(joinIDs(cs.Missing, func(m string) string { return "missing " + m }), cs.Problems...)}
 	}
-	return &step{Phase: ph, Step: "sync-foundation", Do: "Sync and archive the foundation: /spec-sync foundation (" + run("sync foundation") + "), then " + run("archive foundation") + ".", Run: run("sync foundation")}
+	return &step{Phase: ph, Step: "archive-foundation", Do: "Archive the foundation: " + run("archive foundation") + " (it checks the change, then merges its specs and ADRs).", Run: run("archive foundation")}
 }
 
 func (p *Project) capsDone(caps []capability) int {
@@ -246,7 +246,7 @@ func (p *Project) phaseCapabilities() *step {
 		tpl = fmt.Sprintf(` It is an integration: write the contract (the integration-contract template: %s), a sandbox in %s, and at least 2 "Failure:" scenarios.`, run("instructions specs"), capFile)
 	}
 	if p.activeExists(c.Cap) && p.hasLiving(c.Cap) {
-		return &step{Phase: ph, Step: "archive-capability", Do: fmt.Sprintf("The %s spec is synced. Archive the change: %s.", c.Cap, run("archive "+c.Cap)), Run: run("archive " + c.Cap), Problems: []string{where}}
+		return &step{Phase: ph, Step: "archive-capability", Do: fmt.Sprintf("The %s spec is merged. Archive the change: %s.", c.Cap, run("archive "+c.Cap)), Run: run("archive " + c.Cap), Problems: []string{where}}
 	}
 	cs := p.changeState(c.Cap, c.Cap)
 	if c.Kind == "integration" && isPlaceholder(c.Sandbox) {
@@ -258,7 +258,7 @@ func (p *Project) phaseCapabilities() *step {
 	if !cs.Complete {
 		return &step{Phase: ph, Step: "finish-capability", Do: "Finish the " + c.Cap + " change.", Problems: append(append([]string{where}, joinIDs(cs.Missing, func(m string) string { return "missing " + m })...), cs.Problems...)}
 	}
-	return &step{Phase: ph, Step: "sync-capability", Do: fmt.Sprintf("Sync the %s change: %s, then %s.", c.Cap, run("sync "+c.Cap), run("archive "+c.Cap)), Run: run("sync " + c.Cap), Problems: []string{where}}
+	return &step{Phase: ph, Step: "archive-capability", Do: fmt.Sprintf("Archive the %s change: %s (it checks the change, then merges its spec).", c.Cap, run("archive "+c.Cap)), Run: run("archive " + c.Cap), Problems: []string{where}}
 }
 
 var findingLineRE = regexp.MustCompile(`(?i)^-\s+(blocker|major)\b`)

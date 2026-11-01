@@ -18,8 +18,8 @@ In Codex they are skills: `$spec-apply <change>` instead of `/spec-apply <change
 | `/spec-propose <change>` | Creates the change and its artifacts: proposal, specs, tasks, plus app-map, design and ADRs unless the change is on the fast path (Size S, `Risk: none`, no sensitive path, no UI). |
 | `/spec-apply <change>` | Test-first, one fresh `spec-implementer` subagent per dispatch (the change at Size S, a task group at M/L, parallel waves for tasks with separate files); `wingman-spec check` decides each one. |
 | `/spec-fix [change] [findings]` | Post-QA: classify findings (`code-bug` redo, `spec-mistake` amend, accepted deviation, `new-work`), confirm with the user, patch specs and tasks or open a follow-up change. Never writes `specs/` or `adrs/`. |
-| `/spec-sync <change> [--check]` | `wingman-spec sync`: merges the delta specs into `specs/` and promotes ADRs to `adrs/`. `/spec-archive` does it too; run it alone only to inspect or fix a sync problem. |
-| `/spec-archive <change>` | Syncs, then `wingman-spec archive` (refuses an unfinished or unsynced change). |
+| `/spec-archive <change>` | `wingman-spec archive`: gates (tasks, findings, finish on this tree, lint, a clean merge), merges the specs and ADRs, archives. |
+| `/spec-sync <change> [--check]` | Inspects a merge, or fixes one the archive refused (`sync --rebase`). |
 | `/spec-garden [--check]` | Takes the drift report (code anchors vs specs vs tests); fixes each gap or accepts it (an `Accepted:` line on the requirement). |
 | `/spec-adopt [scope] [--check]` | Brownfield, one-off: baseline specs and ADRs. Only confirmed behaviour (test, doc, owner) becomes a requirement; bugs, debug leftovers and unclear behaviour go to `observed/<capability>.md`. Never overwrites a spec. |
 | `/spec-green-start` | New product, no code yet: the analyst's only command. Run it again and again; it reads `wingman-spec greenfield status` and does the one next step, up to `READY FOR HANDOVER`. |
@@ -35,8 +35,8 @@ In Codex they are skills: `$spec-apply <change>` instead of `/spec-apply <change
   (apply): executes tasks test-first and never changes specs or ADRs except via `/spec-fix`.
 - **Explore: grill first.** Keep grilling (`/spec-explore`) until every decision branch is resolved, then write artifacts.
   Fallback: numbered interview rounds with a recommended answer each; stop only when nothing is left assumed.
-- **The CLI writes the specs.** `wingman-spec sync` merges deltas and promotes ADRs; `wingman-spec archive` is the only way to
-  archive. Never merge a delta, copy an ADR or move a change folder by hand.
+- **The CLI writes the specs.** `wingman-spec archive` merges deltas, promotes ADRs and archives. Never merge a delta, copy an
+  ADR or move a change folder by hand.
 - **New product (greenfield).** Spec-only changes say `Kind: spec-only`; slices say `Slice: <id>`. Before any greenfield
   command run `wingman-spec mode --for <start|plan|next>`: exit 6 means the project is not greenfield (existing code, archived
   changes, or already implemented); print its text and stop, write nothing. Never review your own specs: use `spec-reviewer`.
@@ -89,7 +89,7 @@ worktree is refused (`run-owned`), and so is a command already running on the ch
 ### Reference
 
 `wingman-spec help reference` prints the exit codes, every check rule, the run state and the config keys; `wingman-spec <command>
---help` the options of one command. `wingman-spec doctor` shows what is missing in the config and environment. `lint <change>`
-checks tasks, size and visual blocks. `wingman-spec instructions <artifact> <change>` and the `/spec-*` commands carry the detail
+--help` the options of one command. `wingman-spec doctor` shows what is missing in the config and environment. Run `lint <change>
+--text`, `trace` and `run-checks` and fix what they report. `wingman-spec instructions <artifact> <change>` and the `/spec-*` commands carry the detail
 for each stage.
 <!-- WINGMAN-SPEC:END -->

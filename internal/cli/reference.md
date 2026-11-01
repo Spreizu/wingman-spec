@@ -37,6 +37,17 @@ PLANNING (lint <change>, size <change>, validate <change>; no command runs)
   Tasks: `## N. Group`, `- [ ] N.M ...` with Spec:, Test first:, Files:, Done when: (a command in backticks), Visual: <ids>|all for UI,
   optional After: <label> (needs that task's result). Delta specs: ## ADDED / MODIFIED / REMOVED / RENAMED (`- Old -> New`).
 
+CHECKS AND ARCHIVE
+  lint <change> --text             every plan problem as file:line: severity: text (task IDs, Files:, After:, visual-reach, ...)
+  trace [<change>] [--text]        scenarios without a [cap/slug] test tag; tags that name no scenario (test_files: extra globs)
+  run-checks [<change>] [--only lint,typecheck,test,visual] [--text]   logs in runs/<change>/checks/, parsed failures
+                                   (TAP, JUnit via commands.junit, vitest, jest, pytest, go, eslint, tsc), a checks timeline event
+  archive <change>                 gate: blocked, tasks, findings, finish (the tree finish recorded), lint, a clean merge; then
+                                   merge specs and ADRs atomically and move the change. No override. Refusal: exit 1, nothing written.
+  sync <change> --check | --rebase report the merge without writing; re-pin spec-base.json after the living spec moved
+  The merge refuses every ambiguous delta (names twice, rename chains or swaps, ADDED of an existing or MODIFIED/REMOVED of a
+  missing requirement, a living text changed since its pin): docs/spec-merge.md.
+
 VISUAL CHECK (visual: in wingman-spec.yaml; scenarios are ```visual blocks)
   Block keys: route:, key:, state: with do: steps, viewports: (default 375/768/1280), reference:, overlay:, component:, expect:,
   role:, absent:, redirects-to:, ignore:, ignore-http:. The app is started from visual.command and probed at visual.url.

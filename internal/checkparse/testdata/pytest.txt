@@ -1,0 +1,18 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.5, pytest-9.2.0, pluggy-1.7.0
+rootdir: /work/app
+collected 3 items
+
+py/test_x.py .Fs                                                         [100%]
+
+=================================== FAILURES ===================================
+___________________________________ test_bad ___________________________________
+
+>   def test_bad(): assert 1 == 2
+                    ^^^^^^^^^^^^^
+E   assert 1 == 2
+
+py/test_x.py:3: AssertionError
+=========================== short test summary info ============================
+FAILED py/test_x.py::test_bad - assert 1 == 2
+==================== 1 failed, 1 passed, 1 skipped in 0.02s ====================

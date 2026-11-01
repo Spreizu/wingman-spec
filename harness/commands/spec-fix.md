@@ -23,7 +23,7 @@ This command is the approved path to edit specs after apply. `/spec-apply` and i
    - **accept**: the difference is fine; change nothing but record why.
  A `BLOCKED.md` carries a `Proposed outcome: redo|amend|accept|new-work` line written by the implementer; treat it as a proposal to confirm, not a decision. Classes:
    - **code-bug** (outcome **redo**): the spec is right; the implementation or tests do not match. Do **not** edit specs. Append test-first tasks. A UI fix task gets a `Visual:` line naming the scenario: the verifier re-checks it, the visual reviewer compares its before/after images, and `finish` guards every other declared scenario.
-   - **spec-mistake** (outcome **amend**): the spec definition was wrong, incomplete, or a developer requested a correction to intended behavior. Update the change's delta spec (`ADDED` / `MODIFIED` / `REMOVED`). If code and tests already match the *corrected* behavior, stop at the spec (then `/spec-sync`). If they followed the wrong spec, update the spec **and** append TDD tasks.
+   - **spec-mistake** (outcome **amend**): the spec definition was wrong, incomplete, or a developer requested a correction to intended behavior. Update the change's delta spec (`ADDED` / `MODIFIED` / `REMOVED`). If code and tests already match the *corrected* behavior, stop at the spec (`/spec-archive` merges it). If they followed the wrong spec, update the spec **and** append TDD tasks.
    - **accepted deviation** (outcome **accept**): the code differs from the spec (or a task could not be done as written) and the owner agrees that it stays that way. Change no code and no requirement text; when it matches an unanchored, untested or stale-anchor drift gap (see `wingman-spec drift`), record it with `.wingman-spec/bin/wingman-spec drift decide <gap-key> --accept --note "<why it is fine>"` (one `Accepted:` line on the requirement), otherwise write the reasoning in `progress.md`. If `BLOCKED.md` exists, remove it only when the outcome leaves nothing to do (accept) or after the change is amended/tasks appended.
    - **new-work**: a new capability or a substantial new requirement. Do not implement it here. Classification only: list it in the summary, and tell the user to run `/spec-explore` then `/spec-propose`.
 
@@ -35,9 +35,9 @@ This command is the approved path to edit specs after apply. `/spec-apply` and i
    - **Active change** (`changes/<name>/` exists): patch it in place. Rewrite that change's spec files so they describe the corrected contract. Append a `QA fix` group to `tasks.md` (its tasks do not count against the `Size:` cap; merge findings that touch the same file into one task); never uncheck finished work. Touch `proposal.md`, `design.md` or `adrs/` only when the correction actually changes why, how, or a decision.
    - **Archived, or no owning change**: confirm a kebab-case name (default `fix-<original>`), run `.wingman-spec/bin/wingman-spec new <name>`. Write **short** artifacts in artifact order (`app-map` → `proposal` → `specs` → `design` → `adrs` → `tasks`). Keep them short: this is a follow-up, not a new product. A Size S, Risk none change without sensitive paths or UI writes only `proposal`, `specs` and `tasks`. Deltas target the promoted specs in `specs/`.
 
-   Never write `specs/` or `adrs/` here. Promotion stays `/spec-sync`.
+   Never write `specs/` or `adrs/` here; `/spec-archive` merges and promotes them.
 
-4. **Validate.** Run `.wingman-spec/bin/wingman-spec validate <name>`. Fix problems only in files this command wrote.
+4. **Validate.** Run `.wingman-spec/bin/wingman-spec lint <name> --text` and fix what it reports in files this command wrote.
 
 5. **Implement only new work.** If `tasks.md` has unchecked `- [ ]` items this command added, you are the **orchestrator**, exactly as in `/spec-apply`. Earlier tasks are already ticked, so `next` starts at the first new one. The loop ends with `finish`, as in `/spec-apply`. If an earlier finish ran out of attempts, delete the file its `exhausted` message names first.
 
@@ -54,7 +54,7 @@ This command is the approved path to edit specs after apply. `/spec-apply` and i
    - <capability>: updated | unchanged
    Tasks:
    - added <n> | none (spec-only)
-   Next: run /spec-apply <name> if tasks were added; when it is ready to close: /spec-archive <name> (it syncs first). /spec-sync <name> only to inspect or fix a sync problem.
+   Next: run /spec-apply <name> if tasks were added; when it is ready to close: /spec-archive <name>.
 Owner approval: <none | requirements>
    ```
 

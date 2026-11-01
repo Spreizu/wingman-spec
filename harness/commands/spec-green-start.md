@@ -9,7 +9,7 @@ Write the specification of a new product (greenfield) from the client's requirem
 ## Every run
 
 1. Run `.wingman-spec/bin/wingman-spec greenfield status`. If it exits 6 (REFUSED), print its text, say what it names instead (`/spec-adopt`, `/spec-propose`, `/spec-garden`) and stop. Nothing was written.
-2. Do exactly the step it names under `Next:` and nothing else (the playbook below). Do not run `/spec-propose`, `/spec-sync` or any other command on your own initiative: this command calls them where the step says so.
+2. Do exactly the step it names under `Next:` and nothing else (the playbook below). Do not run `/spec-propose`, `/spec-archive` or any other command on your own initiative: this command calls them where the step says so.
 3. Run status again. Repeat 2 and 3 until `Next:` says it needs a person, or the first line is `READY FOR HANDOVER`.
 4. End every run with these three lines, copied from the last status output and in plain words (no file paths unless the person must open one):
    `Done:` what is finished. `Next:` the one thing to do next. `Blocked by:` who or what, or `nothing`.
@@ -32,7 +32,7 @@ When a step needs a person (the analyst, the client), stop and say exactly what 
 - **write-understood**: write the one-page summary in plain words (the client reads it, not a developer). **approve-understood**: stop; the analyst records it with the client's name after the client agreed.
 - **propose-foundation / finish-foundation**: create the change `foundation` with `Kind: spec-only` in `proposal.md`: `Owner approval:` is the client's name (approval of `understood.md`), `non-functional-requirements` with a number and a unit in every requirement, the fixed decisions as ADRs, `glossary.md`. `tasks.md` is one ticked line. No code tasks, no code.
 - **propose-capability / finish-capability**: create the change named after the capability, `Kind: spec-only`: requirements, each with a `Why:` line (who wants it, and why) and WHEN/THEN scenarios a tester can run. An integration also gets a `Contract` requirement (use the integration contract template of the schema), at least 2 `Failure:` scenarios, and its sandbox. Do the capabilities in the order status shows.
-- **sync-* / archive-***: run the archive command shown (`/spec-archive <change>` syncs first: specs, ADRs, then the verifier). Use `/spec-sync <change>` on its own only to inspect or fix a sync problem.
+- **archive-***: run the archive command shown (`/spec-archive <change>`); on a merge refusal, `/spec-sync <change>`.
 - **review-spec, review-plan, dry-run**: build the packet with the command shown, give it to the `spec-reviewer` subagent (never review your own work, never answer for it), write its reply to a file and record it with the `--reply` command shown. A different agent must do this: if no subagent is available, stop and tell the analyst.
 - **fix-review-findings, fix-plan-findings, fix-roadmap, fix-gate, resolve-unknowns**: fix exactly what the list names, with a spec-only change for specs and edits of the slice files for the plan. A finding you disagree with is not skipped: say so to the analyst.
 - **signoff-spec**: stop; the analyst records the client's sign-off with the command shown.

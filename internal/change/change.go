@@ -126,8 +126,9 @@ type SyncResult struct {
 	Problems     []string     `json:"problems"`
 }
 
-// Sync merges every delta spec of the change into the living specs and promotes its ADRs. Nothing is written when a
-// delta conflicts. With dryRun nothing is written at all.
+// Sync merges every delta spec of the change into the living specs (see spec.Merge) and promotes its ADRs. Every
+// merge is computed and checked in memory first; nothing is written when one delta conflicts, and the living specs are
+// written all at once. With dryRun nothing is written at all.
 func Sync(r *layout.Root, name string, dryRun bool) (*SyncResult, error) {
 	dir, err := Dir(r, name)
 	if err != nil {
@@ -138,8 +139,12 @@ func Sync(r *layout.Root, name string, dryRun bool) (*SyncResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	type write struct{ path, text string }
-	var writes []write
+	bases, _, err := spec.PinBases(dir, r.LivingSpecs(), false, !dryRun)
+	if err != nil {
+		res.Problems = append(res.Problems, fmt.Sprintf("%s: %s: fix or delete it, then run `wingman-spec sync %s --rebase`", r.Rel(filepath.Join(dir, spec.BaseFile)), err, name))
+		return res, nil
+	}
+	writes := map[string][]byte{}
 	for _, p := range deltas {
 		capability := strings.TrimSuffix(filepath.Base(p), ".md")
 		db, err := os.ReadFile(p)
@@ -151,12 +156,8 @@ func Sync(r *layout.Root, name string, dryRun bool) (*SyncResult, error) {
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
-		d := spec.ParseDelta(string(db))
-		if len(spec.Synced(string(old), d)) == 0 && len(d.Problems) == 0 && len(old) > 0 {
-			res.Capabilities = append(res.Capabilities, Capability{capability, "unchanged"})
-			continue
-		}
-		merged, err := spec.Merge(capability, string(old), d)
+		base := bases[capability]
+		merged, err := spec.Merge(capability, string(old), spec.ParseDelta(string(db)), &base)
 		if err != nil {
 			me, ok := errors.AsType[*spec.MergeError](err)
 			if !ok {
@@ -168,25 +169,23 @@ func Sync(r *layout.Root, name string, dryRun bool) (*SyncResult, error) {
 			continue
 		}
 		action := "updated"
-		if len(old) == 0 {
+		switch {
+		case merged == string(old):
+			action = "unchanged"
+		case len(old) == 0:
 			action = "created"
 		}
 		res.Capabilities = append(res.Capabilities, Capability{capability, action})
-		writes = append(writes, write{target, merged})
+		if action != "unchanged" {
+			writes[target] = []byte(merged)
+		}
 	}
 	if len(res.Problems) > 0 {
 		return res, nil
 	}
-	if !dryRun {
-		if len(writes) > 0 {
-			if err := os.MkdirAll(r.LivingSpecs(), 0o755); err != nil {
-				return nil, err
-			}
-		}
-		for _, w := range writes {
-			if err := os.WriteFile(w.path, []byte(w.text), 0o644); err != nil {
-				return nil, err
-			}
+	if !dryRun && len(writes) > 0 {
+		if err := spec.WriteAtomic(writes); err != nil {
+			return nil, err
 		}
 	}
 	adrs, err := adr.Promote(dir, name, r.ADRs(), dryRun)
@@ -198,6 +197,20 @@ func Sync(r *layout.Root, name string, dryRun bool) (*SyncResult, error) {
 		res.ADRs = adrs
 	}
 	return res, nil
+}
+
+// Rebase records the base of every delta spec of the change again from the living specs as they are now (after the
+// delta was updated for what another change merged) and returns the requirements whose base moved.
+func Rebase(r *layout.Root, name string) ([]string, error) {
+	dir, err := Dir(r, name)
+	if err != nil {
+		return nil, err
+	}
+	_, moved, err := spec.PinBases(dir, r.LivingSpecs(), true, true)
+	if moved == nil {
+		moved = []string{}
+	}
+	return moved, err
 }
 
 // SyncCheck lists what of the change is not merged into the living specs or promoted to adrs/. It writes nothing.
@@ -229,45 +242,15 @@ func SyncCheck(r *layout.Root, name string) ([]string, error) {
 	return probs, nil
 }
 
-// Refused is an archive that cannot happen yet.
-type Refused struct {
-	Reason   string   `json:"problem"`
-	Tasks    []string `json:"tasks,omitempty"`
-	Problems []string `json:"problems,omitempty"`
-	Blocked  bool     `json:"-"`
-}
-
-func (e *Refused) Error() string { return e.Reason }
-
 // ArchiveName is the archive folder of a change archived at t: YYYY-MM-DD-HHMM-<change>.
 func ArchiveName(name string, t time.Time) string { return t.Format("2006-01-02-1504") + "-" + name }
 
-// Archive moves a finished, synced change to archive/YYYY-MM-DD-HHMM-<change> and returns the new folder.
+// Archive moves a change to archive/YYYY-MM-DD-HHMM-<change> and returns the new folder. The checks that come first
+// are verify's archive gate.
 func Archive(r *layout.Root, name string, now time.Time) (string, error) {
 	dir, err := Dir(r, name)
 	if err != nil {
 		return "", err
-	}
-	if _, err := os.Stat(filepath.Join(dir, "BLOCKED.md")); err == nil {
-		return "", &Refused{Reason: "BLOCKED.md exists: run /spec-fix first", Blocked: true}
-	}
-	if b, err := os.ReadFile(filepath.Join(dir, "tasks.md")); err == nil {
-		var open []string
-		for _, t := range tasks.Parse(string(b)).All() {
-			if !t.Done {
-				open = append(open, strings.TrimSpace(t.Label+" "+t.Title))
-			}
-		}
-		if len(open) > 0 {
-			return "", &Refused{Reason: fmt.Sprintf("%d task(s) are not done: finish /spec-apply (or /spec-fix) first", len(open)), Tasks: open}
-		}
-	}
-	probs, err := SyncCheck(r, name)
-	if err != nil {
-		return "", err
-	}
-	if len(probs) > 0 {
-		return "", &Refused{Reason: fmt.Sprintf("change %q is not synced: run `wingman-spec sync %s` first", name, name), Problems: probs}
 	}
 	dst := filepath.Join(r.Archive(), ArchiveName(name, now))
 	if _, err := os.Stat(dst); err == nil {
@@ -279,10 +262,14 @@ func Archive(r *layout.Root, name string, now time.Time) (string, error) {
 	return dst, os.Rename(dir, dst)
 }
 
-// Validate validates the change against the living specs.
+// Validate validates the change against the living specs, recording the base of a delta spec seen for the first time
+// (see spec.PinBases).
 func Validate(r *layout.Root, name string) (*validate.Report, error) {
 	dir, err := Dir(r, name)
 	if err != nil {
+		return nil, err
+	}
+	if _, _, err := spec.PinBases(dir, r.LivingSpecs(), false, true); err != nil && !strings.Contains(err.Error(), spec.BaseFile) {
 		return nil, err
 	}
 	return validate.Change(dir, r.LivingSpecs(), r.Rel)

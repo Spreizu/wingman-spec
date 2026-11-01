@@ -169,7 +169,7 @@ artifacts:
       - `## MODIFIED`: MUST include the full updated requirement block (the name is the key)
       - `## REMOVED`: the `### Requirement:` heading with **Reason** and **Migration**
       - `## RENAMED`: one line per rename, `- Old name -> New name`
-      `wingman-spec sync` merges them in the order RENAMED, REMOVED, MODIFIED, ADDED and stops on any conflict.
+      `wingman-spec archive` merges them in the order RENAMED, REMOVED, MODIFIED, ADDED and refuses every ambiguous case.
 
       Format rules:
       - `### Requirement: <name>` followed by a SHALL/MUST statement.
@@ -341,8 +341,8 @@ artifacts:
       A Size S change on the full path writes just `adrs/none.md` (an ADR makes the change at least M);
       on the fast path nothing is written.
 
-      ADRs are promoted to the specs root `adrs/` directory when specs are synced:
-      `wingman-spec sync <change>` merges the specs and then promotes the ADRs, numbered `NNNN-<slug>.md`.
+      ADRs are promoted to the specs root `adrs/` directory on archive:
+      `wingman-spec archive <change>` merges the specs and then promotes the ADRs, numbered `NNNN-<slug>.md`.
     requires:
       - specs
 
@@ -469,6 +469,6 @@ apply:
     When no unchecked tasks remain, the orchestrator runs `wingman-spec finish <change>`: full
     tests, typecheck, lint, validate, every visual scenario, trace tags, no source-text tests.
     A failure goes to one implementer with the fix prompt that finish writes; then finish runs
-    again. Then tell the user to run `/spec-archive <change>`. It runs `/spec-sync <change>` (specs, ADRs, anchors and drift check) first and stops on a sync problem;
-    `wingman-spec archive` refuses a change that is not synced. If the finish result lists
+    again. Then tell the user to run `/spec-archive <change>`: `wingman-spec archive` gates on this finish,
+    then merges the specs and ADRs, and refuses on a problem. If the finish result lists
     `why_owner_approval`, the change rewrites a Why or removes a requirement: show it to the owner.

@@ -1,0 +1,33 @@
+
+ RUN  v2.1.9 /work/app
+
+ ❯ src/a.test.js (3 tests | 1 failed | 1 skipped) 6ms
+   × math > fails [calc/subtracts] 5ms
+     → expected 1 to be 3 // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/a.test.js > math > fails [calc/subtracts]
+AssertionError: expected 1 to be 3 // Object.is equality
+
+- Expected
++ Received
+
+- 3
++ 1
+
+ ❯ src/a.test.js:4:56
+      2| describe('math', () => {
+      3|   test('adds [calc/adds-numbers]', () => { expect(1 + 1).toBe(2); });
+      4|   test('fails [calc/subtracts]', () => { expect(2 - 1).toBe(3); });
+       |                                                        ^
+      5|   test.skip('skipped', () => {});
+      6| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed | 1 skipped (3)
+   Start at  15:32:22
+   Duration  196ms (transform 21ms, setup 0ms, collect 13ms, tests 6ms, environment 0ms, prepare 43ms)
+
