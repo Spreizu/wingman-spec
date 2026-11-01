@@ -20,6 +20,7 @@ commands:
   typecheck: {{q .Typecheck}}
   lint: {{q .Lint}}
   # targeted: <runner> {files}   # how to run some test files ({files}: the paths, {dirs}: their folders); derived for common runners
+  # test_one: <runner> {name} {file}  # how to run one review fix's tests ({name}: regex, {id}: review_<slug>); derived for common runners
   # test_run: finish             # the project tests run once, at `finish`; typecheck and lint keep the check level
   # check_level: targeted        # targeted (default) | group | task | finish: when the project commands run during apply
 {{- if not .Linked}}

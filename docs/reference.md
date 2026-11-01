@@ -89,7 +89,7 @@ Commands, all prefixed `spec-` (Codex: `$spec-…`): `/spec-explore`, `/spec-pro
 
 1. **Explore**: `/spec-explore [topic]` runs the `grilling` skill until every decision is settled. With a design input it maps the design to your tokens and components first (see [Design input](#design-input-matching-a-design)).
 2. **Plan**: `/spec-propose <change>` writes every artifact in order and validates. `proposal.md` starts with `Size: S|M|L` (checked against the specs by `wingman-spec size`); the task plan has at most 3 / 5 / 8 implementation tasks, no close-out tasks, and a final code review only for Size M/L, a Risk kind or a UI change (`wingman-spec lint` enforces it). A Size S change with `Risk: none`, no sensitive path (auth, payment, migrations, ...), no UI and no new dependency takes the fast path: only proposal, specs and tasks; an edit that leaves that scope upgrades the change to the full path (design, ADR record and app-map are then required). Reasons: [docs/fast-path.md](fast-path.md).
-3. **Implement**: `/spec-apply <change>`. The main agent orchestrates; fresh `spec-implementer` subagents do the work. `wingman-spec next` hands out one dispatch (the change at Size S, a task group at M/L) or a **wave** of up to `parallel:` (default 3) tasks of one group whose `Files:` do not overlap, one prompt each. `wingman-spec check` accepts a task only if exactly its box changed, its `Done when:` command, the project tests, typecheck, lint and `wingman-spec validate` pass, the changed tests do not read source files as text, and every scenario the task names has a test tagged `[capability/scenario-slug]`. In a wave each task is checked on its own (`--task`), and the project commands run at the wave's last check. A rejected task is retried with the failure output and the implementer's attempt note, up to 3 attempts. The note (`runs/<change>/notes/<task>.md`) says what the attempt tried and ruled out. Two attempts in a row can fail the same way: same check, first failing test and first error line. Then the next attempt is the last. `check` keeps the failed diff next to the note and puts the task's `Files:` back as they were at hand-out, and the prompt asks for a different approach. A repeat on the last attempt stops the task with that report. A reply without a `STATUS:` line is checked with `--reported none`. It stops when all boxes are ticked, on `BLOCKED.md`, or when a task runs out of attempts. UI tasks go through the visual loop inside the same check. A review task that changes code lists each fix as `Review fix: <slug> - <finding>` in `progress.md`. `check` runs the test tagged `[review:<slug>]` on the code as the review was handed out: it must fail there and pass now. `untestable: <reason>` on the line skips the test; it is warned about and kept in the timeline. After the last task `wingman-spec finish` runs the close-out without an agent (full tests, typecheck, lint, validate, every visual scenario, trace tags, source-text rule). Each step is logged in `runs/<change>/` of the specs root (git-ignored).
+3. **Implement**: `/spec-apply <change>`. The main agent orchestrates; fresh `spec-implementer` subagents do the work. `wingman-spec next` hands out one dispatch (the change at Size S, a task group at M/L) or a **wave** of up to `parallel:` (default 3) tasks of one group whose `Files:` do not overlap, one prompt each. `wingman-spec check` accepts a task only if exactly its box changed, its `Done when:` command, the project tests, typecheck, lint and `wingman-spec validate` pass, the changed tests do not read source files as text, and every scenario the task names has a test tagged `[capability/scenario-slug]`. In a wave each task is checked on its own (`--task`), and the project commands run at the wave's last check. A rejected task is retried with the failure output and the implementer's attempt note, up to 3 attempts. The note (`runs/<change>/notes/<task>.md`) says what the attempt tried and ruled out. Two attempts in a row can fail the same way: same check, first failing test and first error line. Then the next attempt is the last. `check` keeps the failed diff next to the note and puts the task's `Files:` back as they were at hand-out, and the prompt asks for a different approach. A repeat on the last attempt stops the task with that report. A reply without a `STATUS:` line is checked with `--reported none`. It stops when all boxes are ticked, on `BLOCKED.md`, or when a task runs out of attempts. UI tasks go through the visual loop inside the same check. A review task that changes code lists each fix as `Review fix: <slug> - <finding>` in `progress.md`. Its test carries `[review:<slug>]` in its name, or `review_<slug>` where test names are identifiers. `check` runs that test on the code as the review was handed out: it must fail there and pass now. `untestable: <reason>` on the line skips the test; it is warned about and kept in the timeline. How the test is selected is under [Review proof](#review-proof). After the last task `wingman-spec finish` runs the close-out without an agent (full tests, typecheck, lint, validate, every visual scenario, trace tags, source-text rule). Each step is logged in `runs/<change>/` of the specs root (git-ignored).
 4. **Fix (optional)**: `/spec-fix [change] [findings]` after manual testing: classify each finding (code bug, wrong spec, new work), patch the open change or open a short follow-up, TDD what needs code.
 5. **Sync**: `wingman-spec sync <change>` merges the delta specs deterministically (RENAMED, REMOVED, MODIFIED, ADDED, in that order; a conflict is an error with its line and nothing is written) and promotes the ADRs to `adrs/NNNN-<slug>.md` (re-runs update in place; `supersedes:` marks the old one). `--check` reports without writing. `/spec-archive` runs it, so run `/spec-sync` on its own only to inspect or fix a sync problem.
 6. **Archive**: `/spec-archive <change>` syncs, then `wingman-spec archive <change>` refuses (exit 1, with the reasons) a change with open tasks, unmerged specs or unpromoted ADRs, and only then moves it to `archive/YYYY-MM-DD-HHMM-<change>/` with its timeline and `archived.json` (`archived_at` to the second, with the UTC offset).
@@ -100,6 +100,38 @@ Commands, all prefixed `spec-` (Codex: `$spec-…`): `/spec-explore`, `/spec-pro
 **Existing codebase?** Run `/spec-adopt [scope]` once before the first change (`/spec-adopt src/billing` for one area, `--check` to only report). It agrees a capability inventory with you, writes baseline specs to `specs/<capability>.md` and records decisions already in the code as ADRs. It never overwrites an existing spec. Existing code is evidence of what happens today, not proof anyone wants it: only behavior a test, a document or the owner confirms becomes a requirement (each carries a `Confirmed:` line, and the spec's Purpose says `Baseline: adopted <date>`). Suspected bugs, debug leftovers, incidental details and unclear behavior go to `observed/<capability>.md`, one file per capability with an owner and how to confirm; `wingman-spec drift` lists adopted requirements without `Confirmed:` and incomplete entries (advisory). On the sample in `tests/fixtures/adopt` (7 seeded problems) the adopt command turns none into requirements and records all 7 (a regression fixture, not a benchmark).
 
 **Rewrites keep your edits.** Anything a tool rewrites in a file that already exists (`init` and `update` on AGENTS.md, CLAUDE.md and workspace files; `adrs --fix`; `drift decide`; `greenfield approve`; the extension's marker fixes) changes only its own lines: comments, key order, blank lines, quoting and line endings stay byte for byte. `tests/fixers.sh` checks each one.
+
+### Review proof
+
+A review fix's test is named for the fix. Runners with free-text names take `[review:<slug>]`. Runners with identifier names take `review_<slug>`, with `_` for `-` (`TestReview_<slug>` in Go). ExUnit takes `@tag review: "<slug>"`. `check` runs each fix on its own, first on the code before the review and then on the fixed code. Both runs use the same command, so a filter that selects no test fails. The command comes from the first rule that applies:
+
+1. `commands.test_one`, when it is set.
+2. A name filter for the runner. The runner is found in the test command, the per-file command or the `package.json` test script. When none of these names one, a marker file decides and the runner's own command is used. The filters:
+
+| Runner | Found by | Filter |
+|---|---|---|
+| Vitest, Jest, Bun | `vitest`, `jest`, `bun test` | `-t <regex>` |
+| node:test | `node --test` | `--test-name-pattern=<regex>` |
+| Mocha | `mocha` | `--grep <regex>` |
+| Deno | `deno test` | `--filter /<regex>/` |
+| Go | `go test`, `go.mod` | `-run <regex>` |
+| pytest | `pytest`, `pytest.ini`, `conftest.py` | `-k review_<slug>` |
+| Cargo | `cargo test`, `Cargo.toml` | `cargo test review_<slug>` |
+| .NET | `dotnet test`, `*.sln`, `*.csproj`, `*.fsproj` | `--filter FullyQualifiedName~review_<slug>` |
+| Maven | `mvn`, `mvnw`, `pom.xml` | `-Dtest=*#*review_<slug>*` |
+| Gradle | `gradle`, `gradlew`, `build.gradle(.kts)` | `--tests *review_<slug>*` |
+| RSpec | `rspec`, `.rspec` | `-e [review:<slug>]` |
+| PHPUnit | `phpunit`, `phpunit.xml(.dist)` | `--filter <regex>` |
+| Swift | `swift test`, `Package.swift` | `--filter <regex>` |
+| ExUnit | `mix test`, `mix.exs` | `--only review:<slug>` |
+| Dart, Flutter | `dart test`, `flutter test`, `pubspec.yaml` | `--name <regex>` |
+
+`<regex>` matches both name forms. The filter goes before `{files}` or `{dirs}` of the per-file command, or after the test command.
+
+3. The per-file command (`commands.targeted` or derived) on the tagged files.
+4. The whole test command.
+
+The `review_proof` check and the `review-proof` timeline event record the mode of each fix: `override`, `name:<runner>`, `file` or `suite`. Example override: `test_one: tox -e py -- -k {id} {file}`.
 
 ## Configuration (`.wingman-spec/wingman-spec.yaml`)
 
@@ -112,6 +144,7 @@ Unknown keys are errors, so a typo never becomes a silent default. Lookup order 
 | `rules` | extra rules per artifact (`rules: {proposal: [...], tasks: [...]}`), printed with its instruction | none |
 | `commands.test`, `commands.typecheck`, `commands.lint` | what `check` and `finish` run (`none` disables one) | detected by `init` |
 | `commands.targeted` | how to run some test files (`{files}`, `{dirs}`); derived for common runners | derived |
+| `commands.test_one` | how to run the tests of one review fix: `{name}` (a quoted regex for the tag and the identifier), `{id}` (`review_<slug>`), `{tag}`, `{file}` / `{files}`, `{dirs}` (env `WINGMAN_SPEC_TEST_ONE_CMD`) | by runner |
 | `commands.check_level` | `targeted` / `group` / `task` / `finish`: when the project commands run during apply (env `WINGMAN_SPEC_CHECK_LEVEL`) | `targeted` |
 | `commands.test_run` | `finish`: the project tests run once, at `finish` (env `WINGMAN_SPEC_TEST_RUN`) | |
 | `parallel` | tasks per parallel wave (`1`: no waves; `next --parallel N` overrides) | `3` |
@@ -365,7 +398,7 @@ Requires Go (see `go.mod`) and Node 22. The shell suites run against the binary 
 | `tests/visual-steps.sh` | state steps: `click` / `hover` on a control hidden at one viewport is skipped with an info note (clicked where visible), a missing or covered control and the strict `click!` fail, `fill` is never skipped |
 | `tests/verify-task.sh` | the apply-loop contract with stub subagents, injected faults, quality checks and the visual loop against static pages |
 | `tests/retry-notes.sh` | retries: the failure fingerprint (timings and positions ignored), the start-over on a repeat and the stop on the last attempt, the attempt note in the retry prompt and its removal on pass, `--reported none` |
-| `tests/review-proof.sh` | the review proof: a review that changes code needs a `Review fix:` line per fix and a `[review:<slug>]` test that fails on the code before the review and passes after (each fix on its own), or `untestable: <reason>` (warned and in the timeline) |
+| `tests/review-proof.sh` | the review proof: a review that changes code needs a `Review fix:` line per fix and a `[review:<slug>]` test that fails on the code before the review and passes after (each fix on its own), or `untestable: <reason>` (warned and in the timeline); selection by name, by `commands.test_one`, per file and by whole suite, with real runs for node:test, and Go and pytest when installed |
 | `tests/chronology.sh` | archived.json written by the archive step, same-day ordering, the legacy fallbacks, created time, replay order |
 | `tests/traceability.sh` | the Why line, owner approval, anchors, drift, sync and archive gates |
 | `tests/testpaths.sh` | which paths are tests (positive and negative table), one tagged test per language through `finish`, `anchors`, `problems` and the anchor guard, PHP and Java gaps |

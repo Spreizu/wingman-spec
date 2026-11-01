@@ -12,15 +12,3 @@ func TestReviewFixes(t *testing.T) {
 		t.Errorf("reviewFixes = %+v, want %+v", got, want)
 	}
 }
-
-func TestNameFilter(t *testing.T) {
-	if f := nameFilter("node", "a-b"); f != `--test-name-pattern='\[review:a-b\]'` {
-		t.Errorf("node: %s", f)
-	}
-	if f := nameFilter("vitest", "x"); f != `-t '\[review:x\]'` {
-		t.Errorf("vitest: %s", f)
-	}
-	if f := nameFilter("", "x"); f != "" {
-		t.Errorf("unknown runner: %q", f)
-	}
-}

@@ -31,7 +31,7 @@ ws_set() {
     { print }
     END { if (!done) print k ": " v }' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
 }
-# ws_cmd <test|typecheck|lint|targeted|test_run|check_level> <value> [file]: set one commands.<key>.
+# ws_cmd <test|typecheck|lint|targeted|test_one|test_run|check_level> <value> [file]: set one commands.<key>.
 ws_cmd() {
   local f="${3:-$WCFG}"
   awk -v k="$1" -v v="$2" '

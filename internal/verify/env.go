@@ -275,7 +275,7 @@ func (e *Env) cmdInfo(name, key, env string) CmdInfo {
 		}
 		return CmdInfo{Name: name, Cmd: new(v), Source: env, State: "set"}
 	}
-	val := map[string]string{"test": e.Cfg.Commands.Test, "typecheck": e.Cfg.Commands.Typecheck, "lint": e.Cfg.Commands.Lint, "targeted": e.Cfg.Commands.Targeted}[key]
+	val := map[string]string{"test": e.Cfg.Commands.Test, "typecheck": e.Cfg.Commands.Typecheck, "lint": e.Cfg.Commands.Lint, "targeted": e.Cfg.Commands.Targeted, "test_one": e.Cfg.Commands.TestOne}[key]
 	src := e.Cfg.Sources["commands."+key]
 	if src == "" {
 		src = e.configFile()

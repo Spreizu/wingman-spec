@@ -234,7 +234,7 @@ func (e *Env) targetedTests(changeDir string, st *State, testCmd string) targete
 	if len(files) == 0 {
 		return targeted{why: "no test file targets this task (none changed, tagged with its scenarios or named after its files); the full suite runs at finish", files: []string{}, counts: counts}
 	}
-	return targeted{cmd: withFiles(tpl, files), tpl: tpl, source: source, files: files, counts: counts}
+	return targeted{cmd: testpaths.WithFiles(tpl, files), tpl: tpl, source: source, files: files, counts: counts}
 }
 
 // ---------- check level ----------

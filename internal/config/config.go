@@ -53,6 +53,7 @@ type Commands struct {
 	Typecheck  string `yaml:"typecheck" json:"typecheck,omitempty"`
 	Lint       string `yaml:"lint" json:"lint,omitempty"`
 	Targeted   string `yaml:"targeted" json:"targeted,omitempty"`
+	TestOne    string `yaml:"test_one" json:"test_one,omitempty"`
 	TestRun    string `yaml:"test_run" json:"test_run,omitempty"`
 	CheckLevel string `yaml:"check_level" json:"check_level,omitempty"`
 }
@@ -289,7 +290,7 @@ var checkLevels = []string{"targeted", "group", "task", "finish"}
 
 func (c *Config) applyCommands(file string, n *yaml.Node) error {
 	if n.Kind != yaml.MappingNode {
-		return errors.New("write a map: test, typecheck, lint, targeted, test_run, check_level")
+		return errors.New("write a map: test, typecheck, lint, targeted, test_one, test_run, check_level")
 	}
 	var cmds Commands
 	if err := strict(n, &cmds); err != nil {
@@ -305,6 +306,7 @@ func (c *Config) applyCommands(file string, n *yaml.Node) error {
 	set("typecheck", &c.Commands.Typecheck, cmds.Typecheck)
 	set("lint", &c.Commands.Lint, cmds.Lint)
 	set("targeted", &c.Commands.Targeted, cmds.Targeted)
+	set("test_one", &c.Commands.TestOne, cmds.TestOne)
 	if cmds.TestRun != "" && cmds.TestRun != "finish" {
 		return fmt.Errorf("commands.test_run %q: the only value is finish", cmds.TestRun)
 	}

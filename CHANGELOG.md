@@ -84,6 +84,9 @@ Upgrade an 0.11 project once with `wingman-spec import openspec` ([docs/install.
 - **Review fixes need proof.** A review task that changes code lists each fix as `Review fix: <slug> - <finding>` in
   `progress.md`. `check` runs the test tagged `[review:<slug>]` on the code as the review got it, where it must fail,
   and on the fixed code, where it must pass. `untestable: <reason>` skips the test with a warning in the timeline.
+  The test is selected by name for 18 runners (Go, pytest, Cargo, .NET, Maven, Gradle, RSpec, PHPUnit, Swift,
+  ExUnit, Dart, Flutter, Deno, Bun, Mocha, node:test, Vitest, Jest), where `review_<slug>` names identifier tests.
+  `commands.test_one` overrides it. Otherwise the tagged files run, then the whole suite. The timeline records the mode.
 
 ## 0.11.2
 
