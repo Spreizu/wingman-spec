@@ -82,8 +82,8 @@ Upgrade an 0.11 project once with `wingman-spec import openspec` ([docs/install.
   last. Its prompt rules out that approach, and the task's `Files:` are put back with the failed diff kept. Each
   implementer writes a short attempt note in `runs/<change>/notes/`, and the retry prompt carries it. A reply with no
   `STATUS:` line is checked with `--reported none`.
-- **Review fixes need proof.** A review task that changes code lists each fix as `Review fix: <slug> - <finding>` in
-  `progress.md`. `check` runs the test tagged `[review:<slug>]` on the code as the review got it, where it must fail,
+- **Review fixes need proof.** A review task that changes code records each fix with `wingman-spec progress
+  --review-fix <slug>`. `check` runs the test tagged `[review:<slug>]` on the code as the review got it, where it must fail,
   and on the fixed code, where it must pass. `untestable: <reason>` skips the test with a warning in the timeline.
   The test is selected by name for 18 runners (Go, pytest, Cargo, .NET, Maven, Gradle, RSpec, PHPUnit, Swift,
   ExUnit, Dart, Flutter, Deno, Bun, Mocha, node:test, Vitest, Jest), where `review_<slug>` names identifier tests.
@@ -102,6 +102,9 @@ Upgrade an 0.11 project once with `wingman-spec import openspec` ([docs/install.
   each file atomically. The refused cases: [docs/spec-merge.md](docs/spec-merge.md).
 - **Plan checks.** `lint` reports duplicate task labels, an `After:` that names no earlier task, a task without `Files:` and
   a visual scenario the design cannot reach. `lint --text` prints `file:line: severity: text`.
+  A `redirects-to:` line is a complete visual claim without a key, and a 375 px viewport shows a narrow-screen edge case.
+  The planning instructions explain the `Not visual: <reason>; covered by <test>` line for an edge case the live app
+  cannot show.
 - **`wingman-spec trace`** lists scenarios without a `[cap/slug]` test tag and tags that name no scenario; `test_files:`
   adds test-file globs.
 - **`wingman-spec run-checks`** runs lint, typecheck, test and visual with logs in `runs/<change>/checks/` and a parsed

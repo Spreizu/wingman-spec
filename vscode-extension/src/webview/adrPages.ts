@@ -133,7 +133,7 @@ export function adrsPage(d: ViewData): string {
 <div class="timeline">${ordered.map((a) => adrCard(project, a, links)).join('')}</div>`;
   const body =
     project.adrs.length === 0
-      ? emptyState('No promoted ADRs yet', '<code>/spec-sync &lt;change&gt;</code> or the Promote button on a change ADR moves it to the adr directory.')
+      ? emptyState('No promoted ADRs yet', '<code>/spec-archive &lt;change&gt;</code> or the Promote button on a change ADR moves it to the adr directory.')
       : `<div class="tabs" role="tablist"><button class="tab active" data-tab="timeline">${icon('clock', 14)} Timeline</button><button class="tab" data-tab="graph">${icon('graph', 14)} Graph</button></div>
 <div class="pane active" data-pane="timeline">${timeline}</div><div class="pane" data-pane="graph">${graphView(project)}</div>`;
 

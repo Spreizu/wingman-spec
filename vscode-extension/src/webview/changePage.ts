@@ -109,7 +109,7 @@ function adrCard(project: ProjectModel, change: Change, adr: ChangeAdr, d: ViewD
   const tone = SYNC_TONE[sync.state] ?? 'muted';
   const actions: string[] = [];
   if (sync.state === 'not-promoted' || sync.state === 'out-of-date') {
-    actions.push(`<button class="btn" ${cmdAttr('promoteAdr', project.root, change.name, adr.slug)} title="Write this ADR to the root adr directory, as /spec-sync would">${icon('arrow', 13)} Promote</button>`);
+    actions.push(`<button class="btn" ${cmdAttr('promoteAdr', project.root, change.name, adr.slug)} title="Write this ADR to the root adr directory, as archive does">${icon('arrow', 13)} Promote</button>`);
   }
   if (sync.target) {
     actions.push(`<button class="btn" ${routeAttr({ page: 'adr', root: project.root, number: sync.target.number })}>Promoted ${esc(sync.target.number)}</button>`);
