@@ -6,6 +6,11 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
 - **Archive gate.** A committed file your `.gitignore` matches (an app log written while you click through the app)
   no longer makes finish stale, and a stale finish lists the files that changed since it passed.
+- **Data states.** The plan instructions ask for a visual `state:` per data state of a list, table, grid, feed or cart
+  (`empty`, `one-row`, `many-rows`, `long-name`, `each-status`), each reached by steps, seed data or a test role and
+  checked at 375. `lint` fails a list view with no populated state (`visual-data-states`) and `Not visual` on a narrow,
+  long-text or many-rows case (`not-visual-layout`), and warns when `ignore: layout:horizontal-overflow` hides the sideways
+  scroll the scenario's THEN rules out (`visual-overflow-claim`).
 
 ## 0.12.0
 

@@ -336,7 +336,7 @@ reset_visual "$VT"; sed -i.b 's/^- none named$/- A very long display name at 375
 rc=0; $V lint demo > "$T/vl.json" 2>&1 || rc=$?
 fault "a UI edge case (long text) whose visual scenario has no state showing it fails lint" '[ $rc = 1 ] && grep -q "needs a visual scenario with a state that shows it" "$T/vl.json"'
 reset_visual "$VT"
-sed -i.b 's/^state: default$/expect: main > p:nth-child(2) above [data-testid="list"]\nexpect: [data-testid="search"] above [data-testid="count"]\nstate: default/' "$C/specs/app.md"; rm -f "$C/specs/app.md.b"
+sed -i.b 's/^state: default$/expect: main > p:nth-child(2) above [data-testid="list"]\nexpect: [data-testid="search"] above [data-testid="count"]\nstate: default\nstate: one-result\n  key: [data-testid="result"]/' "$C/specs/app.md"; rm -f "$C/specs/app.md.b"
 rc=0; $V lint demo > "$T/vl.json" 2>&1 || rc=$?
 expect "lint notes (info, exit 0) a block-level expect that an empty/no-results state probably removes, and says to repeat it under the state" '[ $rc = 0 ] && grep -q "visual-expect-scope" "$T/vl.json" && grep -q "checked on the loaded page only, not in state no-results" "$T/vl.json" && grep -q "repeat it indented under that .state:" "$T/vl.json"'
 expect "... but not one about block-level keys (they hold in every state)" '[ "$(grep -c "visual-expect-scope" "$T/vl.json")" = 1 ]'

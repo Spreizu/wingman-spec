@@ -369,6 +369,9 @@ func (e *Env) planReport(changeDir string, vl vlint) planRep {
 		}
 	}
 	ux := pf(slices.Concat(quality.UXLint(changeDir, vids), quality.VisualGapLint(changeDir, ui), quality.ReachLint(changeDir, vm)), inChange)
+	for _, p := range slices.Concat(visual.DataStateLint(vl.scenarios, e.R.Specs), visual.OverflowClaimLint(vl.scenarios, e.R.Specs)) {
+		ux = append(ux, PlanFinding{File: p["file"].(string), Line: p["line"].(int), Severity: p["severity"].(string), Kind: p["kind"].(string), Text: p["text"].(string)})
+	}
 	val := e.validateFindings()
 	var plan []PlanFinding
 	if trace.IsSpecOnly(changeDir) {

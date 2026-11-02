@@ -115,6 +115,7 @@ type Scenario struct {
 	Visual      bool   `json:"visual"`
 	NotVisual   string `json:"not_visual,omitempty"` // the reason of a `Not visual: <reason>` line
 	Shows       bool   `json:"-"`                    // a THEN/AND line names a [data-testid] element
+	Text        string `json:"-"`                    // the name and the WHEN/THEN lines
 }
 
 var (
@@ -159,31 +160,64 @@ func SpecScenarios(dir string) []*Scenario {
 					cur = nil
 					continue
 				}
-				cur = &Scenario{ID: sf.Cap + "/" + spec.Slug(m[1]), Capability: sf.Cap, Requirement: req, Name: m[1], File: sf.File, Line: i + 1}
+				cur = &Scenario{ID: sf.Cap + "/" + spec.Slug(m[1]), Capability: sf.Cap, Requirement: req, Name: m[1], File: sf.File, Line: i + 1, Text: m[1]}
 				out = append(out, cur)
 			} else if cur != nil {
 				if m := notVisualRE.FindStringSubmatch(l); m != nil {
 					cur.NotVisual = m[1]
 				}
 				cur.Shows = cur.Shows || thenTestID.MatchString(l)
+				if m := gwtLineRE.FindStringSubmatch(l); m != nil {
+					cur.Text += "\n" + m[1]
+				}
 			}
 		}
 	}
 	return out
 }
 
-const dataStateHint = "Never delete a scenario or its ```visual block: when the live app lacks the data, reach the state with a test role in `visual.roles`, seed data in `visual.command` or a route, and say which in design.md; only when none works, write `Not visual: <reason>; covered by <test>` under the scenario"
+const dataStateHint = "Never delete a scenario or its ```visual block: when the live app lacks the data, reach the state with `do:` steps, seed data in `visual.command`, a test role in `visual.roles` or a route, and say which in design.md. `Not visual: <reason>; covered by <test>` is only for a case that is not about layout"
 
-// VisualGapLint warns, in a change with UI, about a scenario whose THEN names a [data-testid] element but that has
-// neither a ```visual block nor a `Not visual: <reason>` line (a visual block silently dropped, e.g. during design).
+var (
+	layoutRE   = regexp.MustCompile(`(?i)\b(?:narrow|small screens?|375\s*(?:px)?|(?:mobile|phone)\s+(?:widths?|screens?|views?|viewports?|layouts?)|overflow\w*|sideways|horizontal(?:ly)?\s+scroll\w*|wrap(?:s|ped|ping)?|truncat\w*|ellipsis)\b`)
+	volumeRE   = regexp.MustCompile(`(?i)\blong(?:er|est)?\s+(?:\w+\s+){0,2}?(?:names?|titles?|texts?|labels?|words?|translations?|strings?|values?|descriptions?|content|emails?|addresses|urls?|lines?|lists?)\b|\b(?:many|lots\s+of|several|hundreds\s+of|dozens\s+of)\s+(\w+)`)
+	notCountRE = regexp.MustCompile(`(?i)^(?:attempts?|times|tries|requests?|retries|calls?|failed|wrong|invalid|logins?|seconds|minutes)$`)
+	rejectRE   = regexp.MustCompile(`(?i)\b(?:reject\w*|refus\w*|denied|invalid|too\s+(?:long|many)|not\s+saved|limit\w*)\b`)
+)
+
+// layoutCase is the words that make a scenario about layout (a narrow screen, long text, many rows), or "". A long or
+// many case whose THEN rejects the input (a length or rate limit) is logic, not layout.
+func layoutCase(text string) string {
+	t := prose(text)
+	if m := layoutRE.FindString(t); m != "" {
+		return m
+	}
+	if rejectRE.MatchString(t) {
+		return ""
+	}
+	for _, m := range volumeRE.FindAllStringSubmatch(t, -1) {
+		if m[1] == "" || !notCountRE.MatchString(m[1]) {
+			return m[0]
+		}
+	}
+	return ""
+}
+
+// VisualGapLint reports, in a change with UI, a scenario whose THEN names a [data-testid] element but that has neither a
+// ```visual block nor a `Not visual: <reason>` line (warning, a block silently dropped, e.g. during design), and a
+// `Not visual` scenario about layout (error): only the visual check sees a narrow screen, long text or many rows.
 func VisualGapLint(changeDir string, ui bool) []Finding {
 	var out []Finding
 	if !ui {
 		return out
 	}
 	for _, s := range SpecScenarios(filepath.Join(changeDir, "specs")) {
+		f := filepath.Join("specs", filepath.Base(s.File))
 		if s.Shows && !s.Visual && s.NotVisual == "" {
-			out = append(out, Finding{File: filepath.Join("specs", filepath.Base(s.File)), Line: s.Line, Severity: "warning", Kind: "visual-gap", Text: fmt.Sprintf("%s:%d: scenario %s checks a page element but has no ```visual block. %s", filepath.Base(s.File), s.Line, s.ID, dataStateHint)})
+			out = append(out, Finding{File: f, Line: s.Line, Severity: "warning", Kind: "visual-gap", Text: fmt.Sprintf("%s:%d: scenario %s checks a page element but has no ```visual block. %s", filepath.Base(s.File), s.Line, s.ID, dataStateHint)})
+		}
+		if x := layoutCase(s.Text); s.NotVisual != "" && !s.Visual && x != "" {
+			out = append(out, Finding{File: f, Line: s.Line, Severity: "error", Kind: "not-visual-layout", Text: fmt.Sprintf("%s:%d: scenario %s is about layout (%q) but says `Not visual`: a unit test cannot see a long name or many rows push the page wider than 375px. Give it a ```visual block with a `state:` that shows it (`do:` steps, seed data or a test role the design names), checked at 375", filepath.Base(s.File), s.Line, s.ID, x)})
 		}
 	}
 	return out

@@ -100,9 +100,10 @@ artifacts:
         text, empty, error, many items, limits, invalid input, missing data. Use their words. End
         each bullet with `-> <capability>/<scenario-slug>`, the scenario that proves it.
         A UI edge case points at a visual scenario that shows it: a `state:` named for the case
-        (a long name, an empty list), or `viewports: 375` for a narrow-screen case. When the live
-        app cannot show it (a POST error, a flag no test user has), write `Not visual: <reason>;
-        covered by <test>` under that scenario. Write `- none named` only when there are none.
+        (a long name, many rows, an empty list), or `viewports: 375` for a narrow-screen case.
+        `Not visual: <reason>; covered by <test>` under the scenario is only for a case that is
+        not about layout (a POST error, a flag no test user has); a narrow, long-text or many-rows
+        case always gets a state. Write `- none named` only when there are none.
         `wingman-spec lint` fails a bullet with no scenario or an unknown one, and a UI case
         with no such state. It warns when the plan mentions an edge case the list lacks. Every
         size keeps every edge case.
@@ -224,17 +225,21 @@ artifacts:
         only there. Steps: `click <sel>`,
         `fill <sel> = <text>`, `press <Key>`, `hover <sel>`, `wait <ms>`, `goto /path`,
         `storage <localStorage key> = <value>` (then reload), `reload`. Without states the page
-        is checked as loaded. Cover the empty, error and boundary states the requirement names.
+        is checked as loaded.
       - `overlay: <selector>` (optional): a modal/drawer that may cover other key elements.
       - `role: <name>` (optional): the user the page is opened as, defined under `visual.roles` in
         `wingman-spec.yaml` (or `anonymous`, the default). Use it for gated features; one role
         per block, so write one scenario per role. Never put a password in a spec.
-      - **States that need data** the live app lacks (a blocked account, a long name, an empty
-        list): keep the scenario and its block. Reach the state with a test account role in
-        `visual.roles` such as `role: blocked-customer`, seed data in the start command
-        (`visual.command`), or a route or `storage` value. The design names which, and a task sets it
-        up. Only when none works, replace the block with `Not visual: <reason>; covered by <test>`
-        under the scenario.
+      - **Data states**: a view with variable data (a list, table, grid, feed, cart, search
+        results, repeated form rows) gets a `state:` per data state the change affects, named for
+        it: `empty`, `one-row`, `many-rows`, `long-name`, `each-status`, plus `error` or `loading`
+        where they apply. A populated state has an indented `key:` on a row and is checked at 375
+        too. Never rely on whatever the database holds: reach each state with `do:` steps, seed
+        data in `visual.command` (prefer it to steps that save data, since steps repeat per
+        viewport), a test role in `visual.roles` (`role: member-with-orders`) or a route. The
+        design names which, and a task sets it up. `Not visual: <reason>; covered by <test>` under
+        the scenario is only for a case that is not about layout. `wingman-spec lint` fails a list
+        view with no populated state and `Not visual` on a narrow, long-text or many-rows case.
         `absent: <selector>` (repeatable, also inside a state): must NOT be visible to that role.
         `redirects-to: /path`: the route must end on that path (e.g. `/login` for a visitor).
       - `ignore: <code>` / `ignore-http: <text>` (optional, repeatable, whole block): skip a defect
@@ -294,7 +299,7 @@ artifacts:
 
       The specs are input here. Do not delete or weaken a scenario or a ```visual block.
       **Testing approach** names each visual scenario with a `state:` by its id and says how the
-      state is reached (see "States that need data" under specs). If a scenario cannot stay, stop and ask the owner.
+      state is reached (see "Data states" under specs). If a scenario cannot stay, stop and ask the owner.
 
       Sections (follow the template):
       - **Context**: current state and constraints only. Reference the proposal for motivation.

@@ -155,3 +155,40 @@ func TestListTestFilesGlobs(t *testing.T) {
 		t.Errorf("without globs: the built-in detection only, got %v", got)
 	}
 }
+
+// `Not visual` on a layout case (a narrow screen, long text, many rows) is an error; on a logic case it stays fine, also
+// when the case only mentions length or a count it rejects.
+func TestNotVisualLayout(t *testing.T) {
+	d := t.TempDir()
+	for _, tc := range []struct {
+		name, when, then string
+		err              bool
+	}{
+		{"Long firm name still shows", "a firm has a 90-character name", "the row shows the whole name", true},
+		{"Form on a narrow page", "the page is 375px wide", "the save button stays visible", true},
+		{"Many orders", "the buyer has many orders", "each order has a row", true},
+		{"Label wraps", "the label is in German", "the label wraps onto two lines", true},
+		{"Wrong password", "the password is wrong", "the form shows an error", false},
+		{"Too long title is rejected", "the title is a long title of 300 characters", "the title is rejected with a message", false},
+		{"Many attempts lock the form", "there are many attempts in a minute", "the form is locked", false},
+		{"Paused label", "the firm is paused", "the row shows the Paused label", false},
+	} {
+		write(t, filepath.Join(d, "specs", "app.md"), "## ADDED\n\n### Requirement: App\nThe system SHALL work.\n\n#### Scenario: "+tc.name+"\n- **WHEN** "+tc.when+"\n- **THEN** "+tc.then+"\n\nNot visual: covered by AppTest\n")
+		n := 0
+		for _, f := range VisualGapLint(d, true) {
+			if f.Kind == "not-visual-layout" && f.Severity == "error" {
+				n++
+			}
+		}
+		if (n == 1) != tc.err {
+			t.Errorf("%s: %d not-visual-layout errors, want error=%v", tc.name, n, tc.err)
+		}
+		if n := len(VisualGapLint(d, false)); n != 0 {
+			t.Errorf("%s: no UI, want no finding, got %d", tc.name, n)
+		}
+	}
+	write(t, filepath.Join(d, "specs", "app.md"), "## ADDED\n\n### Requirement: App\nThe system SHALL work.\n\n#### Scenario: Long name\n- **WHEN** a long name\n- **THEN** it shows\n\n```visual\nroute: /\nkey: #a\n```\n")
+	if n := len(VisualGapLint(d, true)); n != 0 {
+		t.Errorf("a layout case with a visual block: want no finding, got %d", n)
+	}
+}
