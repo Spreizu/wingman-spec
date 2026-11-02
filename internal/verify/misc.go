@@ -683,6 +683,10 @@ func (e *Env) archiveGate(changeDir string) []gateCheck {
 		g.Problem = fmt.Sprintf("finish passed before this version recorded what it checked: run `wingman-spec finish %s` again", e.O.Change)
 	case fin.Gate != now:
 		g.Problem = fmt.Sprintf("the code or the plan changed since finish passed (%s, at %s): run `wingman-spec finish %s` again", fin.At, shortHead(fin.Head), e.O.Change)
+		g.Details = runstate.GateChanges(e.code, fin.Gate, now)
+		if n := len(g.Details); n > 10 {
+			g.Details = append(g.Details[:10], fmt.Sprintf("and %d more", n-10))
+		}
 	}
 	add(g)
 	g = gateCheck{Check: "lint"}

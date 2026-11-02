@@ -2,6 +2,11 @@
 
 Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
+## Unreleased
+
+- **Archive gate.** A committed file your `.gitignore` matches (an app log written while you click through the app)
+  no longer makes finish stale, and a stale finish lists the files that changed since it passed.
+
 ## 0.12.0
 
 Wingman Spec is now its own tool: one Go binary, `wingman-spec`, replaces the OpenSpec schema, the `openspec` CLI and the 15

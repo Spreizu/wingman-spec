@@ -77,3 +77,39 @@ func TestCacheTree(t *testing.T) {
 		t.Error("the real index changed")
 	}
 }
+
+// The archive gate on a real project: the app appends to a committed log under an ignored folder between finish and
+// archive, the workflow ticks tasks and writes run state, the user commits. None of it is code; a code edit is.
+func TestGateTree(t *testing.T) {
+	d := t.TempDir()
+	git(t, d, "init", "-q")
+	put(t, filepath.Join(d, "app/logs/queries.log"), "x\n")
+	put(t, filepath.Join(d, "app/main.php"), "a\n")
+	git(t, d, "add", "-A")
+	git(t, d, "commit", "-qm", "base")
+	put(t, filepath.Join(d, ".gitignore"), "app/logs/\nscratch/\n")
+	put(t, filepath.Join(d, "app/new.php"), "n\n")
+	put(t, filepath.Join(d, ".wingman-spec/changes/c/tasks.md"), "- [ ] 1.1 x\n")
+	fin := GateTree(d)
+	if fin == "" {
+		t.Fatal("no gate tree")
+	}
+	appendTo(t, filepath.Join(d, "app/logs/queries.log"))
+	put(t, filepath.Join(d, "scratch/tmp.txt"), "s\n")
+	put(t, filepath.Join(d, ".wingman-spec/changes/c/tasks.md"), "- [x] 1.1 x\n")
+	put(t, filepath.Join(d, ".wingman-spec/changes/c/progress.md"), "- 1.1 done\n")
+	put(t, filepath.Join(d, ".wingman-spec/runs/c/timeline.jsonl"), "{}\n")
+	if now := GateTree(d); now != fin {
+		t.Fatalf("bookkeeping and an ignored log changed the gate: %v", GateChanges(d, fin, now))
+	}
+	git(t, d, "add", "-A")
+	git(t, d, "commit", "-qm", "after finish")
+	if GateTree(d) != fin {
+		t.Fatal("a commit of the same content changed the gate")
+	}
+	appendTo(t, filepath.Join(d, "app/main.php"))
+	now := GateTree(d)
+	if got := GateChanges(d, fin, now); now == fin || strings.Join(got, ",") != "app/main.php" {
+		t.Fatalf("a code edit: gate %s→%s, changes %v", fin, now, got)
+	}
+}

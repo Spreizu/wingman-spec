@@ -146,8 +146,15 @@ var NotBase = regexp.MustCompile(`(^|/)changes/[^/]+/spec-base\.json$`)
 var NotGate = regexp.MustCompile(NotCode.String() + `|(^|/)\.wingman-spec/(specs|adrs|archive)/`)
 
 // GateTree is the working-tree hash the archive gate compares with the one finish recorded ("" outside git). Untracked
-// files are hashed by content (WorkTree uses stat data), so committing after finish keeps the same hash.
-func GateTree(dir string) string { return IndexTree(dir, NotGate, "add", "-A") }
+// files are hashed by content (WorkTree uses stat data), so committing after finish keeps the same hash. Tracked files
+// the project's .gitignore matches (a committed runtime log the app appends to) are left out: they are not code.
+func GateTree(dir string) string { return indexTree(dir, NotGate, true, "add", "-A") }
+
+// GateChanges lists the paths that differ between two GateTree hashes (nil when either tree is gone).
+func GateChanges(dir, was, now string) []string {
+	xs, _ := gitx.Z(dir, nil, "diff-tree", "-r", "-z", "--name-only", was, now)
+	return xs
+}
 
 // NotApp is NotCode plus tests and Markdown: what the pages are not built from (the visual cache key).
 var NotApp = regexp.MustCompile(NotCode.String() + `|(^|/)(tests?|__tests__|e2e|spec)/|\.(test|spec)\.[^/]+$|\.mdx?$`)
@@ -201,6 +208,10 @@ func workTree(dir string, drop *regexp.Regexp) string {
 // IndexTree is the tree object of a temporary copy of the index after stage (`add -u` or `add -A`), drop paths removed.
 // The real index, HEAD and the branch stay untouched.
 func IndexTree(dir string, drop *regexp.Regexp, stage ...string) string {
+	return indexTree(dir, drop, false, stage...)
+}
+
+func indexTree(dir string, drop *regexp.Regexp, dropIgnored bool, stage ...string) string {
 	real, ok := gitx.Run(dir, nil, "rev-parse", "--path-format=absolute", "--git-path", "index")
 	if !ok {
 		return ""
@@ -226,17 +237,17 @@ func IndexTree(dir string, drop *regexp.Regexp, stage ...string) string {
 	if _, ok := gitx.Run(dir, env, stage...); !ok {
 		return ""
 	}
+	var gone []string
 	if drop != nil {
 		files, _ := gitx.Z(dir, env, "ls-files", "-z")
-		var gone []string
-		for _, f := range files {
-			if drop.MatchString(f) {
-				gone = append(gone, f)
-			}
-		}
-		if len(gone) > 0 {
-			gitx.RunRaw(dir, env, []byte(strings.Join(gone, "\x00")+"\x00"), "update-index", "--force-remove", "-z", "--stdin")
-		}
+		gone = slices.DeleteFunc(files, func(f string) bool { return !drop.MatchString(f) })
+	}
+	if dropIgnored {
+		files, _ := gitx.Z(dir, env, "ls-files", "-z", "-ci", "--exclude-standard")
+		gone = append(gone, files...)
+	}
+	if len(gone) > 0 {
+		gitx.RunRaw(dir, env, []byte(strings.Join(gone, "\x00")+"\x00"), "update-index", "--force-remove", "-z", "--stdin")
 	}
 	t, ok := gitx.Run(dir, env, "write-tree")
 	if !ok {

@@ -131,11 +131,12 @@ expect "the refusal is JSON with every gate check" '[ "$(J "$T/ar.json" result)"
 WINGMAN_SPEC_TRACEABILITY=off $V archive todo >/dev/null 2>"$T/ar.err"; rc=$?
 expect "the refusal also holds with traceability off" '[ $rc = 1 ] && [ -d "$C" ]'
 mkdir -p "$C/adrs"; printf 'No decision here.\n' > "$C/adrs/none.md"; printf -- '---\ntitle: Skip\nstatus: None\ndate: 2026-10-25\n---\nNothing.\n' > "$C/adrs/skip.md"
+printf 'q\n' > ignored/app.log; git add -f ignored/app.log; git commit -qm 'a committed log in an ignored folder'
 $V finish todo > "$T/f.json" 2>/dev/null; rc=$?
 expect "finish passes again (it records the tree it checked)" '[ $rc = 0 ] && grep -q "\"gate\"" .wingman-spec/runs/todo/finished.json'
-printf '// edited after finish\n' >> src/todo.js
+printf '// edited after finish\n' >> src/todo.js; printf 'q\n' >> ignored/app.log
 rc=0; $V archive todo > "$T/ar.json" 2> "$T/ar.err" || rc=$?
-expect "a code edit after finish refuses the archive: finish must hold on this tree" '[ $rc = 1 ] && grep -q "changed since finish passed" "$T/ar.err" && [ -d "$C" ]'
+expect "a code edit after finish refuses the archive and names the file; the app's ignored log does not count" '[ $rc = 1 ] && grep -q "changed since finish passed" "$T/ar.err" && grep -q "finish: src/todo.js" "$T/ar.err" && ! grep -q "app.log" "$T/ar.err" && [ -d "$C" ]'
 sed -i '$d' src/todo.js
 printf -- '---\ntitle: Use a list\nstatus: Accepted\ndate: 2026-10-25\nchange: todo\n---\nWe keep an array.\n' > "$C/adrs/use-a-list.md"
 rc=0; $V archive todo > "$T/ar.json" 2> "$T/ar.err" || rc=$?
