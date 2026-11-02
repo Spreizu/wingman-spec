@@ -45,7 +45,7 @@ jobs:
         working-directory: vscode-extension
       - name: Package the vsix files (6 platforms)
         env:
-          VSCE: pnpm --dir vscode-extension exec vsce
+          VSCE: pnpm exec vsce  # package-vsix.sh runs it inside vscode-extension
         run: scripts/package-vsix.sh
       - uses: actions/upload-artifact@v7
         with:
