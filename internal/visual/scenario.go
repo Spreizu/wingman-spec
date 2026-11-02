@@ -412,7 +412,7 @@ func parseBlock(body []string, firstLine int) *Scenario {
 		stateKeys = stateKeys || len(x.Keys) > 0
 		stateAbsents = stateAbsents || len(x.Absents) > 0
 	}
-	if len(s.Keys) == 0 && !stateKeys && len(s.Absents) == 0 && !stateAbsents {
+	if len(s.Keys) == 0 && !stateKeys && len(s.Absents) == 0 && !stateAbsents && s.RedirectsTo == "" {
 		s.Errors = append(s.Errors, `no "key:" selector: name the elements that must be visible (e.g. key: [data-testid="search"])`)
 	}
 	if len(s.States) == 0 {

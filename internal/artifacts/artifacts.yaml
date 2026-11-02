@@ -99,8 +99,10 @@ artifacts:
       - **Edge cases**: one bullet per edge case the request or the user's answers name: long
         text, empty, error, many items, limits, invalid input, missing data. Use their words. End
         each bullet with `-> <capability>/<scenario-slug>`, the scenario that proves it.
-        A UI edge case points at a visual scenario whose `state:` shows that content, for example
-        an item with a long name at 375 px. Write `- none named` only when there are none.
+        A UI edge case points at a visual scenario that shows it: a `state:` named for the case
+        (a long name, an empty list), or `viewports: 375` for a narrow-screen case. When the live
+        app cannot show it (a POST error, a flag no test user has), write `Not visual: <reason>;
+        covered by <test>` under that scenario. Write `- none named` only when there are none.
         `wingman-spec lint` fails a bullet with no scenario or an unknown one, and a UI case
         with no such state. It warns when the plan mentions an edge case the list lacks. Every
         size keeps every edge case.
@@ -146,7 +148,7 @@ artifacts:
       proposal. Modified capabilities: use the existing file name from the living `specs/`.
 
       Size S does not remove scenarios. Write the scenario that each bullet under the proposal's
-      **Edge cases** names. For a UI case, write a visual scenario with a matching `state:`.
+      **Edge cases** names. For a UI case, follow the proposal rule above.
 
       **Why line** (when `traceability` is not `off`). On the line under each SHALL sentence, write
       `Why: <role> wants <outcome>, so that <reason>.` in the words of the person who asked, for
@@ -212,7 +214,8 @@ artifacts:
       task's `Files:` names its component. A reviewer compares before/after clips of the task's
       own key elements with the THEN text and the design reference. Fields (one per line):
       - `route: /path` (required): the page to open.
-      - `key: <CSS selector>` (one or more; required): elements that must be visible, inside the
+      - `key: <CSS selector>` (one or more; required unless the block has `absent:` or
+        `redirects-to:`): elements that must be visible, inside the
         viewport and not overlap each other. Prefer `[data-testid="..."]` and name the test ids
         in the THEN text, so the implementer adds them.
       - `viewports: 375, 768, 1280` (optional; this is the default).
@@ -289,9 +292,9 @@ artifacts:
       **Testing approach** if it adds something; delete the other template sections. Size M and L
       write every section below (`wingman-spec size` fails an M/L design without Decisions).
 
-      The specs are input here. Do not delete or weaken a scenario or a ```visual block. A visual
-      state the live app cannot show gets a way to reach it in **Testing approach** (see "States
-      that need data" under specs). If a scenario cannot stay, stop and ask the owner.
+      The specs are input here. Do not delete or weaken a scenario or a ```visual block.
+      **Testing approach** names each visual scenario with a `state:` by its id and says how the
+      state is reached (see "States that need data" under specs). If a scenario cannot stay, stop and ask the owner.
 
       Sections (follow the template):
       - **Context**: current state and constraints only. Reference the proposal for motivation.

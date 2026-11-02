@@ -50,6 +50,26 @@ func TestEdgeLintUIState(t *testing.T) {
 	}
 }
 
+// A narrow-width edge case is shown by a narrow viewport of its block; it needs no state of its own.
+func TestEdgeLintNarrowViewport(t *testing.T) {
+	d := t.TempDir()
+	write(t, filepath.Join(d, "proposal.md"), "## Why\nApp change.\n\n## What Changes\n- A change.\n\n## Edge cases\n- Narrow form at 375px -> app/search\n")
+	write(t, filepath.Join(d, "specs", "app.md"), "## ADDED\n\n### Requirement: App\nThe system SHALL work.\n\n#### Scenario: Search\n- **WHEN** the query is typed\n- **THEN** the grid filters\n")
+	for _, tc := range []struct {
+		vp   []int
+		want int
+	}{{[]int{375}, 0}, {[]int{768, 1280}, 1}} {
+		_, fs := EdgeLint(d, "", map[string]VisualScenario{"app/search": {States: []VisualState{{Name: "default"}}, Viewports: tc.vp}}, false)
+		if got := errorsOf(fs); got != tc.want {
+			t.Errorf("viewports %v: %d errors, want %d: %+v", tc.vp, got, tc.want, fs)
+		}
+	}
+	write(t, filepath.Join(d, "proposal.md"), "## Why\nApp change.\n\n## What Changes\n- A change.\n\n## Edge cases\n- A long title wraps at 375 -> app/search\n")
+	if _, fs := EdgeLint(d, "", map[string]VisualScenario{"app/search": {States: []VisualState{{Name: "default"}}, Viewports: []int{375}}}, false); errorsOf(fs) != 1 {
+		t.Errorf("long text at 375 still needs a state: %+v", fs)
+	}
+}
+
 // A UI change whose visual blocks were all dropped still needs a state per UI edge case, and a page-element scenario
 // without a block warns; a `Not visual: <reason>` line answers both.
 func TestDroppedVisualBlocks(t *testing.T) {

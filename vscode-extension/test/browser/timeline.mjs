@@ -1,4 +1,4 @@
-// Headless Chromium check of the Timeline tab on the change page and the archived change page: entries in time order, one line
+// Headless Chromium check of the Timeline tab on the change page and the archived change page: entries newest first, one line
 // each, details collapsed until clicked, the decision entry, the idle marker; then a live refresh (the file grows, the page
 // is rendered again). Needs Playwright (not part of `node --test`):
 //   PLAYWRIGHT_NODE_MODULES=<node_modules with playwright> [PLAYWRIGHT_BROWSERS_PATH=...] \
@@ -48,7 +48,7 @@ async function show(route, name, width, expand, idles = 1) {
   await page.evaluate(() => document.querySelectorAll('[data-pane]').forEach((p) => p.classList.toggle('active', p.getAttribute('data-pane') === 'timeline')));
   const rows = await page.$$eval('[data-pane="timeline"] .tl-entry', (els) => els.map((e) => ({ time: e.querySelector('.tl-time')?.textContent, step: e.querySelector('.tl-step')?.textContent, open: e.querySelector('details')?.open ?? null, decision: e.classList.contains('tl-decision'), h: Math.round(e.querySelector('.tl-line').getBoundingClientRect().height) })));
   const times = rows.map((r) => r.time);
-  if (times.join() !== [...times].sort().join()) fail(`${name} ${width}px: not in time order (${times.join(', ')})`);
+  if (times.join() !== [...times].sort().reverse().join()) fail(`${name} ${width}px: not newest first (${times.join(', ')})`);
   if (rows.some((r) => r.open)) fail(`${name} ${width}px: a detail is open before a click`);
   if (rows.filter((r) => r.decision).length !== 1) fail(`${name} ${width}px: expected one decision entry`);
   if (width >= 900 && rows.some((r) => r.h > 30)) fail(`${name} ${width}px: an entry is more than one line (${rows.map((r) => r.h).join(',')})`);
@@ -65,7 +65,7 @@ async function show(route, name, width, expand, idles = 1) {
   return rows.length;
 }
 await show({ page: 'change', root, name: 'demo' }, 'change', 900);
-await show({ page: 'change', root, name: 'demo' }, 'change-expanded', 900, [3, 8]);
+await show({ page: 'change', root, name: 'demo' }, 'change-expanded', 900, [6, 1]); // newest first: the decision, then the failed check
 await show({ page: 'change', root, name: 'demo' }, 'change', 375);
 const archived = await show({ page: 'archived', root, name: '2026-09-30-first-cut' }, 'archived', 900, undefined, 2);
 if (archived !== RUN.length + 2) fail(`archived: expected ${RUN.length + 2} entries, got ${archived}`);

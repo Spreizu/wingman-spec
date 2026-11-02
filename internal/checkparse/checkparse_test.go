@@ -26,6 +26,7 @@ func TestParseFixtures(t *testing.T) {
 		{"gov.txt", "go test", "1 failed, 1 passed, 1 skipped", Failure{File: "x_test.go", Line: 4, Name: "TestB", Message: "want 1 got 2"}},
 		{"jest.txt", "jest", "1 failed, 1 passed", Failure{File: "src/b.jtest.cjs", Line: 3, Name: "math › fails here", Message: "expect(received).toBe(expected) // Object.is equality"}},
 		{"tap.txt", "tap", "2 failed, 2 passed", Failure{File: "/work/app/src/n.test.mjs", Line: 5, Name: "inner bad", Message: "Expected values to be strictly equal:"}},
+		{"nodespec.txt", "node", "2 failed, 2 passed, 1 skipped", Failure{File: "src/n.test.mjs", Line: 5, Name: "inner bad", Message: "Expected values to be strictly equal:"}},
 		{"pytest.txt", "pytest", "1 failed, 1 passed, 1 skipped", Failure{File: "py/test_x.py", Line: 3, Name: "test_bad", Message: "assert 1 == 2"}},
 		{"tsc.txt", "tsc", "2 errors", Failure{File: "src/t.ts", Line: 1, Col: 7, Message: "TS2322: Type 'string' is not assignable to type 'number'."}},
 		{"tscpretty.txt", "tsc", "2 errors", Failure{File: "src/t.ts", Line: 1, Col: 7, Message: "TS2322: Type 'string' is not assignable to type 'number'."}},

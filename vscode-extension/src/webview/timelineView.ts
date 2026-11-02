@@ -1,4 +1,5 @@
-/** The Timeline tab of a change and of an archived change: one calm line per event, grouped by phase and task, details collapsed. */
+/** The Timeline tab of a change and of an archived change: one calm line per event, grouped by phase and task, details
+ * collapsed, newest on top (phases, blocks and the events in each are shown in reverse). */
 import { duration, parseTimeline, phaseSections, verifyChain } from '../model/timeline.ts';
 import type { TimelineBlock, TimelineEntry, TimelineGroup } from '../model/timeline.ts';
 import { emptyState, esc, rich } from './components.ts';
@@ -18,8 +19,10 @@ function line(e: TimelineEntry): string {
 }
 
 function list(g: TimelineGroup): string {
-  return `<ol class="tl-list">${g.entries
-    .map((e) => `${e.idle && e.gap !== undefined ? `<li class="tl-idle" aria-label="idle">Idle for ${esc(duration(e.gap))}</li>` : ''}${line(e)}`)
+  // newest first: an idle gap sits below the event it led up to
+  return `<ol class="tl-list">${[...g.entries]
+    .reverse()
+    .map((e) => `${line(e)}${e.idle && e.gap !== undefined ? `<li class="tl-idle" aria-label="idle">Idle for ${esc(duration(e.gap))}</li>` : ''}`)
     .join('')}</ol>`;
 }
 
@@ -40,6 +43,7 @@ export function timelineTab(text: string | undefined, archivedJson?: string): st
     ? `<p class="tl-chain" role="note">This timeline was changed after it was written: entry ${br.line}${br.event ? ` (${esc(br.event)}${br.at ? ` at ${esc(br.at)}` : ''})` : ''} ${esc(br.reason)}. The entries are shown as they are.</p>`
     : '';
   return `${note}<div class="timeline">${phaseSections(entries)
-    .map((p) => `<section class="tl-phase" aria-label="${esc(p.label)}"><h3 class="tl-phase-title">${esc(p.label)}</h3>${p.blocks.map(block).join('')}</section>`)
+    .reverse()
+    .map((p) => `<section class="tl-phase" aria-label="${esc(p.label)}"><h3 class="tl-phase-title">${esc(p.label)}</h3>${[...p.blocks].reverse().map(block).join('')}</section>`)
     .join('')}</div>`;
 }

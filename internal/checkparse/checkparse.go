@@ -1,5 +1,5 @@
 // Package checkparse turns the output of a lint, typecheck or test command into a short summary: counts and located
-// failures. It reads TAP, JUnit XML, vitest, jest, pytest and go test summaries and eslint and tsc file:line lines;
+// failures. It reads TAP, JUnit XML, node --test (spec), vitest, jest, pytest and go test summaries and eslint and tsc file:line lines;
 // every format whose lines appear is read (a command can run several tools). Output it cannot read gets no summary,
 // and the caller shows the exit code and the tail instead.
 package checkparse
@@ -127,7 +127,7 @@ func Parse(output string, junit []byte) Summary {
 	if len(junit) > 0 {
 		parseJUnit(&s, junit)
 	}
-	for _, p := range []func(*Summary, []string){parseTAP, parseVitestJest, parsePytest, parseGo, parseESLint, parseTSC} {
+	for _, p := range []func(*Summary, []string){parseTAP, parseNodeSpec, parseVitestJest, parsePytest, parseGo, parseESLint, parseTSC} {
 		p(&s, lines)
 	}
 	return s
@@ -338,6 +338,51 @@ func parseTAP(s *Summary, lines []string) {
 		return 1
 	})
 	s.add("tap", fails...)
+}
+
+// ---------- node --test, spec reporter (the default outside TAP since Node 20) ----------
+
+var (
+	nodeCount = regexp.MustCompile(`^ℹ (pass|fail|skipped|todo) (\d+)$`)
+	nodeAt    = regexp.MustCompile(`^test at (.+?):(\d+):\d+$`)
+	nodeName  = regexp.MustCompile(`^✖ (.*?)(?: \([\d.]+m?s\))?$`)
+	nodeCode  = regexp.MustCompile(`^(\w*Error) \[[A-Z_]+\]: `)
+)
+
+func parseNodeSpec(s *Summary, lines []string) {
+	counted := map[string]int{}
+	for _, l := range lines {
+		if m := nodeCount.FindStringSubmatch(strings.TrimSpace(l)); m != nil {
+			counted[m[1]], _ = strconv.Atoi(m[2])
+		}
+	}
+	if len(counted) == 0 || slices.ContainsFunc(lines, func(l string) bool { return strings.HasPrefix(l, "TAP version") }) {
+		return
+	}
+	var fails []Failure
+	for i, l := range lines {
+		m := nodeAt.FindStringSubmatch(strings.TrimSpace(l))
+		if m == nil || i+1 >= len(lines) {
+			continue
+		}
+		f := Failure{File: m[1]}
+		f.Line, _ = strconv.Atoi(m[2])
+		if n := nodeName.FindStringSubmatch(strings.TrimSpace(lines[i+1])); n != nil {
+			f.Name = n[1]
+		}
+		if i+2 < len(lines) {
+			msg := strings.TrimSpace(lines[i+2])
+			if strings.HasPrefix(msg, "AssertionError [") {
+				msg = msg[strings.Index(msg, "]: ")+3:]
+			}
+			f.Message = nodeCode.ReplaceAllString(msg, "$1: ")
+		}
+		fails = append(fails, f)
+	}
+	s.Passed += counted["pass"]
+	s.Failed += counted["fail"]
+	s.Skipped += counted["skipped"] + counted["todo"]
+	s.add("node", fails...)
 }
 
 // ---------- vitest and jest ----------

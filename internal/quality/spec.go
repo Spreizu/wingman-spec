@@ -193,6 +193,8 @@ func VisualGapLint(changeDir string, ui bool) []Finding {
 
 var (
 	edgeWords    = w(`long(?:est|er)?|empty|blank|errors?|invalid|many|lots|overflow(?:s|ing)?|wrap(?:s|ping)?|truncat(?:e|es|ed|ing|ion)?|zero|maximum|minimum|max|min|limits?|boundar(?:y|ies)|duplicates?|missing|offline|slow|unicode|emoji|negative`)
+	narrowEdge   = regexp.MustCompile(`(?i)\b(?:narrow|phones?|mobile|small screens?|375(?:px)?)\b`)
+	contentEdge  = w(`long(?:est|er)?|overflow(?:s|ing)?|wrap(?:s|ping)?|truncat(?:e|es|ed|ing|ion)?|many|lots|empty|errors?`)
 	uiEdge       = w(`long(?:est|er)?|overflow(?:s|ing)?|wrap(?:s|ping)?|truncat(?:e|es|ed|ing|ion)?|many|lots|narrow|phones?|mobile|375(?:px)?|empty|errors?`)
 	arrowID      = regexp.MustCompile("(?i)(?:->|→|=>)\\s*((?:`?[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*`?(?:\\s*[,;]\\s*|\\s+and\\s+|\\s*))+)\\s*$")
 	edgeStop     = map[string]bool{}
@@ -351,8 +353,12 @@ type VisualState struct {
 	Keys  []any  `json:"keys"`
 }
 
-// VisualScenario is a visual scenario of the change by id.
-type VisualScenario struct{ States []VisualState }
+// VisualScenario is a visual scenario of the change by id. Viewports are its widths: a case that is only about a
+// narrow screen is shown by a narrow viewport and needs no state; long text or an empty list at 375 still does.
+type VisualScenario struct {
+	States    []VisualState
+	Viewports []int
+}
 
 // EdgeItem is one bullet of proposal.md ## Edge cases.
 type EdgeItem struct {
@@ -450,6 +456,7 @@ func EdgeLint(changeDir, livingDir string, visual map[string]VisualScenario, ui 
 				if !ok {
 					continue
 				}
+				found = found || (narrowEdge.MatchString(desc) && !contentEdge.match(desc) && slices.ContainsFunc(v.Viewports, func(w int) bool { return w <= 480 }))
 				for _, st := range v.States {
 					if st.Name == "default" || (len(st.Steps) == 0 && len(st.Keys) == 0) {
 						continue
@@ -463,7 +470,7 @@ func EdgeLint(changeDir, livingDir string, visual map[string]VisualScenario, ui 
 				}
 			}
 			if !found {
-				out = append(out, Finding{File: "proposal.md", Line: i + 1, Severity: "error", Kind: "edge-cases", Text: fmt.Sprintf("proposal.md:%d: UI edge case \"%s\" needs a visual scenario with a state that shows it (e.g. `state: long-name` with `do:` steps that add an item with the long text, checked at 375; the state name or its steps should name the case): none of %s has one. %s", i+1, cut(desc, 80), strings.Join(ids, ", "), dataStateHint)})
+				out = append(out, Finding{File: "proposal.md", Line: i + 1, Severity: "error", Kind: "edge-cases", Text: fmt.Sprintf("proposal.md:%d: UI edge case \"%s\" needs a visual scenario with a state that shows it (e.g. `state: long-name` with `do:` steps that add an item with the long text, checked at 375; the state name or its steps should name the case; a narrow case needs only `viewports: 375`): none of %s has one. %s", i+1, cut(desc, 80), strings.Join(ids, ", "), dataStateHint)})
 			}
 		}
 	}

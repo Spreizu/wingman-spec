@@ -125,6 +125,12 @@ func TestRoleGrammar(t *testing.T) {
 	if len(s.Errors) != 0 || s.Role != "admin" || s.Absents[0] != "[d]" || s.States[0].Absents[0] != "[c]" || s.RedirectsTo != "/x/" {
 		t.Fatalf("role:, absent: and redirects-to: %+v", s)
 	}
+	if e := errs(block(nil, "route: /admin\nredirects-to: /login")); e != "" {
+		t.Errorf("a redirect is the block's claim, it needs no key: %q", e)
+	}
+	if e := errs(block(nil, "route: /admin")); !strings.Contains(e, `no "key:"`) {
+		t.Errorf("a block with no claim is refused: %q", e)
+	}
 }
 
 func TestRubricProblems(t *testing.T) {

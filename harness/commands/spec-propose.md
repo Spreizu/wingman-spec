@@ -38,7 +38,7 @@ Confirm the kebab-case change name first; that name is also the exploration slug
 
    What each one must achieve (details are in each instruction):
    - `app-map`: where this change sits in the whole app; capabilities, dependencies, build order; this change's slice (S: `wingman-spec app-map <name> --apply`).
-   - `proposal`: `Size:` and `Risk:` lines, why, what, capabilities, ADR candidates, and **Edge cases**. List every edge case the request or the user's answers name, one bullet each, ending with `-> <capability>/<scenario-slug>`. A UI case points at a visual scenario with a `state:` that shows that content.
+   - `proposal`: `Size:` and `Risk:` lines, why, what, capabilities, ADR candidates, and **Edge cases**. List every edge case the request or the user's answers name, one bullet each, ending with `-> <capability>/<scenario-slug>`. A UI case points at a visual scenario that shows it (a `state:`, `viewports: 375` for a narrow case, or `Not visual: <reason>; covered by <test>`).
    - `specs`: one spec per capability, with concrete, testable scenarios.
      - Each requirement has a `Why: <who wants it, and why>` line under its SHALL sentence (unless `traceability: off`). Rewriting an existing Why or removing a requirement needs the owner's approval first.
      - A requirement that computes, transforms, sorts or stores data also gets an `Invariant: ...` scenario.

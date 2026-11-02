@@ -41,7 +41,7 @@ CHECKS AND ARCHIVE
   lint <change> --text             every plan problem as file:line: severity: text (task IDs, Files:, After:, visual-reach, ...)
   trace [<change>] [--text]        scenarios without a [cap/slug] test tag; tags that name no scenario (test_files: extra globs)
   run-checks [<change>] [--only lint,typecheck,test,visual] [--text]   logs in runs/<change>/checks/, parsed failures
-                                   (TAP, JUnit via commands.junit, vitest, jest, pytest, go, eslint, tsc), a checks timeline event
+                                   (TAP, JUnit via commands.junit, node --test, vitest, jest, pytest, go, eslint, tsc), a checks timeline event
   archive <change>                 gate: blocked, tasks, findings, finish (the tree finish recorded), lint, a clean merge; then
                                    merge specs and ADRs atomically and move the change. No override. Refusal: exit 1, nothing written.
   sync <change> --check | --rebase report the merge without writing; re-pin spec-base.json after the living spec moved

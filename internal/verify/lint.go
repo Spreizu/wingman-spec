@@ -338,13 +338,16 @@ func visualMap(scens []*visual.Scenario) (map[string]quality.VisualScenario, []s
 	m := map[string]quality.VisualScenario{}
 	var ids []string
 	for _, s := range scens {
-		var vs quality.VisualScenario
+		vs := quality.VisualScenario{Viewports: s.Viewports}
 		for _, st := range s.States {
-			keys := []any{}
+			keys, steps := []any{}, []any{}
 			for _, k := range st.Keys {
 				keys = append(keys, k)
 			}
-			vs.States = append(vs.States, quality.VisualState{Name: st.Name, Keys: keys})
+			for _, x := range st.Steps {
+				steps = append(steps, x)
+			}
+			vs.States = append(vs.States, quality.VisualState{Name: st.Name, Steps: steps, Keys: keys})
 		}
 		m[s.ID] = vs
 		ids = append(ids, s.ID)

@@ -150,3 +150,31 @@ test('the tab groups by phase: Propose (start, questions, artifacts, validate, l
   assert.match(html, /Run from<\/div><ul><li>editor<\/li>/);
   assert.match(html, /<span class="tl-step">Question<\/span>/);
 });
+
+test('newest on top: the last phase first, and in each list the latest event first with its idle gap below it', () => {
+  const extra = [
+    ev({ at: '2026-10-30T23:00:00+02:00', event: 'run-start', summary: 'run started (next)' }),
+    ev({ at: '2026-10-30T23:10:00+02:00', event: 'finish', ok: true, summary: 'change verified' }),
+  ];
+  const html = timelineTab([CHAINED.trimEnd(), ...extra].join('\n'));
+  assert.deepEqual([...html.matchAll(/<h3 class="tl-phase-title">([^<]*)</g)].map((m) => m[1]), ['Verify', 'Build', 'Propose']);
+  const propose = html.slice(html.indexOf('>Propose<'));
+  assert.deepEqual([...propose.matchAll(/<span class="tl-step">([^<]*)</g)].map((m) => m[1]).slice(0, 2), ['Planning lint', 'Validate']);
+  const idle = timelineTab(FILE);
+  assert.match(idle, /<\/li><li class="tl-idle"/, 'the idle marker follows the event it led up to');
+});
+
+test('newest block first, each heading above its own events: headings never trail the block they name', () => {
+  const html = timelineTab(WAVE);
+  const heads = [...html.matchAll(/<h4 class="tl-task">([^<]*)</g)].map((m) => m[1]);
+  assert.deepEqual(heads, ['Task 2.1', 'Parallel wave 1: 3 tasks at once', 'Change']);
+  for (const [head, summary] of [['Task 2.1', 'picked 2.1 Report'], ['Change', 'run started (next)']] as const) {
+    const h = html.indexOf(`<h4 class="tl-task">${head}<`);
+    const e = html.indexOf(summary);
+    assert.ok(h >= 0 && e > h, `${head} heading sits above its event`);
+    assert.ok(!html.slice(h + 1, e).includes('<h4 '), `no other heading between ${head} and its event`);
+  }
+  const lane = html.slice(html.indexOf('>Task 1.1</h5>'), html.indexOf('>Task 1.2</h5>'));
+  const times = [...lane.matchAll(/<span class="tl-time">([^<]*)</g)].map((m) => m[1]);
+  assert.deepEqual(times, [...times].sort().reverse(), 'a lane lists its events newest first');
+});
