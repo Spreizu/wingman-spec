@@ -33,7 +33,7 @@ This is a thinking mode. Do NOT write application code and do NOT create change 
 3. **Visualize and compare** where it helps (diagrams, option tables).
 
 4. **Close the session.** When the frontier is empty, summarize:
-   - Decisions settled (these feed the proposal, design and ADRs)
+   - Decisions settled (these feed the proposal, design and ADRs), including existing behaviour the change drops (its requirements go under `## REMOVED`)
    - Capabilities identified (kebab-case) and a proposed first slice
    - With a design input: the design map path, how many regions map to tokens / components / framework / arbitrary, and the open Gaps
    - Anything deliberately deferred

@@ -346,8 +346,8 @@ func (e *Env) Finish() error {
 	return quit(code)
 }
 
-// finishVisual checks every scenario of the change (defects only); with visual.scope: task also the living scenarios the
-// change does not redefine, once, against HEAD.
+// finishVisual checks every scenario of the change (defects only); with visual.scope: task also the living scenarios as
+// they will be after archive (see guardScenarios), once, against HEAD.
 func (e *Env) finishVisual(changeDir, run string, o *outcome) {
 	cfg := e.Cfg.Visual
 	if cfg.Off {
@@ -356,14 +356,9 @@ func (e *Env) finishVisual(changeDir, run string, o *outcome) {
 	vscens := e.scenarios(filepath.Join(changeDir, "specs"))
 	var guards []*visual.Scenario
 	if cfg.Scope == "task" && slices.ContainsFunc(e.changedFiles(), func(f string) bool { return visual.IsUIFile(f, cfg) }) {
-		have := map[string]bool{}
-		for _, s := range vscens {
-			have[s.ID] = true
-		}
-		for _, s := range e.scenarios(e.R.LivingSpecs()) {
-			if !have[s.ID] {
-				guards = append(guards, s)
-			}
+		var err error
+		if guards, err = e.guardScenarios(changeDir, vscens); err != nil {
+			o.fail(err.Error())
 		}
 	}
 	if len(vscens)+len(guards) == 0 {

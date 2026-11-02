@@ -11,6 +11,11 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
   checked at 375. `lint` fails a list view with no populated state (`visual-data-states`) and `Not visual` on a narrow,
   long-text or many-rows case (`not-visual-layout`), and warns when `ignore: layout:horizontal-overflow` hides the sideways
   scroll the scenario's THEN rules out (`visual-overflow-claim`).
+- **Specs after the change.** `finish` (and `check` with `visual.scope: all`) guards the scenarios of `specs/` as they
+  read after archive, merged with archive's own merge: a scenario the change drops from a MODIFIED requirement, or one
+  under a REMOVED requirement, is no longer run against the new page. `lint` fails a surviving scenario that still
+  requires a selector the change declares `absent:` (`visual-stale-guard`) or has the same WHEN as a change scenario
+  that drops the case (`visual-dropped-scenario`), and names the requirement to remove or modify.
 
 ## 0.12.0
 

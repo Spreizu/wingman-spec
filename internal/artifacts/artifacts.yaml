@@ -185,7 +185,8 @@ artifacts:
         Never add `## Purpose` to a delta for an existing capability.
 
       Common pitfall: MODIFIED with partial content loses detail at sync time. If you are
-      only adding behavior, use ADDED.
+      only adding behavior, use ADDED. Behavior the change drops goes under REMOVED (or out of
+      the MODIFIED block), never `Not visual`: finish checks the specs as archive will merge them.
 
       **Invariant scenarios.** Every requirement that computes, transforms, filters, sorts or
       stores data gets one more scenario, named `Invariant: <what always holds>`, for the

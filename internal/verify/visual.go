@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Spreizu/wingman-spec/internal/change"
 	"github.com/Spreizu/wingman-spec/internal/config"
 	"github.com/Spreizu/wingman-spec/internal/gitx"
 	"github.com/Spreizu/wingman-spec/internal/runstate"
@@ -179,14 +180,12 @@ func (e *Env) visualPlan(changeDir string, st *State) vplan {
 				items = append(items, visual.Item{Scenario: s, Role: "change", InScope: inScope(s)})
 			}
 		}
-		ids := map[string]bool{}
-		for _, s := range scens {
-			ids[s.ID] = true
+		guards, err := e.guardScenarios(changeDir, scens)
+		if err != nil {
+			e.say("WARNING: %v", err)
 		}
-		for _, s := range e.scenarios(e.R.LivingSpecs()) {
-			if !ids[s.ID] {
-				items = append(items, visual.Item{Scenario: s, Role: "guard", InScope: inScope(s)})
-			}
+		for _, s := range guards {
+			items = append(items, visual.Item{Scenario: s, Role: "guard", InScope: inScope(s)})
 		}
 	}
 	vp := vplan{cfg: cfg, items: items, mine: mine}
@@ -206,6 +205,46 @@ func (e *Env) visualPlan(changeDir string, st *State) vplan {
 	}
 	vp.triggered = len(mine) > 0 || len(vp.touched) > 0
 	return vp
+}
+
+// guardScenarios are the living scenarios as they will be after archive (the change's deltas merged in with the same
+// merge as archive), less the change's own: a scenario of a requirement the change modifies, removes or drops is not
+// guarded. When a delta does not merge, its capability gets no guards and the error says why.
+func (e *Env) guardScenarios(changeDir string, own []*visual.Scenario) ([]*visual.Scenario, error) {
+	m, err := change.Merged(e.R, changeDir, false)
+	if err != nil {
+		return nil, err
+	}
+	out := afterArchive(m, e.scenarios(e.R.LivingSpecs()), own)
+	if len(m.Problems) > 0 {
+		return out, fmt.Errorf("the living scenarios of %s are not guarded: the delta specs do not merge as archive would merge them (%s): fix the delta, then `wingman-spec validate %s`", strings.Join(m.Failed, ", "), strings.Join(m.Problems, "; "), filepath.Base(changeDir))
+	}
+	return out, nil
+}
+
+// afterArchive keeps the living scenarios that the merged specs still have and that are not the change's own.
+func afterArchive(m *change.MergeResult, living, own []*visual.Scenario) []*visual.Scenario {
+	mine := map[string]bool{}
+	for _, s := range own {
+		mine[s.ID] = true
+	}
+	kept := map[string]map[string]bool{} // capability -> scenario ids after the merge
+	for c, text := range m.Specs {
+		kept[c] = map[string]bool{}
+		for _, s := range visual.ParseSpec(text, "", c) {
+			kept[c][s.ID] = true
+		}
+	}
+	for _, c := range m.Failed {
+		kept[c] = map[string]bool{}
+	}
+	var out []*visual.Scenario
+	for _, s := range living {
+		if after, ok := kept[s.Capability]; !mine[s.ID] && (!ok || after[s.ID]) {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func ids(xs []*visual.Scenario) []string {

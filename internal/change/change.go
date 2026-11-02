@@ -126,33 +126,34 @@ type SyncResult struct {
 	Problems     []string     `json:"problems"`
 }
 
-// Sync merges every delta spec of the change into the living specs (see spec.Merge) and promotes its ADRs. Every
-// merge is computed and checked in memory first; nothing is written when one delta conflicts, and the living specs are
-// written all at once. With dryRun nothing is written at all.
-func Sync(r *layout.Root, name string, dryRun bool) (*SyncResult, error) {
-	dir, err := Dir(r, name)
-	if err != nil {
-		return nil, err
-	}
-	res := &SyncResult{Change: name, Capabilities: []Capability{}, ADRs: []adr.Result{}, Problems: []string{}}
+// MergeResult is the living spec of every capability the change has a delta for, as archive will write it.
+type MergeResult struct {
+	Specs        map[string]string // capability -> merged living spec text
+	Capabilities []Capability
+	Problems     []string // merge conflicts: nothing of the change can be merged while there is one
+	Failed       []string // the capabilities whose delta does not merge
+}
+
+// Merged merges every delta spec of the change folder dir into the living specs in memory, with the bases recorded in
+// spec-base.json (see spec.Merge), exactly as archive does. With pin the bases of new deltas are recorded on disk.
+func Merged(r *layout.Root, dir string, pin bool) (*MergeResult, error) {
+	res := &MergeResult{Specs: map[string]string{}}
 	deltas, err := filepath.Glob(filepath.Join(dir, "specs", "*.md"))
 	if err != nil {
 		return nil, err
 	}
-	bases, _, err := spec.PinBases(dir, r.LivingSpecs(), false, !dryRun)
+	bases, _, err := spec.PinBases(dir, r.LivingSpecs(), false, pin)
 	if err != nil {
-		res.Problems = append(res.Problems, fmt.Sprintf("%s: %s: fix or delete it, then run `wingman-spec sync %s --rebase`", r.Rel(filepath.Join(dir, spec.BaseFile)), err, name))
+		res.Problems = append(res.Problems, fmt.Sprintf("%s: %s: fix or delete it, then run `wingman-spec sync %s --rebase`", r.Rel(filepath.Join(dir, spec.BaseFile)), err, filepath.Base(dir)))
 		return res, nil
 	}
-	writes := map[string][]byte{}
 	for _, p := range deltas {
 		capability := strings.TrimSuffix(filepath.Base(p), ".md")
 		db, err := os.ReadFile(p)
 		if err != nil {
 			return nil, err
 		}
-		target := filepath.Join(r.LivingSpecs(), capability+".md")
-		old, err := os.ReadFile(target)
+		old, err := os.ReadFile(filepath.Join(r.LivingSpecs(), capability+".md"))
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
@@ -166,6 +167,7 @@ func Sync(r *layout.Root, name string, dryRun bool) (*SyncResult, error) {
 			for _, pr := range me.Problems {
 				res.Problems = append(res.Problems, fmt.Sprintf("%s:%d: %s", r.Rel(p), pr.Line, pr.Msg))
 			}
+			res.Failed = append(res.Failed, capability)
 			continue
 		}
 		action := "updated"
@@ -175,13 +177,35 @@ func Sync(r *layout.Root, name string, dryRun bool) (*SyncResult, error) {
 		case len(old) == 0:
 			action = "created"
 		}
+		res.Specs[capability] = merged
 		res.Capabilities = append(res.Capabilities, Capability{capability, action})
-		if action != "unchanged" {
-			writes[target] = []byte(merged)
-		}
 	}
+	return res, nil
+}
+
+// Sync merges every delta spec of the change into the living specs (see Merged) and promotes its ADRs. Every merge is
+// computed and checked in memory first; nothing is written when one delta conflicts, and the living specs are written
+// all at once. With dryRun nothing is written at all.
+func Sync(r *layout.Root, name string, dryRun bool) (*SyncResult, error) {
+	dir, err := Dir(r, name)
+	if err != nil {
+		return nil, err
+	}
+	res := &SyncResult{Change: name, Capabilities: []Capability{}, ADRs: []adr.Result{}, Problems: []string{}}
+	m, err := Merged(r, dir, !dryRun)
+	if err != nil {
+		return nil, err
+	}
+	res.Problems = append(res.Problems, m.Problems...)
 	if len(res.Problems) > 0 {
 		return res, nil
+	}
+	writes := map[string][]byte{}
+	for _, c := range m.Capabilities {
+		res.Capabilities = append(res.Capabilities, c)
+		if c.Action != "unchanged" {
+			writes[filepath.Join(r.LivingSpecs(), c.Name+".md")] = []byte(m.Specs[c.Name])
+		}
 	}
 	if !dryRun && len(writes) > 0 {
 		if err := spec.WriteAtomic(writes); err != nil {

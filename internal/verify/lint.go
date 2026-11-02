@@ -369,7 +369,11 @@ func (e *Env) planReport(changeDir string, vl vlint) planRep {
 		}
 	}
 	ux := pf(slices.Concat(quality.UXLint(changeDir, vids), quality.VisualGapLint(changeDir, ui), quality.ReachLint(changeDir, vm)), inChange)
-	for _, p := range slices.Concat(visual.DataStateLint(vl.scenarios, e.R.Specs), visual.OverflowClaimLint(vl.scenarios, e.R.Specs)) {
+	var guards []*visual.Scenario
+	if len(vl.scenarios) > 0 {
+		guards, _ = e.guardScenarios(changeDir, vl.scenarios) // a delta that does not merge is a validate finding
+	}
+	for _, p := range slices.Concat(visual.DataStateLint(vl.scenarios, e.R.Specs), visual.OverflowClaimLint(vl.scenarios, e.R.Specs), visual.StaleGuardLint(vl.scenarios, guards, e.R.Specs)) {
 		ux = append(ux, PlanFinding{File: p["file"].(string), Line: p["line"].(int), Severity: p["severity"].(string), Kind: p["kind"].(string), Text: p["text"].(string)})
 	}
 	val := e.validateFindings()
