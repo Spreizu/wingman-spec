@@ -6,26 +6,26 @@ You implement the task (or the tasks, in order) the prompt lists, then stop. You
 
 ## Read first
 1. `AGENTS.md` (the "wingman-spec workflow" block) and `.wingman-spec/wingman-spec.yaml` (the project context and commands).
-2. The files the task prompt lists: proposal, specs, design, ADRs, `tasks.md`, and `progress.md` (reviewed-anchor notes) if present. The prompt lists the earlier tasks of the change.
+2. The files the task prompt lists: proposal, specs, design, ADRs, `tasks.md`, and `progress.md` if present. The prompt lists the earlier tasks of the change.
 3. If the prompt includes a previous attempt's failure, start from that output: it is why the last attempt was rejected.
 
 ## Do
 1. Do only the tasks in the prompt, one after the other. Never start another.
 2. Use the `test-driven-development` skill: write the failing test named in `Test first:`, run it and confirm it fails for the right reason, write the minimal code to pass, refactor with tests green. Apply the `ponytail` skill (full): implement only what the task's spec requires; skip unrequested options; name skipped extras in your reply.
 3. If something fails unexpectedly, or a fix fails twice, use the `systematic-debugging` skill: find the root cause before changing more code.
-4. For a `Request code review` task, use the `requesting-code-review` skill with the BASE_SHA and HEAD_SHA the prompt gives. They cover the whole change, uncommitted work included; never use `git rev-parse HEAD~1`. Also use the `ponytail-review` skill (YAGNI/lean: delete, reuse, stdlib, one-implementation abstractions). Treat ponytail-review **Must fix** as Critical and **Should fix** (including lean/yagni) as Important. Fix Critical and Important findings before you reply. Before a code fix, add a test that fails without the fix. Put `[review:<slug>]` in its name, or `review_<slug>` with `_` for `-` where test names are identifiers (Go `TestReview_<slug>`, pytest, Rust, Java, C#). ExUnit uses `@tag review: "<slug>"`. Write `Review fix: <slug> - <finding>` in `progress.md`, plus ` - untestable: <reason>` when no test can show it. A review task may edit any file that a `Files:` line of this change's tasks names, so fix in-change findings now. Put anything outside those files in your reply as a follow-up.
+4. For a `Request code review` task, use the `requesting-code-review` skill with the BASE_SHA and HEAD_SHA the prompt gives. They cover the whole change, uncommitted work included; never use `git rev-parse HEAD~1`. Also use the `ponytail-review` skill (YAGNI/lean: delete, reuse, stdlib, one-implementation abstractions). Treat ponytail-review **Must fix** as Critical and **Should fix** (including lean/yagni) as Important. Fix Critical and Important findings before you reply. Before a code fix, add a test that fails without the fix. Put `[review:<slug>]` in its name, or `review_<slug>` with `_` for `-` where test names are identifiers (Go `TestReview_<slug>`, pytest, Rust, Java, C#). ExUnit uses `@tag review: "<slug>"`. Record each fix with `.wingman-spec/bin/wingman-spec progress <change> --task <id> --review-fix <slug> --note "<finding>"`, plus `--untestable "<reason>"` when no test can show it. A review task may edit any file that a `Files:` line of this change's tasks names, so fix in-change findings now. Put anything outside those files in your reply as a follow-up.
    **Anchor relevance (review tasks).** `wingman-spec guard <change>` lists the `@spec` anchors whose code changed or moved. Sort each one:
    - relevant: the code implements the requirement and the requirement text still describes it;
    - irrelevant, over-anchored or on boilerplate: remove the marker (`wingman-spec anchors prune`);
    - misplaced: move it into the doc comment of the whole function, above the lines it covers, or to the entry point of a requirement spread over many files.
-   For an anchor whose code you changed on purpose and whose requirement still holds, write `Reviewed anchors: <capability>/<requirement-slug> - <why it still holds>` in `progress.md` (create it if needed). A requirement with no passing tagged test is not done.
+   For an anchor whose code you changed on purpose and whose requirement still holds, record `.wingman-spec/bin/wingman-spec progress <change> --reviewed-anchor <capability>/<requirement-slug> --note "<why it still holds>"`. A requirement with no passing tagged test is not done.
    **Tests name their scenario.** Put the scenario id in square brackets in the title of the test that proves it: `it('[list-search/zero-matches] shows the empty state', ...)`. The id is `<capability>/<scenario name in kebab-case>`; the prompt lists the ids this task must tag. Where the title is not a string:
    - pytest/unittest: the test's docstring or a comment on the line above;
    - PHP/Java/Kotlin/C#: a docblock, a comment above the test, or the annotation's string: `@DisplayName("[cap/slug] ...")`, `#[TestDox('[cap/slug] ...')]`, `[Fact(DisplayName = "[cap/slug] ...")]`;
    - Ruby/Elixir/Dart/Lua: the `it`/`test` string.
    The verifier fails the task when a scenario its `Spec:` line names has no tagged test. `finish` fails on any untagged scenario of the change; the visual check covers ```` ```visual ```` scenarios.
    **Code anchors.** When the prompt lists `Code anchors`, write the marker `@spec <capability>/<requirement-slug>` in a comment next to the code that implements each listed requirement. Any comment syntax works: `//`, `#`, `--`, `/* */`, `<!-- -->`. Put the same marker, or the scenario tag, in the test that proves it.
-   - If you change code that carries a marker for a requirement the change does not mention, `check` warns (`anchor-touched-unlisted`). Update the requirement in the delta, or confirm it still holds with a `Reviewed anchors: <capability>/<requirement-slug> - <why>` line in `progress.md` (create it if needed).
+   - If you change code that carries a marker for a requirement the change does not mention, `check` warns (`anchor-touched-unlisted`). Update the requirement in the delta, or confirm it still holds with `--reviewed-anchor` (above).
    - Never write a marker for a requirement the task does not implement, and never invent a slug. The verifier rejects a slug that does not resolve, and `finish` fails a requirement with no code or test anchor.
    **What gets a marker.** Only the smallest unit that implements the requirement's observable behaviour: the entry point or the deciding function. One marker per requirement per code path. A high count alone is no problem; weak anchors are (see `anchor_fit`). A requirement spread over many files says `Anchors: many`.
    - Never mark a helper, import, type, constant, i18n or string table, config, logging or plumbing line.
@@ -56,6 +56,7 @@ You implement the task (or the tasks, in order) the prompt lists, then stop. You
 
 ## Rules
 - Your working directory is the code repository. The change files live where the prompt says (outside the code repository when the specs live in a separate repository); use exactly that path.
+- Never edit `progress.md` by hand; `progress --task <id> --note "..."` logs a note.
 - Do not edit specs, ADRs, other tasks, `.wingman-spec/bin/` or anything under `runs/` (the verifier's run log, including the pre-task capture it compares with) except your attempt note. Do not commit.
 - If the task is impossible, or the specs or design are wrong or ambiguous: do NOT improvise. Write the problem and what you need to `BLOCKED.md` in the change directory.
 - Before you reply, overwrite the attempt note the prompt names with what you tried and what you ruled out, in at most 150 words.

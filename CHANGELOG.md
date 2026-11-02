@@ -105,8 +105,13 @@ Upgrade an 0.11 project once with `wingman-spec import openspec` ([docs/install.
 - **`wingman-spec trace`** lists scenarios without a `[cap/slug]` test tag and tags that name no scenario; `test_files:`
   adds test-file globs.
 - **`wingman-spec run-checks`** runs lint, typecheck, test and visual with logs in `runs/<change>/checks/` and a parsed
-  failure list (TAP, JUnit XML via `commands.junit`, vitest, jest, pytest, go test, eslint, tsc; else the log's tail).
+  failure list (TAP, JUnit XML via `commands.junit`, node --test, vitest, jest, pytest, go test, eslint, tsc; else the log's tail).
   `check` and `finish` show the same parsed failures.
+- **`wingman-spec progress`** is how agents write `progress.md`: a note (`--task 1.2 --note "..."`, optional `--status`),
+  a review fix (`--review-fix <slug> --note "<finding>"`, `--untestable "<reason>"`) or a reviewed anchor
+  (`--reviewed-anchor <cap>/<req> --note "<why>"`). It checks the entry, appends it under the task's heading and records a
+  `progress` event that the timeline shows in the task's block.
+- **Timeline newest first.** The latest block is on top, each heading above its own events, newest event first.
 - **Greenfield.** The `sync-foundation` and `sync-capability` steps are now `archive-foundation` and `archive-capability`.
 
 ## 0.11.2

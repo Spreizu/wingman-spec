@@ -10,6 +10,8 @@
 - Primary actions (Apply next task, Plan with agent, Explore the blocker; Sync or Archive on a complete change) use the VS Code primary button colours. Each page has at most one. Promote is a secondary button.
 - Buttons show only when they apply: Fix findings only with findings for the change; Validate once there is a proposal; Sync and Archive once every task is done (Sync not once synced); Supersede only on an ADR that is not superseded. The overview's blocked card offers Explore the blocker.
 - The schema name is no longer shown next to the change name. The header and the panel tab show the extension icon. The default tab is open before the script runs, and every empty tab says what is missing ("No proposal yet").
+- The Timeline tab shows the newest block first, each heading above its own events, newest event first. Entries the agent writes with `wingman-spec progress` appear as plain Progress lines in their task's block.
+- Recent verifier activity is newest first and lines up with its heading: no bullet indent, an even gap between rows and between the text and its pill. Pending renames on a spec page use the same list.
 - The publisher id is now `elmo-egers`, so the extension id is `elmo-egers.wingman-spec`. Uninstall a locally installed `elmoegers.wingman-spec` first.
 
 ## 0.11.2

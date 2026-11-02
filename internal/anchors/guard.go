@@ -235,7 +235,7 @@ func guardFinish(o GuardOpts, code []Marker, events []Event) GuardResult {
 			if e.Kind == "added" {
 				what = "got a new anchor"
 			}
-			add("anchor-touched-unlisted", e.Key, e.File, e.Line, where+": code anchored to `"+e.Key+"`"+unit+" "+what+", but this change does not mention that requirement (no delta, no `Spec:` line)."+rename+" Update the requirement and its scenarios (delta spec), or confirm it still holds with a line `Reviewed anchors: "+e.Key+" - <why it still holds>` in tasks.md or progress.md.")
+			add("anchor-touched-unlisted", e.Key, e.File, e.Line, where+": code anchored to `"+e.Key+"`"+unit+" "+what+", but this change does not mention that requirement (no delta, no `Spec:` line)."+rename+" Update the requirement and its scenarios (delta spec), or confirm it still holds: `wingman-spec progress <change> --reviewed-anchor "+e.Key+" --note \"<why it still holds>\"`.")
 		}
 		if e.Kind == "moved" && !known(e.Key) {
 			add("anchor-moved", e.Key, e.File, e.Line, where+": the anchored unit of `"+e.Key+"`"+unit+" moved here from "+e.From+" unchanged. Confirm the anchor still belongs where it is now (and that the requirement does not describe the old place).")
@@ -263,7 +263,7 @@ func guardFinish(o GuardOpts, code []Marker, events []Event) GuardResult {
 		if o.Reviewed[k] || res.Touched[k] || !still {
 			continue
 		}
-		add("requirement-changed-code-untouched", k, m.File, m.Line, m.File+":"+strconv.Itoa(m.Line)+": requirement `"+k+"` is modified by the delta spec but none of the code anchored to it changed. Change the code, or add `Reviewed anchors: "+k+" - <why the code already satisfies the new text>`.")
+		add("requirement-changed-code-untouched", k, m.File, m.Line, m.File+":"+strconv.Itoa(m.Line)+": requirement `"+k+"` is modified by the delta spec but none of the code anchored to it changed. Change the code, or record `wingman-spec progress <change> --reviewed-anchor "+k+" --note \"<why the code already satisfies the new text>\"`.")
 	}
 	type spread struct {
 		n     int

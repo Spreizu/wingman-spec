@@ -45,7 +45,8 @@ echo "== a fix with a test that fails before it"
 start
 expect "the review prompt went out" 'grep -q "Request code review" "$T/review.txt"'
 expect "next kept the review's pre-task tree" 'grep -q "\"pre_tree\": \"[0-9a-f]\{40\}\"" .wingman-spec/runs/demo/*/state.json 2>/dev/null || grep -rq "\"pre_tree\"" .wingman-spec/runs'
-fix; proof_test upper-limit 'assert.equal(clamp(15, 0, 10), 10)'; note 'Review fix: upper-limit - clamp returned hi - 1 above the limit'
+fix; proof_test upper-limit 'assert.equal(clamp(15, 0, 10), 10)'; $V progress demo --task 1.R --review-fix upper-limit --note 'clamp returned hi - 1 above the limit' >/dev/null
+expect "the progress command wrote the Review fix line" 'grep -qx -- "- Review fix: upper-limit - clamp returned hi - 1 above the limit" "$C/progress.md"'
 review
 expect "check passes: fails before, passes after" '[ $rc = 0 ] && printf "%s" "$out" | grep -q "\"check\": \"review_proof\"" && printf "%s" "$out" | grep -q "\"upper-limit\": 1"'
 expect "the timeline records the proof" 'grep -h "review-proof" .wingman-spec/runs/demo/timeline.jsonl | grep -q "1 review fix(es) with a fail-before/pass-after test, 0 untestable"'
@@ -78,7 +79,7 @@ expect "rejected: no test is tagged" '[ $rc = 1 ] && printf "%s" "$out" | grep -
 
 echo "== untestable"
 start
-fix; note 'Review fix: upper-limit - hi - 1 above the limit - untestable: only shows under a 32-bit runtime'
+fix; $V progress demo --task 1.R --review-fix upper-limit --untestable 'only shows under a 32-bit runtime' --note 'hi - 1 above the limit' >/dev/null
 review
 expect "passes, with the reason in the warnings and the check" '[ $rc = 0 ] && printf "%s" "$out" | grep -q "review fix upper-limit has no test (untestable: only shows under a 32-bit runtime)" && printf "%s" "$out" | grep -q "\"upper-limit: only shows under a 32-bit runtime\""'
 expect "the timeline counts it as untestable" 'grep -h "review-proof" .wingman-spec/runs/demo/timeline.jsonl | grep -q "0 review fix(es) with a fail-before/pass-after test, 1 untestable"'

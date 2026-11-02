@@ -24,13 +24,13 @@ function step(s: TodoStep): string {
   return `<div class="todo"><code class="cmd">${esc(s.text)}</code><button class="icon-btn" ${copyAttr(s.text)} title="Copy the command">${icon('copy', 13)}</button><button class="btn" ${termAttr(s.text)} title="Types the command into a new terminal; you press Enter">${icon('play', 13)} Terminal</button></div>`;
 }
 
-/** The verifier's last records, oldest first, each with its time (HH:MM:SS, local zone). */
+/** The verifier's last records, newest first, each with its time (HH:MM:SS, local zone). */
 function activityBlock(d: Dashboard): string {
-  const rows = (d.activity ?? []).map((e) => {
+  const rows = [...(d.activity ?? [])].reverse().map((e) => {
     const t = chrono.clock(e.at);
-    return `<li>${t ? `<span class="muted" title="${esc(e.at)}">${esc(t)}</span> ` : ''}${esc(e.event)}${e.task ? ` ${esc(e.task)}` : ''} ${badge(e.ok ? 'passed' : 'failed', e.ok ? 'ok' : 'bad')}</li>`;
+    return `<li>${t ? `<span class="muted" title="${esc(e.at)}">${esc(t)}</span>` : ''}<span>${esc(e.event)}${e.task ? ` ${esc(e.task)}` : ''}</span>${badge(e.ok ? 'passed' : 'failed', e.ok ? 'ok' : 'bad')}</li>`;
   });
-  return rows.length ? `<h3 class="dash-h">Recent verifier activity</h3><ul class="bd activity">${rows.join('')}</ul>` : '';
+  return rows.length ? `<h3 class="dash-h">Recent verifier activity</h3><ul class="plain-list">${rows.join('')}</ul>` : '';
 }
 
 function blocking(b: BlockingItem, skip: ReadonlySet<string>): string {

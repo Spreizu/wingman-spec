@@ -109,14 +109,14 @@ expect "false positives: 0 findings on all $benign benign edits" '[ "$quiet" = "
 
 echo "== seeded: the anchored code changes and the change does not mention the requirement"
 sed -i "s/if (!t) throw new Error('text required');/if (!t) return list;/" src/todo.js; G
-expect "modifying an anchored function without touching the spec: anchor-touched-unlisted (exit 0, a warning)" '[ $rc = 0 ] && [ "$(kinds "$T/g.json")" = "anchor-touched-unlisted" ] && grep -q "todo/add-a-todo" "$T/g.json" && grep -q "Reviewed anchors" "$T/g.json"'
+expect "modifying an anchored function without touching the spec: anchor-touched-unlisted (exit 0, a warning)" '[ $rc = 0 ] && [ "$(kinds "$T/g.json")" = "anchor-touched-unlisted" ] && grep -q "todo/add-a-todo" "$T/g.json" && grep -q "progress <change> --reviewed-anchor todo/add-a-todo" "$T/g.json"'
 expect "the finding names the file and line" 'grep -q "src/todo.js:" "$T/g.json"'
 printf '## 1. Todo\n- [x] 1.1 edit\n  - Spec: todo/add-a-todo\n  - Files: src/todo.js\n' > "$C/tasks.md"; G
 expect "listed by a task Spec: line: no finding" '[ "$(kinds "$T/g.json")" = "" ]'
 printf '## 1. Todo\n- [x] 1.1 edit\n  - Files: src/todo.js\n' > "$C/tasks.md"; G
 expect "without the Spec: line the finding is back" '[ "$(kinds "$T/g.json")" = "anchor-touched-unlisted" ]'
-printf '# progress\n- Reviewed anchors: todo/add-a-todo - an empty text now returns the list, the requirement says nothing about it\n' > "$C/progress.md"; G
-expect "a Reviewed anchors: line answers it" '[ "$(kinds "$T/g.json")" = "" ]'
+$V progress edit --reviewed-anchor todo/add-a-todo --note 'an empty text now returns the list, the requirement says nothing about it' >/dev/null; G
+expect "a reviewed anchor recorded with progress answers it" '[ "$(kinds "$T/g.json")" = "" ]'
 rm "$C/progress.md"; mkdir -p "$C/specs/todo"; printf '## MODIFIED\n\n### Requirement: Add a todo\nThe system SHALL append a todo, ignoring empty text.\nWhy: The owner wants it to work, so that people can rely on it.\n\n#### Scenario: Empty\n- **WHEN** the user adds ""\n- **THEN** the list is unchanged\n' > "$C/specs/todo.md"; G
 expect "a delta spec that MODIFIES the requirement answers it" '[ "$(kinds "$T/g.json")" = "" ]'
 sed -i "s/if (!t) return list;/if (!t) throw new Error('text required');/" src/todo.js; G

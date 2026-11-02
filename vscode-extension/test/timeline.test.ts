@@ -178,3 +178,19 @@ test('newest block first, each heading above its own events: headings never trai
   const times = [...lane.matchAll(/<span class="tl-time">([^<]*)</g)].map((m) => m[1]);
   assert.deepEqual(times, [...times].sort().reverse(), 'a lane lists its events newest first');
 });
+
+test('progress entries the CLI records sit in their task block (a wave lane too), newest first, as plain lines', () => {
+  const text = [
+    WAVE,
+    ev({ at: at(2, 30), event: 'progress', task: '1.2', summary: 'the user form posts to /users' }),
+    ev({ at: at(10), event: 'progress', task: '2.1', summary: 'Review fix empty-total: an empty cart showed NaN' }),
+    ev({ at: at(11), event: 'progress', task: '2.1', summary: 'Reviewed anchor cart/total: only the query changed' }),
+  ].join('\n');
+  const es = parseTimeline(text).filter((e) => e.event === 'progress');
+  assert.deepEqual(es.map((e) => [e.step, e.result]), [['Progress', ''], ['Progress', ''], ['Progress', '']], 'no verdict pill');
+  const html = timelineTab(text);
+  const lane = html.slice(html.indexOf('>Task 1.2</h5>'), html.indexOf('>Task 1.3</h5>'));
+  assert.match(lane, /the user form posts to \/users/);
+  const t21 = html.slice(html.indexOf('>Task 2.1</h4>'), html.indexOf('Parallel wave 1'));
+  assert.ok(t21.indexOf('Reviewed anchor') < t21.indexOf('Review fix') && t21.indexOf('Review fix') < t21.indexOf('picked 2.1'), 'newest first under the task heading');
+});

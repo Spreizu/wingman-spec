@@ -112,7 +112,7 @@ test('the changes list is ordered by the time each change was created (its first
   assert.match(html, /2026-10-28 18:45:59/);
 });
 
-test('verifier records are shown in time order with their time of day, whatever order they were written in', () => {
+test('verifier records are shown newest first with their time of day, whatever order they were written in', () => {
   const rec = (at: string, event: string, task: string): string => JSON.stringify({ at, event, task, ok: true, attempt: 1 });
   const metrics = [rec('2026-10-28T12:00:00Z', 'check', '1.2'), rec('2026-10-28T10:00:00Z', 'check', '1.1'), rec('2026-10-28T11:00:00Z', 'finish', '1.1')].join('\n');
   const run = summarizeRun({ runId: '20261028T100000Z', metrics, state: '{}' });
@@ -123,6 +123,7 @@ test('verifier records are shown in time order with their time of day, whatever 
   assert.match(html, /Recent verifier activity/);
   const clocks = [...html.matchAll(/>(\d\d:\d\d:\d\d)</g)].map((m) => m[1]);
   assert.equal(clocks.length, 3);
-  assert.equal(clocks.join(), [10, 11, 12].map((h) => chrono.clock(Date.UTC(2026, 9, 28, h, 0, 0))).join());
+  assert.equal(clocks.join(), [12, 11, 10].map((h) => chrono.clock(Date.UTC(2026, 9, 28, h, 0, 0))).join(), 'newest first');
+  assert.match(html, /<ul class="plain-list"><li><span class="muted"[^>]*>[^<]*<\/span><span>check 1\.2<\/span><span class="badge/, 'a plain list: no bullet indent, the pill a flex item of its row');
   assert.equal(chrono.latestRun(['20261028T100000Z', '20261028T090000Z', '20261027T235959Z']), '20261028T100000Z');
 });

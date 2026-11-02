@@ -103,6 +103,7 @@ const STEPS: Record<string, string> = {
   size: 'Size check',
   'app-map': 'App map',
   status: 'Status',
+  progress: 'Progress',
 };
 /** Events whose `ok` is a verdict worth a word. */
 const VERDICT = new Set(['check', 'review', 'visual', 'finish', 'sync', 'archive', 'validate', 'lint', 'size']);

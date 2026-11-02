@@ -68,7 +68,7 @@ func (e *Env) reviewProof(changeDir string, st *State, tinfo CmdInfo, o *outcome
 	}
 	failf := func(f string, a ...any) { x.Set("ok", false); o.fail("review proof: " + fmt.Sprintf(f, a...)) }
 	if len(fixes) == 0 {
-		failf("the review changed code (%s) but progress.md has no `Review fix: <slug> - <finding>` line. Each Critical or Important fix needs a test named with `[review:<slug>]` or `review_<slug>` that fails without the fix, or `untestable: <reason>` on its line", strings.Join(code, ", "))
+		failf("the review changed code (%s) but progress.md has no `Review fix: <slug> - <finding>` line. Record each Critical or Important fix with `wingman-spec progress %s --task %s --review-fix <slug> --note \"<finding>\"`; its test is named with `[review:<slug>]` or `review_<slug>` and fails without the fix, or add `--untestable \"<reason>\"`", strings.Join(code, ", "), e.O.Change, st.Task.Label)
 		return
 	}
 	var proven, untestable, tests []string
@@ -87,7 +87,7 @@ func (e *Env) reviewProof(changeDir string, st *State, tinfo CmdInfo, o *outcome
 			}
 		}
 		if len(by) == 0 {
-			failf("no test is tagged `[review:%s]` or named `review_%s`: add one that fails without the fix, or write `untestable: <reason>` on its `Review fix:` line", f.slug, strings.ReplaceAll(f.slug, "-", "_"))
+			failf("no test is tagged `[review:%s]` or named `review_%s`: add one that fails without the fix, or record the fix again with `--untestable \"<reason>\"`", f.slug, strings.ReplaceAll(f.slug, "-", "_"))
 			return
 		}
 		proven = append(proven, f.slug)

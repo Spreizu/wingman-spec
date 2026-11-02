@@ -179,6 +179,16 @@ func (a *app) verifyCmds() []*cobra.Command {
 		})
 	appMap := a.vcmd("app-map <change>", "The two-line app map of a Size S change (--apply writes app-map.md)", one, 0, (*verify.Env).AppMap,
 		func(f *pflag.FlagSet, o *verify.Options) { f.BoolVar(&o.Apply, "apply", false, "write app-map.md") })
+	progress := a.vcmd("progress <change>", "Append an entry to progress.md (a note, a review fix or a reviewed anchor) and record it in the timeline", one, 0, (*verify.Env).Progress,
+		func(f *pflag.FlagSet, o *verify.Options) {
+			f.StringVar(&o.Session, "session", "", "this agent session's id (env WINGMAN_SPEC_SESSION)")
+			f.StringVar(&o.Task, "task", "", "the task the entry is for (its label, e.g. 1.2)")
+			f.StringVar(&o.Note, "note", "", "the entry: what was done, the finding fixed, or why the anchored requirement still holds")
+			f.StringVar(&o.Status, "status", "", "done|partial|blocked, on a plain note")
+			f.StringVar(&o.ReviewFix, "review-fix", "", "record a review fix with this slug (its test carries [review:<slug>])")
+			f.StringVar(&o.Untestable, "untestable", "", "with --review-fix: why no test can show the fix")
+			f.StringVar(&o.Anchor, "reviewed-anchor", "", "record that <capability>/<requirement-slug> still holds after its anchored code changed")
+		})
 	var only string
 	runChecks := a.vcmd("run-checks [<change>]", "Run lint, typecheck and test (and the change's visual check) in full; logs to files, a parsed summary", opt, fRun, func(e *verify.Env) error {
 		for s := range strings.SplitSeq(only, ",") {
@@ -210,7 +220,7 @@ func (a *app) verifyCmds() []*cobra.Command {
 			func(f *pflag.FlagSet, o *verify.Options) {
 				f.BoolVar(&o.Text, "text", false, "one file:line finding per line instead of JSON")
 			}),
-		runChecks,
+		runChecks, progress,
 		a.vcmd("problems [<change>]", "Every finding as one located list, for editors (read-only)", opt, 0, (*verify.Env).Problems),
 	}
 }

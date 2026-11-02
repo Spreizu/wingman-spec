@@ -90,7 +90,7 @@ ${
         .join('');
       const renames = p.spec.renames.map((r) => `<li><code>${esc(r.from)}</code> renamed to <code>${esc(r.to)}</code></li>`).join('');
       return `<h2 class="section-title">${icon('layers')} Pending in <button class="link" ${routeAttr({ page: 'change', root: project.root, name: p.change, tab: 'specs' })}>${esc(p.change)}</button></h2>
-${renames ? `<ul>${renames}</ul>` : ''}${cards}`;
+${renames ? `<ul class="plain-list">${renames}</ul>` : ''}${cards}`;
     })
     .join('');
 

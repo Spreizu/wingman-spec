@@ -185,3 +185,60 @@ func TestTimelineRecordsPlanningAndLog(t *testing.T) {
 		t.Fatalf("validate = %+v", r)
 	}
 }
+
+// progress appends checked entries to progress.md, in the lines the review proof and the anchor guard read, and records each.
+func TestProgress(t *testing.T) {
+	dir := t.TempDir()
+	run(t, dir, "init")
+	run(t, dir, "new", "pg")
+	ch := filepath.Join(dir, ".wingman-spec", "changes", "pg")
+	put(t, filepath.Join(ch, "tasks.md"), "## 1. Notes\n- [ ] 1.1 Add a note\n- [ ] 1.R Request code review\n")
+	for _, bad := range [][]string{
+		{"--task", "9.9", "--note", "x"},                                // no such task
+		{"--task", "1.1", "--note", ""},                                 // empty note
+		{"--task", "1.1", "--note", "two\nlines"},                       // not one line
+		{"--task", "1.1", "--review-fix", "empty-title", "--note", "x"}, // not a review task
+		{"--task", "1.R", "--review-fix", "Bad Slug", "--note", "x"},
+		{"--task", "1.1", "--status", "finished", "--note", "x"},
+		{"--task", "1.1", "--untestable", "why", "--note", "x"},
+		{"--reviewed-anchor", "notes", "--note", "x"},
+	} {
+		if r := run(t, dir, append([]string{"progress", "pg"}, bad...)...); r.code != ExitUsage {
+			t.Fatalf("progress %q = %+v, want a usage error", bad, r)
+		}
+	}
+	for _, ok := range [][]string{
+		{"--task", "1.1", "--note", "the note form posts to /notes"},
+		{"--task", "1.1", "--status", "blocked", "--note", "waiting for the notes table"},
+		{"--task", "1.R", "--review-fix", "empty-title", "--note", "an empty title was saved"},
+		{"--task", "1.R", "--review-fix", "slow-list", "--untestable", "needs 10k rows", "--note", "the list loaded every note"},
+		{"--reviewed-anchor", "notes/list-notes", "--note", "only the query changed"},
+	} {
+		if r := run(t, dir, append([]string{"progress", "pg"}, ok...)...); r.code != 0 {
+			t.Fatalf("progress %q = %+v", ok, r)
+		}
+	}
+	if r := run(t, dir, "progress", "pg", "--task", "1.R", "--review-fix", "empty-title", "--untestable", "a race", "--note", "an empty title was saved"); r.code != 0 {
+		t.Fatalf("a review fix recorded again = %+v", r)
+	}
+	b, _ := os.ReadFile(filepath.Join(ch, "progress.md"))
+	want := "# Progress: pg\n\n## 1.1 Add a note\n\n- the note form posts to /notes\n- waiting for the notes table (blocked)\n" +
+		"\n## 1.R Request code review\n\n- Review fix: empty-title - an empty title was saved - untestable: a race\n" +
+		"- Review fix: slow-list - the list loaded every note - untestable: needs 10k rows\n" +
+		"\n## Change\n\n- Reviewed anchors: notes/list-notes - only the query changed\n"
+	if string(b) != want {
+		t.Fatalf("progress.md =\n%s\nwant\n%s", b, want)
+	}
+	tl, _ := os.ReadFile(filepath.Join(dir, ".wingman-spec", "runs", "pg", "timeline.jsonl"))
+	var got []string
+	for l := range strings.SplitSeq(strings.TrimSpace(string(tl)), "\n") {
+		var e struct{ Event, Task, Summary string }
+		_ = json.Unmarshal([]byte(l), &e)
+		if e.Event == "progress" {
+			got = append(got, e.Task+"|"+e.Summary)
+		}
+	}
+	if len(got) != 6 || got[0] != "1.1|the note form posts to /notes" || got[3] != "1.R|Review fix slow-list: the list loaded every note (untestable: needs 10k rows)" || got[5] != "1.R|Review fix empty-title: an empty title was saved (untestable: a race) (replaces the earlier entry)" || got[4] != "|Reviewed anchor notes/list-notes: only the query changed" {
+		t.Fatalf("progress events = %q", got)
+	}
+}

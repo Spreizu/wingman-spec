@@ -77,6 +77,9 @@ type Options struct {
 	Accept, JSON      bool
 	Apply, Text       bool
 	Base, Key         string
+	ReviewFix, Anchor string // progress: a `Review fix:` or `Reviewed anchors:` entry
+	Untestable        string
+	Status            string
 	Select            []string
 }
 

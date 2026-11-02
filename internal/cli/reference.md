@@ -8,6 +8,8 @@ APPLY LOOP (the orchestrating agent drives it; a subagent implements; the CLI de
   review <change> --reply FILE | --reviewer none   record the spec-visual-reviewer's verdict after exit 5
   finish <change>                 after the last task: full commands, validate, every visual scenario, traceability, test evidence
   visual <change> [--scenario ID] the implementer's own visual check, any time
+  progress <change> [--task ID] --note TEXT   the only writer of progress.md: [--status done|partial|blocked],
+                                  --review-fix SLUG [--untestable WHY] (a review task), --reviewed-anchor CAP/REQ; a progress event
   Pass --session <id> (or WINGMAN_SPEC_SESSION) on every call: one id per agent conversation.
 
 EXIT CODES
@@ -24,7 +26,7 @@ WHAT check RUNS (each command with a timeout, --timeout or WINGMAN_SPEC_TIMEOUT_
   - test quality: changed tests must not read source files as text; each scenario the Spec: line names needs a test tagged
     [capability/scenario-slug] or an @spec marker;
   - anchors: placement, the anchor guard (anchored code changed without its requirement being mentioned: update the delta, or add
-    `Reviewed anchors: <cap>/<req> - <why it still holds>` to tasks.md or progress.md), anchor fit;
+    `progress <change> --reviewed-anchor <cap>/<req> --note "<why it still holds>"`), anchor fit;
   - validate; the visual check for a task with a Visual: line or changed UI files.
   Fast path (Size S, Risk: none, no sensitive path, no UI, no dependency manifest): no app-map, design or ADR; check and finish
   upgrade a change whose edits leave that scope (runs/<change>/upgrade.json).

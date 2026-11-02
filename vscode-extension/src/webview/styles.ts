@@ -267,6 +267,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tile .x { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
 .dash-notes { margin-top: 10px; font-size: 12px; }
 .dash-h { display: flex; align-items: center; gap: 8px; margin: 18px 0 10px; font-size: 13px; }
+/* a list aligned with its heading: no bullets or indent, one row gap, pills centred on the text */
+.plain-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.plain-list li { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.plain-list:not(:last-child) { margin-bottom: 12px; }
 .block-item { padding: 10px 12px; margin-bottom: 8px; border-radius: 9px; border: 1px solid color-mix(in srgb, var(--vscode-charts-yellow, #d29922) 45%, transparent); background: color-mix(in srgb, var(--vscode-charts-yellow, #d29922) 7%, transparent); }
 .pre-archive { margin-top: 14px; color: var(--muted); font-size: 12px; }
 .pre-archive > summary { cursor: pointer; }
