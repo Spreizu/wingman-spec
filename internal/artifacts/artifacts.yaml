@@ -55,18 +55,20 @@ artifacts:
       already exist; it has no `specs/` folder, the line `Specs: none`, and tasks that each cite
       `Spec: <capability>/<requirement-slug>`. A change is never both.
 
-      **Size and risk first.** Line 1 is `Size: S`, `M` or `L`. Line 2 is `Risk: none`, or the
+      **Size and risk first.** Line 1 is `Size: S`, `M`, `L`, `XL` or `XXL`. Line 2 is `Risk: none`, or the
       kinds that apply: security, money, data-migration, concurrency, public-api. Decide the size
       here, once, from what the specs will contain. This table is the only definition of the sizes:
 
       | Size | Capabilities | Requirements | Other limits | Implementation tasks |
       |---|---|---|---|---|
       | S | 1 | at most 3 requirements | nothing BREAKING, `Risk: none`, no ADR, no visual scenario | at most 3 |
-      | M | up to 2 capabilities | more than 3 allowed | UI with visual scenarios, or an ADR | at most 5 |
-      | L | 3 or more | any | anything BREAKING, or any risk | at most 8 |
+      | M | up to 2 capabilities | more than 3 allowed | UI with visual scenarios, or an ADR | at most 6 |
+      | L | 3 or more | any | anything BREAKING, or any risk | at most 12 |
+      | XL, XXL | as L | as L | as L, with more tasks | at most 20, 30 |
 
       A change is S only when everything in the S row holds, L when anything in the L row applies,
-      and M otherwise. Task caps S/M/L: 3/5/8. Size trims documents only. It never removes a scenario, an edge case
+      and M otherwise. XL and XXL are L with more tasks: the same artifacts and rules. Task caps S/M/L/XL/XXL:
+      3/6/12/20/30. Size trims documents only. It never removes a scenario, an edge case
       or a test. Never delete a visual block to stay S: raise the size.
 
       `wingman-spec lint` reports the planning path:
@@ -296,7 +298,7 @@ artifacts:
 
       Not written on the fast path (see the proposal instruction). **Size S** (proposal.md): write only **Implementation guide** and **Pitfalls**, plus a short
       **Testing approach** if it adds something; delete the other template sections. Size M and L
-      write every section below (`wingman-spec size` fails an M/L design without Decisions).
+      write every section below (`wingman-spec size` fails an M-or-larger design without Decisions).
 
       The specs are input here. Do not delete or weaken a scenario or a ```visual block.
       **Testing approach** names each visual scenario with a `state:` by its id and says how the
@@ -368,11 +370,12 @@ artifacts:
       lines only. Detail lines under a task must be indented and must NOT be checkboxes.
 
       **Size comes from proposal.md.** Do not repeat it here. The `Size:` line of proposal.md caps
-      the number of implementation tasks (review tasks not counted): S at most 3, M at most 5,
-      L at most 8. `wingman-spec lint` fails a plan over its cap, a Size line in tasks.md that
+      the number of implementation tasks (review tasks not counted): S at most 3, M at most 6,
+      L at most 12, XL at most 20, XXL at most 30. `wingman-spec lint` fails a plan over its cap (raise the Size line), a Size line in tasks.md that
       disagrees with proposal.md, and a change whose specs need a bigger size (`size`); `next`
       refuses them. Fewer, fuller tasks are cheaper: every task is a fresh subagent that
-      re-reads the change.
+      re-reads the change. More than 30 tasks is only a warning: split the work into separate
+      changes, each naming the change it depends on, rather than merging tasks to fit.
 
       For every task, include indented lines:
       - `Spec:` the scenarios it satisfies, as `capability > Requirement name (Scenario name,
@@ -417,7 +420,7 @@ artifacts:
         `[capability/scenario-slug]` tag instead. `finish` fails a requirement with no code
         anchor or no test anchor. The script reads the markers; you only write the comments.
         Placement rules: see `spec-implementer`.
-      - Reviews: a Size M/L change, a Risk kind or a UI change ends with `Request code review of the whole change`. A fast change has no review task.
+      - Reviews: a Size M or larger change, a Risk kind or a UI change ends with `Request code review of the whole change`. A fast change has no review task.
         A review task may fix what it finds in any file named in a `Files:` line of this change's
         tasks; the visual guard treats those files as its scope. It needs no `Files:` line.
         Add a group review (`N.R Request code review for group N`) only in two places: after
@@ -435,7 +438,7 @@ apply:
   requires: [tasks]
   tracks: tasks.md
   instruction: |
-    Implementation is test-driven, one fresh subagent per dispatch (the whole change when it is Size S, one task group when M/L). Run it with `/spec-apply <change>`:
+    Implementation is test-driven, one fresh subagent per dispatch (the whole change when it is Size S, one task group from Size M up). Run it with `/spec-apply <change>`:
     the main agent orchestrates and `wingman-spec` decides whether each task
     is done (`next` hands out a dispatch, `check` verifies it and reverts a bad tick). Read
     proposal.md, specs/, design.md, adrs/ and tasks.md (those that exist).

@@ -137,3 +137,16 @@ test('lintTasks enforces the Size cap live; the plan shape comes from `wingman-s
   assert.ok(!lintTasks(plan('M')).some((i) => i.severity === 'error'));
   assert.ok(!lintTasks(plan('L')).some((i) => i.severity === 'error'));
 });
+
+test('XL and XXL raise the cap; past XXL the plan only warns to split, never to merge', () => {
+  assert.equal(proposalSize('Size: XL\nRisk: none\n'), 'XL');
+  assert.equal(proposalSize('**Size:** xxl\n'), 'XXL');
+  const task = (n: number): string => `- [ ] 1.${n} T${n}\n  - Spec: a > b\n  - Test first: t\n  - Files: src/f${n}.ts\n  - Done when: \`npm test\` exits 0\n`;
+  const plan = (n: number): string => `## 1. G\n\n${Array.from({ length: n }, (_, i) => task(i + 1)).join('')}- [ ] 1.R Request code review of the whole change\n`;
+  const l13 = lintTasks(plan(13), 'L');
+  assert.ok(l13.some((i) => i.severity === 'error' && i.message.includes('Set Size: XL')));
+  assert.deepEqual(lintTasks(plan(13), 'XL'), []);
+  const big = lintTasks(plan(31), 'XXL');
+  assert.ok(!big.some((i) => i.severity === 'error'));
+  assert.ok(big.some((i) => i.severity === 'warning' && /separate changes/.test(i.message) && /Do not merge tasks just to fit/.test(i.message)));
+});

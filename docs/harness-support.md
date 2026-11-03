@@ -76,7 +76,7 @@ itself is harness-independent: the main agent orchestrates, a subagent implement
    just before the task. So the three harnesses get the same gate whether or not their subagents can see images; only
    the review step depends on image viewing.
 9. **Quality rules live in the CLI, not the prompt.** These are all in the CLI:
-   - the size check (`Size: S|M|L` in proposal.md against the specs) and the plan caps (3/5/8 implementation tasks);
+   - the size check (`Size: S|M|L|XL|XXL` in proposal.md against the specs) and the plan caps (3/6/12/20/30 implementation tasks);
    - the trace check (`[capability/scenario-slug]` in test titles) and the source-text rule;
    - the typecheck/lint commands and the `finish` close-out.
 

@@ -45,7 +45,7 @@ var (
 	taskRE     = regexp.MustCompile(`^[-*+]\s+\[([ xX])\]\s+(?:(\d+\.(?:\d+|[A-Za-z]+))\s+)?(.*?)\s*$`)
 	reviewRE   = regexp.MustCompile(`(?i)\bcode review\b|\breview\b.*\b(group|change)\b`)
 	closeoutRE = regexp.MustCompile(`(?i)full (test )?suite|wingman-spec validate|openspec validate|validation passes|every (spec )?scenario is covered|every visual scenario passes|visual check and review`)
-	sizeRE     = regexp.MustCompile(`(?i)^\s*(?:[-*]\s+)?\**Size\**:\s*\**\s*([SML])\b`)
+	sizeRE     = regexp.MustCompile(`(?i)^\s*(?:[-*]\s+)?\**Size\**:\s*\**\s*(XXL|XL|[SML])\b`)
 	groupRE    = regexp.MustCompile(`^##\s+(?:(\d+)\.\s*)?(.*?)\s*$`)
 	detailRE   = regexp.MustCompile(`^\s+[-*+]\s+([A-Za-z ]+):\s*(.*)$`)
 	commentRE  = regexp.MustCompile(`<!--.*?-->`)

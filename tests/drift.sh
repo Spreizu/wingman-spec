@@ -44,7 +44,7 @@ for (const s of skills) {
 { const plan = read('internal/quality/plan.go');
   const cap = (k) => (plan.match(new RegExp(`"${k}": (\\d+)`)) || [])[1];
   const num = (k) => (plan.match(new RegExp(`${k}\\s*=\\s*(\\d+)`)) || [])[1];
-  const caps = `${cap('S')}/${cap('M')}/${cap('L')}`, capsSp = `${cap('S')} / ${cap('M')} / ${cap('L')}`;
+  const sizes = ['S', 'M', 'L', 'XL', 'XXL'], caps = sizes.map(cap).join('/'), capsSp = sizes.map(cap).join(' / ');
   const risks = JSON.parse('[' + ((plan.match(/var Risks = \[\]string\{([^}]*)\}/) || [])[1] || '') + ']');
   if (!cap('S') || !num('SMaxRequirements') || !num('MMaxCapabilities') || risks.length < 3) problems.push('could not read the size rules from internal/quality/plan.go');
   const docs = { 'artifacts.yaml': schema, 'the reference page': reference, 'proposal template': read('internal/artifacts/templates/proposal.md'), 'spec-propose.md': read('harness/commands/spec-propose.md') };

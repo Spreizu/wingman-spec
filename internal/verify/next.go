@@ -26,7 +26,7 @@ type PacketTask struct {
 	Details []string `json:"details"`
 }
 
-// batchTasks: what one `next` hands out: Size S the whole change, Size M/L one task group, no Size line one task; a
+// batchTasks: what one `next` hands out: Size S the whole change, Size M and up one task group, no Size line one task; a
 // review task goes alone.
 func (e *Env) batchTasks(changeDir string, ts []taskRef, pending int) []taskRef {
 	isReview := func(t taskRef) bool { return tasks.IsReview(t.T.Label, t.T.Title) }
@@ -103,7 +103,7 @@ func (e *Env) Next() error {
 		}
 	}
 	if len(pbad) > 0 {
-		e.emit(O("result", "plan", "problems", pbad, "fix", "Re-plan with /spec-fix (merge tasks, or change Size: in proposal.md and write the full artifacts for that size; Why problems: fix the Why lines of the delta specs and the Owner approval line), then rerun."))
+		e.emit(O("result", "plan", "problems", pbad, "fix", "Re-plan with /spec-fix (raise Size: in proposal.md and write the full artifacts for that size; Why problems: fix the Why lines of the delta specs and the Owner approval line), then rerun."))
 		return quit(Usage)
 	}
 	if e.O.NewRun {

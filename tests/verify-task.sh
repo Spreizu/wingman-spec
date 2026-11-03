@@ -362,6 +362,20 @@ expect "lint names consecutive tasks on the same file as merge candidates" 'grep
 sed -i.b 's/^Size: S/Size: M/' "$C/tasks.md" && rm -f "$C/tasks.md.b"
 rc=0; $V lint demo > "$T/pl.json" 2>&1 || rc=$?
 expect "the same plan as Size: M passes lint (warnings only)" '[ $rc = 0 ] && ! grep -q "\"kind\": \"size-cap\"" "$T/pl.json"'
+reset_change "Size: L
+
+## 1. G
+$(for i in $(seq 1 13); do echo "- [ ] 1.$i t$i"; done)
+- [ ] 1.R Request code review of the whole change"
+rc=0; $V lint demo > "$T/pl.json" 2>&1 || rc=$?
+expect "13 tasks at Size: L fail lint and ask for Size: XL, without advice to merge tasks" '[ $rc = 1 ] && grep -q "Set Size: XL in proposal.md" "$T/pl.json" && ! grep -qi "merge tasks" "$T/pl.json"'
+reset_change "Size: XXL
+
+## 1. G
+$(for i in $(seq 1 31); do echo "- [ ] 1.$i t$i"; done)
+- [ ] 1.R Request code review of the whole change"
+rc=0; $V lint demo > "$T/pl.json" 2>&1 || rc=$?
+expect "31 tasks at Size: XXL only warn (lint passes) and suggest separate changes" '[ $rc = 0 ] && grep -q "\"kind\": \"size-split\"" "$T/pl.json" && grep -q "separate changes" "$T/pl.json" && ! grep -q "\"kind\": \"size-cap\"" "$T/pl.json"'
 reset_change 'Size: M
 
 ## 1. G

@@ -37,6 +37,11 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
   commands that read and writes no file except the design map, which stays in the chat in plan mode. It ends with the
   decisions and a proposal draft and offers `/spec-propose <slug>`, telling you to switch to agent mode first when you
   are in plan mode; `/spec-propose` picks the exploration up from the chat.
+- **Bigger task caps, no hard limit.** The implementation-task caps are S 3, M 6, L 12 (were 3/5/8), plus two new
+  sizes, `Size: XL` (20) and `Size: XXL` (30): larger variants of L with the same artifacts and rules. A plan over its
+  declared cap still fails lint and names the size it needs. Over 30 tasks lint only warns and suggests separate changes,
+  each naming the change it depends on; it never advises merging tasks just to fit. `/spec-propose` offers that split
+  and asks you instead of squeezing a very large plan. The editor reads XL and XXL too.
 - **Run summary.** Once a run has finished, the Timeline tab of a change (and of an archived change) opens with one
   card: how long the run took, the tasks completed, the checks at finish and the task checks with their fix rounds, the
   visual scenarios, the review findings fixed, the code files changed since the run's base commit with their added and

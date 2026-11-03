@@ -102,12 +102,19 @@ export function lintTaskPlan(text: string, proposalSize = ''): Issue[] {
   const groups = parseTasks(text);
   const impl = groups.flatMap((g) => g.tasks.filter((t) => quality.isImplementationTask(g.title, t.id, t.title)));
   const first = groups[0];
-  if (impl.length <= cap || !first) return [];
-  const next = size === 'S' ? 'M' : size === 'M' ? 'L' : '';
-  return [{ line: first.line, severity: 'error', message: `Size ${size} allows at most ${cap} implementation tasks; this plan has ${impl.length}. Merge tasks that touch the same files${next ? `, or set Size: ${next} in proposal.md` : ', or split the change'}.` }];
+  if (!first) return [];
+  const out: Issue[] = [];
+  const need = quality.sizeFor(impl.length);
+  if (quality.SIZES.indexOf(need) > quality.SIZES.indexOf(size)) {
+    out.push({ line: first.line, severity: 'error', message: `Size ${size} allows at most ${cap} implementation tasks; this plan has ${impl.length}. Set Size: ${need} in proposal.md.` });
+  }
+  if (impl.length > quality.CAPS.XXL) {
+    out.push({ line: first.line, severity: 'warning', message: `${impl.length} implementation tasks, more than Size XXL's ${quality.CAPS.XXL}. Consider splitting the work into separate changes, each naming the change it depends on. Do not merge tasks just to fit.` });
+  }
+  return out;
 }
 
-/** The `Size: S|M|L` line of a proposal.md (HTML comments ignored), or ''. */
+/** The `Size: S|M|L|XL|XXL` line of a proposal.md (HTML comments ignored), or ''. */
 export function proposalSize(text: string): string {
   return quality.proposalSize(text).size ?? '';
 }

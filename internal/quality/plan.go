@@ -25,8 +25,11 @@ type Finding struct {
 	Fix      string `json:"fix,omitempty"`
 }
 
+// Sizes in order. XL and XXL are larger variants of L: the same artifacts and rules, a higher task cap.
+var Sizes = []string{"S", "M", "L", "XL", "XXL"}
+
 // Caps are the implementation-task caps per size.
-var Caps = map[string]int{"S": 3, "M": 5, "L": 8}
+var Caps = map[string]int{"S": 3, "M": 6, "L": 12, "XL": 20, "XXL": 30}
 
 // Size rules (the one source of truth; the docs quote these numbers).
 const (
@@ -38,7 +41,20 @@ const (
 // Risks are the risk kinds a proposal may declare.
 var Risks = []string{"security", "money", "data-migration", "concurrency", "public-api"}
 
-var sizeOrder = map[string]int{"S": 0, "M": 1, "L": 2}
+var sizeOrder = map[string]int{"S": 0, "M": 1, "L": 2, "XL": 3, "XXL": 4}
+
+// IsLarge reports whether size is L or one of its larger variants.
+func IsLarge(size string) bool { return size != "" && sizeOrder[size] >= sizeOrder["L"] }
+
+// SizeFor is the smallest size whose cap holds n implementation tasks (XXL beyond every cap).
+func SizeFor(n int) string {
+	for _, s := range Sizes {
+		if n <= Caps[s] {
+			return s
+		}
+	}
+	return "XXL"
+}
 
 // PlanResult is the outcome of PlanLint.
 type PlanResult struct {
@@ -99,28 +115,20 @@ func PlanLint(text string, o PlanOpts) PlanResult {
 		}
 	}
 	if p.Size == "" {
-		out = append(out, Finding{Line: 1, Severity: "warning", Kind: "size", Text: fmt.Sprintf(`no "Size: S|M|L" line at the top of proposal.md; caps are S <= %d, M <= %d, L <= %d implementation tasks (this plan has %d)`, Caps["S"], Caps["M"], Caps["L"], len(impl))})
-	} else if len(impl) > Caps[p.Size] {
-		more := ", or split the change."
-		if p.Size != "L" {
-			next := "L"
-			if p.Size == "S" {
-				next = "M"
-			}
-			more = fmt.Sprintf(", or set Size: %s in proposal.md and write the full artifacts.", next)
+		out = append(out, Finding{Line: 1, Severity: "warning", Kind: "size", Text: fmt.Sprintf(`no "Size: S|M|L|XL|XXL" line at the top of proposal.md; caps are S <= %d, M <= %d, L <= %d, XL <= %d, XXL <= %d implementation tasks (this plan has %d)`, Caps["S"], Caps["M"], Caps["L"], Caps["XL"], Caps["XXL"], len(impl))})
+	} else if need := SizeFor(len(impl)); sizeOrder[need] > sizeOrder[p.Size] {
+		art := " and write the full artifacts for it"
+		if IsLarge(p.Size) {
+			art = " (the same artifacts as L)"
 		}
-		out = append(out, Finding{Line: p.SizeLine, Severity: "error", Kind: "size-cap", Text: fmt.Sprintf("Size %s allows at most %d implementation tasks; this plan has %d. Merge tasks that touch the same files or form one red/green/refactor cycle%s", p.Size, Caps[p.Size], len(impl), more)})
+		out = append(out, Finding{Line: p.SizeLine, Severity: "error", Kind: "size-cap", Text: fmt.Sprintf("Size %s allows at most %d implementation tasks; this plan has %d. Set Size: %s in proposal.md%s.", p.Size, Caps[p.Size], len(impl), need, art)})
+	}
+	if len(impl) > Caps["XXL"] {
+		out = append(out, Finding{Line: p.SizeLine, Severity: "warning", Kind: "size-split", Text: fmt.Sprintf("%d implementation tasks, more than Size XXL's %d. Consider splitting the work into separate changes, each a working slice whose proposal names the change it depends on, so they run in order. Do not merge tasks just to fit. Lint still passes, so apply can proceed.", len(impl), Caps["XXL"])})
 	}
 	size := p.Size
 	if size == "" {
-		switch {
-		case len(impl) <= Caps["S"]:
-			size = "S"
-		case len(impl) <= Caps["M"]:
-			size = "M"
-		default:
-			size = "L"
-		}
+		size = SizeFor(len(impl))
 	}
 	var last *tasks.Group
 	if len(p.Groups) > 0 {
@@ -141,14 +149,11 @@ func PlanLint(text string, o PlanOpts) PlanResult {
 		if isFinal(i) {
 			continue
 		}
-		early := size == "L" && r.g == firstImpl
+		early := IsLarge(size) && r.g == firstImpl
 		if !r.g.Risky && !early {
 			an := "n " + size
-			if size == "L" {
-				an = "n L"
-			}
 			extra := ""
-			if size == "L" {
+			if IsLarge(size) {
 				extra = ", the early review after group 1"
 			}
 			out = append(out, Finding{Line: r.t.Line, Severity: "warning", Kind: "review", Text: fmt.Sprintf(`%s: group review on a%s change. Keep one final review of the whole change%s and reviews after groups marked "(risky)" in their heading; delete this one`, taskID(r.t), an, extra)})
@@ -166,17 +171,17 @@ func PlanLint(text string, o PlanOpts) PlanResult {
 	}
 	if len(impl) > 0 && o.Review != nil && !*o.Review && hasFinal {
 		r := reviews[len(reviews)-1]
-		out = append(out, Finding{Line: r.t.Line, Severity: "warning", Kind: "review", Text: fmt.Sprintf("%s: no final review on this change (Size S, Risk none, no UI); a review task is for Size M/L, a Risk kind or a UI change. Delete it", taskID(r.t))})
+		out = append(out, Finding{Line: r.t.Line, Severity: "warning", Kind: "review", Text: fmt.Sprintf("%s: no final review on this change (Size S, Risk none, no UI); a review task is for Size M or larger, a Risk kind or a UI change. Delete it", taskID(r.t))})
 	}
 	if len(impl) > 0 && needReview && !hasFinal {
 		line := 1
 		if last != nil {
 			line = last.Line
 		}
-		out = append(out, Finding{Line: line, Severity: "warning", Kind: "review", Text: `no final "Request code review of the whole change" task at the end (required for Size M/L, a Risk kind or a UI change)`})
+		out = append(out, Finding{Line: line, Severity: "warning", Kind: "review", Text: `no final "Request code review of the whole change" task at the end (required for Size M or larger, a Risk kind or a UI change)`})
 	}
-	if size == "L" && firstImpl != nil && len(p.Groups) > 1 && !slices.ContainsFunc(firstImpl.Tasks, func(t *tasks.Task) bool { return t.Review }) {
-		out = append(out, Finding{Line: firstImpl.Line, Severity: "warning", Kind: "review", Text: fmt.Sprintf(`Size L: end group %s (the walking skeleton) with an early "Request code review for group %s" task; it is the review that found real problems in the pilot`, firstImpl.N, firstImpl.N)})
+	if IsLarge(size) && firstImpl != nil && len(p.Groups) > 1 && !slices.ContainsFunc(firstImpl.Tasks, func(t *tasks.Task) bool { return t.Review }) {
+		out = append(out, Finding{Line: firstImpl.Line, Severity: "warning", Kind: "review", Text: fmt.Sprintf(`Size %s: end group %s (the walking skeleton) with an early "Request code review for group %s" task; it is the review that found real problems in the pilot`, size, firstImpl.N, firstImpl.N)})
 	}
 	for _, g := range p.Groups {
 		for _, t := range g.Tasks {
@@ -280,7 +285,7 @@ func disjoint(a, b *tasks.Task) bool {
 
 var (
 	commentBlock = regexp.MustCompile(`(?s)<!--.*?-->`)
-	propSizeRE   = regexp.MustCompile(`(?i)^\s*(?:[-*]\s+)?\**Size\**:\s*\**\s*([SML])\b`)
+	propSizeRE   = regexp.MustCompile(`(?i)^\s*(?:[-*]\s+)?\**Size\**:\s*\**\s*(XXL|XL|[SML])\b`)
 	propRiskRE   = regexp.MustCompile(`(?i)^\s*(?:[-*]\s+)?\**Risk\**:\s*\**\s*(.*?)\s*$`)
 	riskNoneRE   = regexp.MustCompile(`^(none|no|-|n/a)?$`)
 	riskSplitRE  = regexp.MustCompile(`\s*[,;/]\s*|\s+and\s+`)

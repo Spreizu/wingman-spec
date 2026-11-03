@@ -1,7 +1,7 @@
 The wingman-spec reference: the apply loop, what each check does, exit codes, run state and configuration.
 
 APPLY LOOP (the orchestrating agent drives it; a subagent implements; the CLI decides)
-  next <change> --format prompt   hand out one dispatch: the whole change at Size S, one task group at M/L, a review task alone,
+  next <change> --format prompt   hand out one dispatch: the whole change at Size S, one task group from Size M up, a review task alone,
                                   one task with --per-task; tasks of one group with disjoint Files: come as a parallel WAVE of up
                                   to `parallel:` packets (default 3). next records the pre-task state of the task's visual scenarios.
   check <change> --reported done|failed|blocked [--task <label>]   verify the dispatch and tick it on a pass
@@ -32,10 +32,10 @@ WHAT check RUNS (each command with a timeout, --timeout or WINGMAN_SPEC_TIMEOUT_
   upgrade a change whose edits leave that scope (runs/<change>/upgrade.json).
 
 PLANNING (lint <change>, size <change>, validate <change>; no command runs)
-  proposal.md starts with `Size: S|M|L` and `Risk: none|<kinds>` (security, money, data-migration, concurrency, public-api).
+  proposal.md starts with `Size: S|M|L|XL|XXL` and `Risk: none|<kinds>` (security, money, data-migration, concurrency, public-api).
   S = 1 capability, at most 3 requirements, nothing BREAKING, no risk, no ADR, no visual scenarios; M = up to 2 capabilities, or UI
-  with visual scenarios; L = 3 or more capabilities, BREAKING, a risk, or a (risky) group. Task caps S/M/L: 3/5/8 implementation tasks.
-  One final review task; group reviews only after group 1 of an L change and after groups marked (risky); no close-out tasks.
+  with visual scenarios; L = 3 or more capabilities, BREAKING, a risk, or a (risky) group. XL/XXL = L with more tasks. Task caps S/M/L/XL/XXL: 3/6/12/20/30 implementation tasks; over 30 warns to split.
+  One final review task; group reviews only after group 1 of an L (or larger) change and after groups marked (risky); no close-out tasks.
   Tasks: `## N. Group`, `- [ ] N.M ...` with Spec:, Test first:, Files:, Done when: (a command in backticks), Visual: <ids>|all for UI,
   optional After: <label> (needs that task's result). Delta specs: ## ADDED / MODIFIED / REMOVED / RENAMED (`- Old -> New`).
 

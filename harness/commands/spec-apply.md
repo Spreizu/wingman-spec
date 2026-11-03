@@ -1,5 +1,5 @@
 ---
-description: "Implement a wingman-spec change test-first: one subagent per dispatch (the change when Size S, a task group when M/L, parallel waves for independent tasks), each verified by wingman-spec check."
+description: "Implement a wingman-spec change test-first: one subagent per dispatch (the change when Size S, a task group from Size M up, parallel waves for independent tasks), each verified by wingman-spec check."
 argument-hint: "<change>"
 ---
 Implement a change test-first. You are the orchestrator: one fresh subagent per dispatch, and the CLI, not you, decides whether each task is done.

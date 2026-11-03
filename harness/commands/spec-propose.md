@@ -34,7 +34,7 @@ Confirm the kebab-case change name first; that name is also the exploration slug
    - Write the prose by the `spec-writing` skill.
    `wingman-spec lint <name>` reports the planning path and any missing artifact (`path-artifacts`). The **fast** path (Size S, `Risk: none`, no UI, no sensitive path in `Files:`) writes only proposal, specs and tasks. Every other change is **full**.
 
-   **Decide the size before the first artifact.** proposal.md gets `Size: S|M|L` and `Risk:` lines; `lint` checks them against the specs. In short: **S** is 1 capability, at most 3 requirements, nothing BREAKING, no risk, no ADR, no visual scenarios. **M** is up to 2 capabilities, or a UI change with visual scenarios. **L** is 3 or more capabilities, anything BREAKING, or a risk (security, money, data-migration, concurrency, public-api). Task caps S/M/L: 3/5/8. Size trims documents, never scenarios or edge cases.
+   **Decide the size before the first artifact.** proposal.md gets `Size: S|M|L|XL|XXL` and `Risk:` lines; `lint` checks them against the specs. In short: **S** is 1 capability, at most 3 requirements, nothing BREAKING, no risk, no ADR, no visual scenarios. **M** is up to 2 capabilities, or a UI change with visual scenarios. **L** is 3 or more capabilities, anything BREAKING, or a risk (security, money, data-migration, concurrency, public-api). XL and XXL are L with more tasks. Task caps S/M/L/XL/XXL: 3/6/12/20/30. Size trims documents, never scenarios or edge cases. If the plan needs more than 30 tasks, do not squeeze it: propose to the user a split into separate changes, each with what it depends on, and ask before writing.
 
    What each one must achieve (details are in each instruction):
    - `app-map`: where this change sits in the whole app; capabilities, dependencies, build order; this change's slice (S: `wingman-spec app-map <name> --apply`).
@@ -49,7 +49,7 @@ Confirm the kebab-case change name first; that name is also the exploration slug
    - `design`: decisions and a junior-oriented implementation guide (S: guide and pitfalls only; fast path: none). The design never deletes a scenario or a visual block. A visual state the live app lacks data for gets a test role, seed or route in the design; `Not visual: <reason>; covered by <test>` only for a case that is not about layout.
    - `adrs`: one `adrs/<slug>.md` per significant decision, or `adrs/none.md`. Size S writes only `adrs/none.md`; the fast path writes none.
    - `tasks`: test-first tasks with Spec / Test first / Files / Done when, and no `Size:` line (proposal.md has it).
-     - Size M/L, a Risk kind or a UI change: end with one code review task. It may fix findings in any file the change's tasks name in `Files:`.
+     - Size M or larger, a Risk kind or a UI change: end with one code review task. It may fix findings in any file the change's tasks name in `Files:`.
      - A task that builds UI has `Visual: <scenario ids>`. Name each visual scenario from the task after which all its key elements exist, not from an earlier shell task.
      - With a design map, `Files:` follows it: the components and token files it names, and a new component only where the map lists a gap.
 

@@ -67,3 +67,43 @@ func TestIDLint(t *testing.T) {
 		}
 	}
 }
+
+func TestSizeCapsXLAndSplit(t *testing.T) {
+	plan := func(n int) string {
+		var b strings.Builder
+		b.WriteString("## 1. G\n\n")
+		for i := 1; i <= n; i++ {
+			fmt.Fprintf(&b, "- [ ] 1.%d T%d\n  - Spec: a > b\n  - Test first: t\n  - Files: src/f%d.ts\n  - Done when: `npm test` exits 0\n", i, i, i)
+		}
+		b.WriteString("- [ ] 1.R Request code review of the whole change\n")
+		return b.String()
+	}
+	kinds := func(size string, n int) map[string]string {
+		out := map[string]string{}
+		for _, f := range PlanLint(plan(n), PlanOpts{Size: size}).Problems {
+			if strings.HasPrefix(f.Kind, "size") {
+				out[f.Kind] = f.Severity + ": " + f.Text
+			}
+		}
+		return out
+	}
+	if k := kinds("L", 13); !strings.Contains(k["size-cap"], "error") || !strings.Contains(k["size-cap"], "Set Size: XL") || strings.Contains(strings.ToLower(k["size-cap"]), "merge") {
+		t.Fatalf("L with 13 tasks: %v", k)
+	}
+	if k := kinds("XL", 13); len(k) != 0 {
+		t.Fatalf("XL with 13 tasks: %v", k)
+	}
+	if k := kinds("S", 7); !strings.Contains(k["size-cap"], "Set Size: L") {
+		t.Fatalf("S with 7 tasks: %v", k)
+	}
+	k := kinds("XXL", 31)
+	if _, bad := k["size-cap"]; bad || !strings.HasPrefix(k["size-split"], "warning") || !strings.Contains(k["size-split"], "separate changes") {
+		t.Fatalf("XXL with 31 tasks: %v", k)
+	}
+	if got := ReadProposalSize("Size: XL\nRisk: none\n").Size; got != "XL" {
+		t.Fatalf("Size: XL read as %q", got)
+	}
+	if !IsLarge("XXL") || IsLarge("M") || IsLarge("") || SizeFor(21) != "XXL" || SizeFor(31) != "XXL" || SizeFor(4) != "M" {
+		t.Fatal("IsLarge/SizeFor")
+	}
+}

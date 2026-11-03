@@ -1,4 +1,4 @@
-Size: M <!-- S, M or L, from the size table in the proposal instruction. S: 1 capability, at most 3 requirements, nothing BREAKING, Risk: none, no ADR, no visual scenario. M: up to 2 capabilities, or UI with visual scenarios. L: 3 or more capabilities, BREAKING or any risk. Caps 3 / 5 / 8 implementation tasks. `wingman-spec size` checks it. -->
+Size: M <!-- S, M, L, XL or XXL, from the size table in the proposal instruction. S: 1 capability, at most 3 requirements, nothing BREAKING, Risk: none, no ADR, no visual scenario. M: up to 2 capabilities, or UI with visual scenarios. L: 3 or more capabilities, BREAKING or any risk. XL and XXL: L with more tasks. Caps 3 / 6 / 12 / 20 / 30 implementation tasks. `wingman-spec size` checks it. -->
 Risk: none <!-- or the kinds that apply: security, money, data-migration, concurrency, public-api. Any risk makes it L. -->
 
 ## Why

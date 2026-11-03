@@ -18,9 +18,9 @@ A change is **fast** when all of these hold; otherwise it is **full**:
 | Artifact | Fast | Full |
 | --- | --- | --- |
 | `app-map.md` | none, or the two lines from `wingman-spec app-map <change> --apply` | the analyst's map (Size S: two lines, also generated) |
-| `design.md` | none | guide and pitfalls (S), full design (M/L) |
+| `design.md` | none | guide and pitfalls (S), full design (M and up) |
 | `adrs/` | none | `none.md` or the ADRs |
-| final review task | none | Size M/L, a Risk kind, or UI |
+| final review task | none | Size M or larger, a Risk kind, or UI |
 | `progress.md` | none | none (the task prompt lists the earlier tasks) |
 
 Specs, scenarios, edge cases, the `Done when:` tests, the scenario tags, the source-text rule, `finish`, drift and the owner approval are the same on both paths.

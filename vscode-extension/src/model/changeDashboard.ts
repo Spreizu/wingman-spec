@@ -3,7 +3,7 @@
  * list of what still blocks the archive, each with what to do. Pure: the run files and the verifier answers come in as inputs.
  */
 import chrono from '../core/chronology.ts';
-import quality from '../core/plan.ts';
+import quality, { type Size } from '../core/plan.ts';
 import type { TraceChange, TraceGap } from './traceability.ts';
 import type { Change, Task } from './types.ts';
 import type { SyncCheckReport, VerifierFinding } from './verifier.ts';
@@ -95,8 +95,8 @@ export function summarizeRun(files: RunFiles): RunSummary | undefined {
   };
 }
 
-/** `Size: S|M|L` and `Risk: ...` of proposal.md (`plan.proposalSize`, the CLI's reading). */
-export function proposalSize(text: string | undefined): { size?: 'S' | 'M' | 'L'; risk?: string } {
+/** `Size: S|M|L|XL|XXL` and `Risk: ...` of proposal.md (`plan.proposalSize`, the CLI's reading). */
+export function proposalSize(text: string | undefined): { size?: Size; risk?: string } {
   const p = quality.proposalSize(text ?? '');
   return { ...(p.size ? { size: p.size } : {}), ...(p.risk ? { risk: p.risk.length ? p.risk.join(', ') : 'none' } : {}) };
 }
@@ -141,7 +141,7 @@ export interface Dashboard {
   tasks: { total: number; done: number; verified: number; rows: TaskRow[] };
   checks: { known: boolean; passed: number; failed: number; lastFailure?: string; exhausted: boolean; lintErrors: number; guardFindings: number; attempts: number };
   review: { reviewTasksDone: number; reviewTasksTotal: number; visual: 'pending' | 'none' };
-  size: { size?: 'S' | 'M' | 'L'; cap?: number; planned: number; over: boolean; risk?: string };
+  size: { size?: Size; cap?: number; planned: number; over: boolean; risk?: string };
   approvals: ApprovalRow[];
   /** The verifier's last records of this change's run (checks, finish, review), oldest first by time. */
   activity?: RunEvent[];

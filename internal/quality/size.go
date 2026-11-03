@@ -311,7 +311,7 @@ func SizeCheck(f Facts) SizeResult {
 		if req.Size != "S" {
 			extra = " (" + strings.Join(append(append([]string{}, req.Reasons["L"]...), req.Reasons["M"]...), "; ") + ")"
 		}
-		out = append(out, Finding{File: "proposal.md", Line: 1, Severity: "warning", Kind: "size", Text: fmt.Sprintf(`proposal.md has no "Size: S|M|L" line; by the specs this change is Size: %s%s`, req.Size, extra)})
+		out = append(out, Finding{File: "proposal.md", Line: 1, Severity: "warning", Kind: "size", Text: fmt.Sprintf(`proposal.md has no "Size: S|M|L|XL|XXL" line; by the specs this change is Size: %s%s`, req.Size, extra)})
 	}
 	if declared != "" && sizeOrder[declared] < sizeOrder[req.Size] {
 		why := append([]string{}, req.Reasons["L"]...)

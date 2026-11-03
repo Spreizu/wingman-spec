@@ -1,7 +1,7 @@
 **The loop.** `W` below is `.wingman-spec/bin/wingman-spec`, run from the code repository. Pick one short session id for this conversation (for example `a7f3`) and pass `--session <id>` to every `W` call, so a second agent on the same change is refused instead of overwriting your run. `W` alone decides progress: it reads `tasks.md` and re-runs every check itself. Never edit `tasks.md`, never tick a box, never skip `check`.
 
 1. **`W next <change> --format prompt`**, then act on the exit code:
-   - `0`: the output is one dispatch: the whole change at Size S, one task group at Size M/L, a review task alone, or one task with `--per-task`. It holds each task's `Done when:`, the files to read and, on a retry, the last failure. Go to step 2 and change nothing in the code repository before the subagent starts (`next` has captured the pre-task state of the task's visual scenarios).
+   - `0`: the output is one dispatch: the whole change at Size S, one task group from Size M up, a review task alone, or one task with `--per-task`. It holds each task's `Done when:`, the files to read and, on a retry, the last failure. Go to step 2 and change nothing in the code repository before the subagent starts (`next` has captured the pre-task state of the task's visual scenarios).
    - `0` and a first line `WAVE <n>: <k> tasks (...)`: a **parallel wave**. Tasks of one group with disjoint `Files:` come as one `=== packet <label> ===` prompt each, up to `parallel:` (default 3). Go to step 2 and dispatch them together.
    - `10`: every task is ticked. Go to **Finish**.
    - `3`: `BLOCKED.md` exists. Show it with its `Proposed outcome:` line, tell the user to run `/spec-fix`, and stop.

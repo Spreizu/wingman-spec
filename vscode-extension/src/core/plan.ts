@@ -3,9 +3,12 @@
  * helpers (same regular expressions); every rule that needs more than one file stays in the CLI (`wingman-spec problems --json`).
  */
 
-/** Implementation-task caps per declared size. */
-export const CAPS = { S: 3, M: 5, L: 8 } as const;
+/** Implementation-task caps per declared size; XL and XXL are L with more tasks. */
+export const CAPS = { S: 3, M: 6, L: 12, XL: 20, XXL: 30 } as const;
 export type Size = keyof typeof CAPS;
+export const SIZES = Object.keys(CAPS) as Size[];
+/** The smallest size whose cap holds n implementation tasks (XXL beyond every cap). */
+export const sizeFor = (n: number): Size => SIZES.find((s) => n <= CAPS[s]) ?? 'XXL';
 
 const REVIEW_RE = /\bcode review\b|\breview\b.*\b(group|change)\b/i;
 const CLOSEOUT_RE = /full (test )?suite|wingman-spec validate|validation passes|every (spec )?scenario is covered|every visual scenario passes|visual check and review/i;
@@ -28,11 +31,11 @@ export interface ProposalSize {
   riskLine: number | null;
 }
 
-/** `Size: S|M|L` and `Risk: none|<kinds>` lines of proposal.md (first occurrence, comments ignored). */
+/** `Size: S|M|L|XL|XXL` and `Risk: none|<kinds>` lines of proposal.md (first occurrence, comments ignored). */
 export function proposalSize(text: string): ProposalSize {
   const out: ProposalSize = { size: null, line: null, risk: null, riskLine: null };
   stripComments(text).replace(/\r\n/g, '\n').split('\n').forEach((l, i) => {
-    const s = out.size ? null : /^\s*(?:[-*]\s+)?\**Size\**:\s*\**\s*([SML])\b/i.exec(l);
+    const s = out.size ? null : /^\s*(?:[-*]\s+)?\**Size\**:\s*\**\s*(XXL|XL|[SML])\b/i.exec(l);
     if (s?.[1]) {
       out.size = s[1].toUpperCase() as Size;
       out.line = i + 1;
@@ -66,5 +69,5 @@ const SKIP_DIR = /^(node_modules|\.git|dist|build|out|coverage|vendor|\.venv|ven
 /** True for a file the CLI scans for markers (relative, `/`-separated path). */
 export const isScannable = (f: string): boolean => !f.split('/').slice(0, -1).some((seg) => SKIP_DIR.test(seg)) && !SKIP_EXT.test(f);
 
-const plan = { CAPS, isCloseoutGroup, isReviewTask, isImplementationTask, proposalSize, isNoneAdr, TAG_RE, isScannable };
+const plan = { CAPS, SIZES, sizeFor, isCloseoutGroup, isReviewTask, isImplementationTask, proposalSize, isNoneAdr, TAG_RE, isScannable };
 export default plan;
