@@ -208,6 +208,7 @@ func (a *app) verifyCmds() []*command {
 		a.vcmd("finish <change>", "Close-out once every task is ticked: full commands, validate, visual, trace, anchors, test evidence", one, run, (*verify.Env).Finish,
 			func(f *flagSet, o *verify.Options) {
 				f.StringVar(&o.Report, "format", "json", "json|junit|markdown")
+				f.BoolVar(&o.Affected, "affected", false, "run only the tests of the requirements the change touches (its own, and those whose @spec-anchored code changed); a test of unmarked code is missed")
 			}),
 		a.vcmd("lint <change>", "Validate the plan: proposal, delta specs, tasks, design (no command runs)", one, run, (*verify.Env).Lint,
 			func(f *flagSet, o *verify.Options) {

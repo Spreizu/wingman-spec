@@ -439,7 +439,7 @@ func coverageGap(k string, r *Requirement, cv Coverage) (Gap, bool) {
 			Hint: "fix the code or the test (do not skip it), then run the tests through `wingman-spec finish <change>` to record the result"}, true
 	case "stale":
 		return Gap{Type: "stale-test-result", Subject: k, Severity: "info", Text: fmt.Sprintf("requirement %q: the last recorded test result (%s, %s) is stale: the %s since", r.Name, cv.Last, when, cv.Reason),
-			Hint: "run the tests through `wingman-spec finish <change>` again to record a current result"}, true
+			Hint: "run the tests through `wingman-spec finish <change>` again (`--affected` runs only the touched requirements' tests) to record a current result"}, true
 	}
 	return Gap{}, false
 }

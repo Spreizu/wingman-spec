@@ -386,6 +386,21 @@ printf '<testsuites><testsuite name="todo"><testcase classname="todo" name="[tod
 ws_cmd junit report.xml; printf 'touch report.xml; exit 0\n' >> run-tests.sh
 rm -rf .wingman-spec/runs; WINGMAN_SPEC_TRACEABILITY=off $V finish clear > "$T/f.json" 2>/dev/null || true
 expect "a JUnit report (commands.junit) is read too: a failing testcase is recorded as failed" '[ "$(J "$R" requirements.todo/count-the-todos.scenarios.todo/counted)" = failed ] && [ "$(J "$R" requirements.todo/add-a-todo.scenarios.todo/added)" = passed ]'
+
+echo "== finish --affected: only the tests of the requirements the change touches"
+mkdir -p "$T/aff" && cd "$T/aff" && ws_project . && V="$WS"
+mkdir -p src test && cp -r "$T/cov/.wingman-spec/specs" "$T/cov/.wingman-spec/changes" .wingman-spec/ && cp "$T/cov/src/todo.js" src/
+for t in added:add removed:remove counted:count cleared:clear; do printf '// [todo/%s]\n' "${t%%:*}" > "test/${t#*:}.test.js"; done
+printf '[ $# -gt 0 ] || set -- test/*.test.js\nfor f in "$@"; do echo "ok - $(cat "$f")"; echo "$f" >> ran.txt; done\n' > run-tests.sh
+ws_cmd test "sh run-tests.sh"; ws_cmd targeted "sh run-tests.sh {files}"
+git add -A && git commit -qm init
+sed -i 's#  return l.filter((_, j) => j !== i);#  return l.slice(0, i).concat(l.slice(i + 1));#' src/todo.js
+rm -f ran.txt; rc=0; $V finish clear --affected > "$T/f.json" 2>/dev/null || rc=$?
+expect "finish --affected runs the tests of the change's own requirement and of the one whose anchored code changed, nothing else" '[ $rc = 0 ] && [ "$(sort ran.txt | tr "\n" " ")" = "test/clear.test.js test/remove.test.js " ]'
+expect "...names the files and the requirements in the tests check, and warns that unmarked code is not followed" 'grep -q "\"requirements\": \[" "$T/f.json" && grep -q "todo/remove-a-todo" "$T/f.json" && grep -q "a test of changed code that carries no marker" "$T/f.json"'
+expect "...and records only what ran" '[ "$(J .wingman-spec/cache/test-results.json requirements.todo/remove-a-todo.scenarios.todo/removed)" = passed ] && [ "$(J .wingman-spec/cache/test-results.json requirements.todo/add-a-todo)" = undefined ]'
+rm -f ran.txt .wingman-spec/runs -r; $V finish clear > /dev/null 2>&1 || true
+expect "plain finish still runs the full suite" '[ "$(wc -l < ran.txt)" = 4 ]'
 cd "$T/p" || exit 1
 
 echo

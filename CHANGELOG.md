@@ -4,6 +4,12 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
 ## Unreleased
 
+- **`finish --affected`.** Runs only the tests of the requirements the change touches: its ADDED, MODIFIED and
+  renamed requirements, and those whose `@spec`-anchored code units changed since the change began; their tests are the
+  files tagged with their scenarios or carrying their markers, plus changed test files and tests named after changed
+  sources, run through the targeted-test template. The tests check lists the files and requirements, and the run warns
+  that a test of unmarked code is not followed (run plain `finish` for the full suite). Without a targeted template or
+  any affected test file it runs the full suite and says why.
 - **Test results per requirement.** `finish` now records what its test run showed for each scenario (passed, failed,
   skipped; from the runner output and, when `commands.junit` is set, the JUnit report) in
   `.wingman-spec/cache/test-results.json` (derived data, git-ignored), with the commit and tree and fingerprints of the

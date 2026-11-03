@@ -132,8 +132,13 @@ func (e *Env) Finish() error {
 	var o outcome
 	type job struct{ name, cmd string }
 	var jobs []job
+	var affected *Obj
 	if tinfo.Cmd != nil {
-		jobs = append(jobs, job{"tests", tinfo.cmd()})
+		cmd := tinfo.cmd()
+		if e.O.Affected {
+			cmd, affected = e.affectedCmd(changeDir, cmd, &o)
+		}
+		jobs = append(jobs, job{"tests", cmd})
 	} else {
 		o.warn("project tests were not run (commands.test: none)")
 	}
@@ -169,6 +174,9 @@ func (e *Env) Finish() error {
 		x := O("check", j.name, "ok", r.RC == 0, "rc", r.RC, "timed_out", r.TimedOut, "seconds", r.Seconds)
 		if r.Cached {
 			x.Set("cached", true)
+		}
+		if j.name == "tests" && affected != nil {
+			x.Set("affected", affected)
 		}
 		o.check(x)
 		if r.RC != 0 {

@@ -71,6 +71,29 @@ func ChangedSince(codeRoot, base string) []Changed {
 	return out
 }
 
+// TouchedKeys lists the requirement keys whose anchored code units changed since base (edited, added, removed or moved),
+// skipping the files skip reports (tests, specs). Code changed outside every anchored unit names no key.
+func TouchedKeys(codeRoot, base string, skip func(string) bool) map[string]bool {
+	keys := map[string]bool{}
+	for _, c := range ChangedSince(codeRoot, base) {
+		if skip(c.File) {
+			continue
+		}
+		cur, _ := os.ReadFile(filepath.Join(codeRoot, c.File))
+		old := ""
+		if c.From != "" {
+			old, _ = show(codeRoot, base, c.From)
+		}
+		if !strings.Contains(old, "@spec") && !strings.Contains(string(cur), "@spec") {
+			continue
+		}
+		for _, e := range Compare(old, string(cur)) {
+			keys[e.Key] = true
+		}
+	}
+	return keys
+}
+
 // GuardOpts are the inputs of Guard.
 type GuardOpts struct {
 	CodeRoot     string

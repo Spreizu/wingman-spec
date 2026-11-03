@@ -71,6 +71,7 @@ type Options struct {
 	Parallel          int    // lanes per wave (0: the config's parallel)
 	Task              string // the wave task a check or review is for
 	NoCache, Changed  bool
+	Affected          bool // finish: run only the tests of the requirements the change touches
 	Timing, Takeover  bool
 	Session, Reply    string
 	Reviewer          string
