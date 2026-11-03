@@ -252,7 +252,7 @@
         "wingmanSpec.codeView": {
           "type": "boolean",
           "default": true,
-          "description": "In any file: CodeLens, hover, go-to-definition and warnings for `@spec <capability>/<requirement>` markers and `[capability/scenario]` test tags, and anchor counts above requirements in specs."
+          "description": "In any file: CodeLens, hover, go-to-definition and warnings for `@spec <capability>/<requirement>` markers and `[capability/scenario]` test tags, anchor counts above requirements in specs, and on unmarked functions a Used by hover (the requirements whose marked functions call it, through the language server's call hierarchy)."
         },
         "wingmanSpec.runTestsLens": {
           "type": "boolean",

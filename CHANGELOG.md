@@ -40,6 +40,12 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
   hand) may say `Verify: inspection`, `Verify: analysis` or `Verify: demonstration` under its SHALL sentence, with an
   optional note. Its scenarios count as verified in `trace` (`N verified without a test`), and `drift`, the anchor lint
   and the extension's Requirements view no longer call it untested; any other method is a lint error.
+- **Used by, in the editor.** Hovering the name of a function or method that has no `@spec` marker shows which
+  requirements use it: the extension walks the function's callers through the language server's call hierarchy (up to
+  4 calls up, 30 lookups), stops at each `@spec`-marked caller and lists its requirement with the call chain, e.g.
+  `Checkout total` via `total` → `applyDiscount`. Callers in test files are not counted. Works with any language server
+  that offers a call hierarchy (checked with TypeScript and gopls); asked only on hover and cached until a file changes.
+  The CLI is unchanged.
 - **Faster visual runs.** After a visual run the helper keeps Playwright loaded and one headless Chromium running in
   the background, so the next `visual`, `check` or `finish` of the same code root skips node start, the Playwright load
   and the browser launch; the app server waits poll faster, a page's settle step and its ARIA snapshots take fewer

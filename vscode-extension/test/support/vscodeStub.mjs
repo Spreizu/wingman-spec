@@ -8,6 +8,7 @@ export class Range {
   constructor(a, b, c, d) {
     if (typeof a === 'number') { this.start = new Position(a, b); this.end = new Position(c, d); } else { this.start = a; this.end = b; }
   }
+  contains(p) { const after = (x, y) => x.line > y.line || (x.line === y.line && x.character >= y.character); return after(p, this.start) && after(this.end, p); }
 }
 export class Uri {
   constructor(scheme, fsPath) { this.scheme = scheme; this.fsPath = fsPath; }
@@ -33,6 +34,7 @@ export class MarkdownString {
   appendMarkdown(s) { this.value += s; return this; }
 }
 export class Hover { constructor(contents, range) { this.contents = contents; this.range = range; } }
+export const SymbolKind = { File: 0, Module: 1, Namespace: 2, Package: 3, Class: 4, Method: 5, Function: 11 };
 export const ViewColumn = { Active: -1, One: 1 };
 export const DiagnosticSeverity = { Error: 0, Warning: 1, Information: 2, Hint: 3 };
 export class Diagnostic { constructor(range, message, severity) { this.range = range; this.message = message; this.severity = severity; } }
@@ -83,6 +85,7 @@ export function makeDoc(fsPath, text) {
   return {
     uri: Uri.file(fsPath), fileName: fsPath, languageId: 'plaintext', lineCount: lines.length,
     getText: (r) => { if (!r) return text; const ls = lines.slice(r.start.line, r.end.line + 1); ls[ls.length - 1] = ls[ls.length - 1].slice(0, r.end.character); ls[0] = ls[0].slice(r.start.character); return ls.join('\n'); }, lineAt: (i) => ({ text: lines[i] ?? '' }),
+    getWordRangeAtPosition: (p) => { const l = lines[p.line] ?? ''; for (const m of l.matchAll(/\w+/g)) if (p.character >= m.index && p.character <= m.index + m[0].length) return new Range(p.line, m.index, p.line, m.index + m[0].length); return undefined; },
   };
 }
 

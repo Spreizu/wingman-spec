@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import * as vscode from 'vscode';
 import { registerScaffoldCommands } from './commands/scaffold.ts';
 import { TraceCache, registerAnchorCode } from './editor/anchorCode.ts';
+import { registerUsedBy } from './editor/usedBy.ts';
 import { PanelData } from './editor/panelData.ts';
 import { registerProblems } from './editor/problems.ts';
 import { VerifierClient, execRunner } from './editor/verifier.ts';
@@ -78,6 +79,7 @@ export function activate(context: vscode.ExtensionContext): void {
     registerDiagnostics(store),
     traceCache,
     registerAnchorCode(traceCache, panel),
+    registerUsedBy(traceCache),
     registerTraceView(store, traceCache, problems.service),
     registerScaffoldCommands(store, panel, verifier),
     problems.disposable,

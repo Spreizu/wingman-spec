@@ -37,6 +37,7 @@ Open the dashboard from the **Wingman Spec** status bar item or with **Wingman S
 | Roadmap | For a new product: slices in build order and the one that is next. |
 | Requirements & Traceability (Explorer) | Requirements with their Why, code and test anchors, last test result ("2 tests passed", "failed", "stale"), pending changes, drift gaps. |
 | In the editor | Problems, CodeLens, hover and go-to-definition for spec files, tasks, ADRs and `@spec` markers in code. |
+| Used by (hover) | On a function or method without a `@spec` marker: the requirements whose marked functions call it, up to 4 calls up, with the call chain. Needs the language's call hierarchy (TypeScript and JavaScript built in, Go with the Go extension, most other language servers). |
 
 Buttons with a prompt sign run the CLI here: Validate, Status, Sync and Archive on a change, Doctor on the Overview. A
 button that cannot run yet is disabled and the line under it says why. Archive asks first. Buttons with a speech bubble
@@ -63,7 +64,7 @@ All commands start with **Wingman Spec:** in the Command Palette.
 |---|---|---|
 | wingmanSpec.diagnostics | on | Problems in specs, tasks and ADRs |
 | wingmanSpec.codeLens | on | CodeLens on tasks, specs and ADRs |
-| wingmanSpec.codeView | on | CodeLens, hover and warnings for `@spec` markers and test tags |
+| wingmanSpec.codeView | on | CodeLens, hover and warnings for `@spec` markers and test tags, and the Used by hover |
 | wingmanSpec.runTestsLens | on | A Run tests action on markers |
 | wingmanSpec.problemsPanel | on | CLI findings (`wingman-spec problems`) in the Problems panel, with quick fixes |
 | wingmanSpec.dashboardChecks | on | The change page asks the CLI what blocks the archive |

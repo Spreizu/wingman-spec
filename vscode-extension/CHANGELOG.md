@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Requirement IDs: `@spec` markers may name a requirement by its `ID:` line (e.g. `@spec BILLING-7KQ3`) or its slug, in any case, and **Go to Requirement ID** opens a requirement by ID. The Requirements view shows each requirement's last recorded test result, and a `Verify:` line counts as verified without a test. Details in the repository changelog.
+- Hover on the name of a function without a `@spec` marker: **Used by** lists the requirements whose marked functions call it (up to 4 calls up, through the language server's call hierarchy, test callers not counted), each with the call chain and links. Asked only on hover and cached until a file changes; nothing is shown when no requirement reaches it or the language has no call hierarchy.
 - The Branch Review page and the `Open Branch Review` command are removed, with its traceability tree node. Removed settings: `wingmanSpec.branchReviewBase`, `wingmanSpec.branchReviewGit`.
 - Opens faster: the first `@spec` scan of a folder runs in short slices instead of holding the editor (longest pause on a 10,000-file project about 40 ms instead of about 220 ms), the scan is kept in the workspace storage so a reopen only re-reads changed files (Requirements view about 40% sooner), and the two `git log` calls for change and archive times run in parallel without blocking. The views show the same content.
 - The bundled CLI is about 1.6 MB smaller (no cobra, pflag or text/template), so each platform build is about 0.5 MB smaller. Details in the repository changelog.
