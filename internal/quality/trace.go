@@ -3,13 +3,13 @@ package quality
 import (
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/Spreizu/wingman-spec/internal/anchors"
+	"github.com/Spreizu/wingman-spec/internal/gitx"
 
 	"github.com/Spreizu/wingman-spec/internal/spec"
 	"github.com/Spreizu/wingman-spec/internal/testpaths"
@@ -22,19 +22,7 @@ var skipWalk = regexp.MustCompile(`^(node_modules|\.git|dist|build|\.wingman-spe
 
 // GitFiles runs git with args in root and returns the output lines, or nil when git fails.
 func GitFiles(root string, args ...string) []string {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = root
-	b, err := cmd.Output()
-	if err != nil {
-		return nil
-	}
-	var out []string
-	for l := range strings.SplitSeq(string(b), "\n") {
-		if l != "" {
-			out = append(out, l)
-		}
-	}
-	return out
+	return gitx.Lines(root, args...)
 }
 
 // ListTestFiles lists the test files of the code repo (tracked and untracked, git-ignored skipped; without git a walk).

@@ -229,7 +229,10 @@ func Stale(o StaleOpts) ([]StaleAnchor, []string) {
 		if b == nil {
 			return specC{}
 		}
-		text, _ := os.ReadFile(r.File)
+		text, err := os.ReadFile(r.File)
+		if err != nil {
+			return specC{}
+		}
 		a, z := specRange(string(text), r.Line)
 		var best *commit
 		for i := a - 1; i < z && i < len(b.PerLine); i++ {
@@ -295,7 +298,10 @@ func Stale(o StaleOpts) ([]StaleAnchor, []string) {
 		}
 		text, ok := texts[m.File]
 		if !ok {
-			b, _ := os.ReadFile(filepath.Join(o.CodeRoot, m.File))
+			b, err := os.ReadFile(filepath.Join(o.CodeRoot, m.File))
+			if err != nil {
+				continue
+			}
 			text = string(b)
 			texts[m.File] = text
 		}

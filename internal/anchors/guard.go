@@ -131,7 +131,11 @@ func Guard(o GuardOpts) GuardResult {
 			if c.From != "" {
 				baseText, _ = show(o.CodeRoot, o.Base, c.From)
 			}
-			b, _ := os.ReadFile(filepath.Join(o.CodeRoot, c.File))
+			b, err := os.ReadFile(filepath.Join(o.CodeRoot, c.File))
+			if err != nil {
+				events = append(events, Event{Kind: "unreadable", File: c.File, Header: err.Error()})
+				continue
+			}
 			curText := string(b)
 			if strings.Contains(baseText, "\x00") || strings.Contains(curText, "\x00") {
 				continue
@@ -221,6 +225,10 @@ func guardFinish(o GuardOpts, code []Marker, events []Event) GuardResult {
 	}
 	known := func(k string) bool { return o.Listed[k] || o.Reviewed[k] }
 	for _, e := range events {
+		if e.Kind == "unreadable" {
+			add("unreadable-file", "", e.File, 1, "skipped unreadable file: "+e.Header)
+			continue
+		}
 		where := e.File + ":" + strconv.Itoa(e.Line)
 		unit := ""
 		if e.Header != "" {

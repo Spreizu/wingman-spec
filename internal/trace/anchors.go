@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/Spreizu/wingman-spec/internal/anchors"
+	"github.com/Spreizu/wingman-spec/internal/codeindex"
 	"github.com/Spreizu/wingman-spec/internal/config"
-	"github.com/Spreizu/wingman-spec/internal/gitx"
 	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/quality"
 	"github.com/Spreizu/wingman-spec/internal/spec"
@@ -27,6 +27,7 @@ var (
 type Ctx struct {
 	R   *layout.Root
 	Cfg *config.Config
+	Idx *codeindex.Index
 }
 
 // Specs is the living specs directory.
@@ -67,57 +68,35 @@ func (c Ctx) IsScannable(f string) bool {
 	return !skipExt.MatchString(f)
 }
 
+func (c Ctx) files() *codeindex.Index {
+	if c.Idx != nil {
+		return c.Idx
+	}
+	return codeindex.Scan(c.R.Code, c.IsScannable)
+}
+
 // CodeFiles lists the scannable files of the code root (git ls-files, else a walk).
 func (c Ctx) CodeFiles() []string {
-	root := c.R.Code
-	files := gitx.Lines(root, "-c", "core.quotepath=off", "ls-files", "-co", "--exclude-standard")
-	if files == nil {
-		_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
-			if err != nil {
-				return nil
-			}
-			if d.IsDir() {
-				if p != root && skipDir.MatchString(d.Name()) {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			rel, _ := filepath.Rel(root, p)
-			files = append(files, filepath.ToSlash(rel))
-			return nil
-		})
-	}
-	var out []string
-	for _, f := range files {
-		if !c.IsScannable(f) {
-			continue
-		}
-		if st, err := os.Stat(filepath.Join(root, f)); err == nil && st.Mode().IsRegular() {
-			out = append(out, f)
-		}
-	}
-	return out
+	return c.files().RelPaths()
 }
 
 // ScanAnchors returns every marker in the given files (all code files when nil).
 func (c Ctx) ScanAnchors(only []string) []anchors.Marker {
-	if only == nil {
-		only = c.CodeFiles()
-	}
+	idx := c.files()
 	var out []anchors.Marker
+	want := map[string]bool{}
 	for _, f := range only {
-		p := filepath.Join(c.R.Code, f)
-		st, err := os.Stat(p)
-		if err != nil || !st.Mode().IsRegular() || st.Size() > 1<<20 {
+		want[f] = true
+	}
+	for _, f := range idx.Files {
+		if only != nil && !want[f.Rel] {
 			continue
 		}
-		b, err := os.ReadFile(p)
-		s := string(b)
-		if err != nil || strings.Contains(s, "\x00") || !strings.Contains(s, "@spec") {
+		if f.Text == "" || !strings.Contains(f.Text, "@spec") {
 			continue
 		}
-		for _, m := range anchors.MarkersIn(s) {
-			m.File, m.Test = f, testpaths.IsTestPath(f)
+		for _, m := range anchors.MarkersIn(f.Text) {
+			m.File, m.Test = f.Rel, testpaths.IsTestPath(f.Rel)
 			out = append(out, m)
 		}
 	}
@@ -419,8 +398,12 @@ func (c Ctx) PlacementProblems(keys map[string]bool, files []string) []anchors.P
 		files = c.CodeFiles()
 	}
 	var out []anchors.PlacementFinding
+	idx := c.files()
 	for _, f := range files {
-		s := readIf(filepath.Join(c.R.Code, f))
+		s := idx.Text(f)
+		if s == "" {
+			s = readIf(filepath.Join(c.R.Code, f))
+		}
 		if s == "" || len(s) > 1<<20 || strings.Contains(s, "\x00") || !strings.Contains(s, "@spec") {
 			continue
 		}
@@ -492,7 +475,10 @@ func (c Ctx) FitProblems(keys map[string]bool, files []string) ([]anchors.FitFin
 			continue
 		}
 		seen[m.File] = true
-		t := readIf(filepath.Join(c.R.Code, m.File))
+		t := c.files().Text(m.File)
+		if t == "" {
+			t = readIf(filepath.Join(c.R.Code, m.File))
+		}
 		if t != "" && len(t) < 1<<20 && !strings.Contains(t, "\x00") {
 			texts = append(texts, anchors.FitFile{File: m.File, Text: t, Test: testpaths.IsTestPath(m.File)})
 		}
