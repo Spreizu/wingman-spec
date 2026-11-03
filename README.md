@@ -25,6 +25,21 @@ flowchart LR
 
 `@spec` markers in code and tests anchor each requirement. `wingman-spec drift` lists requirements without code or tests and code that changed without its requirement.
 
+## In the editor
+
+The extension dashboard on a small billing project. `add-invoice-export` is in progress (two tasks verified, the date-range task next). `fix-tax-rounding` is blocked, `add-customer-notes` is still a proposal, and `ship-pdf-footer` is ready to archive.
+
+<p align="center"><img src="vscode-extension/images/readme/dashboard.gif" width="920" alt="Wingman Spec dashboard: overview, the invoice-export tasks, the build timeline, the invoices spec, and the ADR list"></p>
+
+<p align="center">
+  <img src="vscode-extension/images/readme/overview.png" width="49%" alt="Overview: four changes, one shipped this month, and an ADR waiting to be synced">
+  <img src="vscode-extension/images/readme/change.png" width="49%" alt="add-invoice-export: checks, size, and the next task with its spec, test, and files">
+</p>
+<p align="center">
+  <img src="vscode-extension/images/readme/timeline.png" width="49%" alt="Build timeline: a failed check, a fix round, and a plan change with its reason">
+  <img src="vscode-extension/images/readme/spec.png" width="49%" alt="Invoices spec: requirements, scenarios, and the pending change">
+</p>
+
 ## Features
 
 - Specs a junior developer can build from: every THEN names a value a test can check.

@@ -2,6 +2,19 @@
 
 See and steer Wingman Spec changes from the editor: tasks, specs, decisions, what was verified, and what happened while a change was built.
 
+<p align="center"><img src="images/readme/dashboard.gif" width="920" alt="Dashboard on a billing project: overview, invoice-export tasks, the build timeline, the invoices spec, and the ADR list"></p>
+
+The pages below are that same project: `add-invoice-export` in progress, `fix-tax-rounding` blocked, `add-customer-notes` still a proposal, and `ship-pdf-footer` ready to archive.
+
+<p align="center">
+  <img src="images/readme/overview.png" width="49%" alt="Overview of the four changes">
+  <img src="images/readme/change.png" width="49%" alt="Tasks for add-invoice-export">
+</p>
+<p align="center">
+  <img src="images/readme/timeline.png" width="49%" alt="Build timeline with a failed check and a plan change">
+  <img src="images/readme/spec.png" width="49%" alt="Invoices spec and its pending change">
+</p>
+
 ## Requirements
 
 - A workspace set up with **Wingman Spec: Set Up This Folder** (`wingman-spec init`): `.wingman-spec/wingman-spec.yaml` next to the code, a specs repository with `wingman-spec.yaml` at its root, or a code repository linked to one.
