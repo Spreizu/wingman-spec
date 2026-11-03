@@ -1715,7 +1715,9 @@ var require_wingman_visual = __commonJS({
     var fs = __require("fs");
     var os = __require("os");
     var path = __require("path");
-    var { spawnSync } = __require("child_process");
+    var { spawn, spawnSync } = __require("child_process");
+    var crypto = __require("crypto");
+    var net = __require("net");
     var VC = require_visual_check();
     var DC = require_design_contract();
     var RL = require_roles();
@@ -1756,16 +1758,16 @@ var require_wingman_visual = __commonJS({
         fs.rmSync(tmp, { recursive: true, force: true });
       }
     }
-    async function capture(j) {
-      const rep = await VC.run({ codeRoot: j.code_root, outDir: j.out_dir, config: cfgOf(j.config), items: j.items, before: true });
+    async function capture(j, warm) {
+      const rep = await VC.run({ codeRoot: j.code_root, outDir: j.out_dir, config: cfgOf(j.config), items: j.items, before: true, shared: warm });
       return { dir: j.out_dir, report: path.join(j.out_dir, "report.json"), source: "pre-task tree (next)", seconds: rep.seconds, ok: rep.ran, skipped: rep.skipped, server: rep.defects.filter((d) => d.code.startsWith("server:")).map((d) => d.code) };
     }
-    async function runNow(j) {
-      const shared = {};
+    async function runNow(j, warm) {
+      const shared = warm || {};
       try {
         return await runWith(j, shared);
       } finally {
-        if (shared.browser) await shared.browser.close().catch(() => {
+        if (!warm && shared.browser) await shared.browser.close().catch(() => {
         });
       }
     }
@@ -1855,7 +1857,240 @@ var require_wingman_visual = __commonJS({
       },
       doctor
     };
+    async function answer(job, warm) {
+      const op = OPS[job.op];
+      if (!op) return { ok: false, error: `wingman-visual: unknown op ${job.op}` };
+      if (job.code_root) process.env.WINGMAN_CODE_ROOT = job.code_root;
+      try {
+        const result = await op(job, warm);
+        return { ok: true, result: result === void 0 ? null : result };
+      } catch (e) {
+        return { ok: false, error: `wingman-visual ${job.op}: ${String(e && e.stack || e).split("\n").slice(0, 3).join(" | ")}` };
+      }
+    }
+    var WARM = /* @__PURE__ */ new Set(["capture", "run"]);
+    function warmSocket(job) {
+      const idle = process.env.WINGMAN_SPEC_VISUAL_WARM;
+      if (!WARM.has(job.op) || !job.code_root || process.platform === "win32" || idle === "off" || idle === "0") return null;
+      try {
+        const dir = path.join(os.tmpdir(), `wingman-visual-${process.getuid()}`);
+        fs.mkdirSync(dir, { recursive: true, mode: 448 });
+        const st = fs.lstatSync(dir);
+        if (!st.isDirectory() || st.uid !== process.getuid() || st.mode & 63) return null;
+        const own = [__filename, ...Object.keys(__require.cache).filter((f) => f.startsWith(__dirname + path.sep))].map((f) => {
+          const s = fs.statSync(f);
+          return [f, s.size, s.mtimeMs];
+        });
+        const env = Object.keys(process.env).filter((k) => /^(PLAYWRIGHT_|WINGMAN_SPEC_VISUAL_|NODE_OPTIONS$|NODE_PATH$)/.test(k)).sort().map((k) => `${k}=${process.env[k]}`);
+        const key = crypto.createHash("sha1").update(JSON.stringify([process.execPath, own, path.resolve(job.code_root), cfgOf(job.config).browsers_path, env])).digest("hex");
+        const sock = path.join(dir, `${key.slice(0, 16)}.sock`);
+        return sock.length < 100 ? sock : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    function viaWarm(sock, job) {
+      return new Promise((resolve) => {
+        const c = net.connect(sock);
+        let buf = "";
+        c.setEncoding("utf8");
+        c.on("connect", () => c.write(JSON.stringify({ job, env: process.env, cwd: process.cwd() }) + "\n"));
+        c.on("data", (d) => {
+          buf += d;
+        });
+        c.on("error", () => {
+        });
+        c.on("close", () => {
+          const [head, line] = buf.split("\n");
+          let h = {};
+          try {
+            h = JSON.parse(head);
+          } catch (e) {
+          }
+          if (!h.taken) {
+            resolve({ busy: !!h.busy });
+            return;
+          }
+          try {
+            resolve({ answer: JSON.parse(line) });
+          } catch (e) {
+            resolve({ busy: true });
+          }
+        });
+      });
+    }
+    async function startWarm(sock, job) {
+      const dir = path.dirname(sock);
+      const live = [];
+      for (const f of fs.readdirSync(dir).filter((x) => x.endsWith(".sock"))) {
+        const p = path.join(dir, f);
+        if (await new Promise((r) => {
+          const c = net.connect(p, () => {
+            c.destroy();
+            r(true);
+          });
+          c.on("error", () => r(false));
+        })) live.push([fs.statSync(p).mtimeMs, p]);
+        else try {
+          fs.unlinkSync(p);
+        } catch (e) {
+        }
+      }
+      if (live.length >= 2) {
+        const oldest = live.sort((a, b) => a[0] - b[0])[0][1];
+        if ((await viaWarm(oldest, { quit: true })).busy) return;
+      }
+      try {
+        spawn(process.execPath, [__filename, "--warm", sock, job.code_root, cfgOf(job.config).browsers_path || ""], { cwd: job.code_root, detached: true, stdio: "ignore" }).unref();
+      } catch (e) {
+      }
+    }
+    async function serveWarm(sock, codeRoot, browsersPath) {
+      process.title = `wingman-visual-warm ${codeRoot}`;
+      for (const s of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(s, () => {
+        try {
+          fs.unlinkSync(sock);
+        } catch (e) {
+        }
+        process.exit(1);
+      });
+      const srv = net.createServer();
+      const listen = () => new Promise((resolve, reject) => {
+        srv.once("error", reject);
+        srv.listen(sock, () => {
+          srv.removeListener("error", reject);
+          resolve();
+        });
+      });
+      try {
+        await listen();
+      } catch (e) {
+        if (e.code !== "EADDRINUSE" || await new Promise((r) => {
+          const c = net.connect(sock, () => {
+            c.destroy();
+            r(true);
+          });
+          c.on("error", () => r(false));
+        })) return;
+        try {
+          fs.unlinkSync(sock);
+          await listen();
+        } catch (e2) {
+          return;
+        }
+      }
+      const warm = {};
+      let busy = false;
+      let idle = null;
+      let pwStamp = null;
+      const stamp = (f) => {
+        try {
+          return fs.statSync(f).mtimeMs;
+        } catch (e) {
+          return null;
+        }
+      };
+      const unlink = () => {
+        srv.close();
+        try {
+          fs.unlinkSync(sock);
+        } catch (e) {
+        }
+      };
+      const stop = () => {
+        unlink();
+        Promise.resolve(warm.browser && warm.browser.close()).catch(() => {
+        }).finally(() => process.exit(0));
+      };
+      const idleMs = (Number(process.env.WINGMAN_SPEC_VISUAL_WARM) || 300) * 1e3;
+      const arm = () => {
+        clearTimeout(idle);
+        idle = setTimeout(stop, idleMs);
+      };
+      const ready = (async () => {
+        const pw = VC.loadPlaywright(codeRoot);
+        if (!pw) return null;
+        pwStamp = stamp(pw.from);
+        const l = await VC.launchChromium(pw, codeRoot, { browsers_path: browsersPath || null });
+        warm.browser = l.browser;
+        warm.dir = l.found.executablePath ? l.found.dir : null;
+        warm.browser.on("disconnected", () => {
+          warm.gone = true;
+          if (!busy) stop();
+        });
+        return pw;
+      })().catch(() => null);
+      arm();
+      const self = stamp(__filename);
+      setInterval(() => {
+        if (!busy && (!fs.existsSync(codeRoot) || stamp(__filename) !== self)) stop();
+      }, 3e4).unref();
+      srv.on("connection", (c) => {
+        let buf = "";
+        c.setEncoding("utf8");
+        c.on("error", () => {
+        });
+        c.on("data", async (d) => {
+          buf += d;
+          const i = buf.indexOf("\n");
+          if (i < 0) return;
+          c.removeAllListeners("data");
+          let m;
+          try {
+            m = JSON.parse(buf.slice(0, i));
+          } catch (e) {
+            c.end("{}\n");
+            return;
+          }
+          if (busy) {
+            c.end('{"busy":true}\n');
+            return;
+          }
+          if (m.job && m.job.quit) {
+            c.end("{}\n");
+            stop();
+            return;
+          }
+          busy = true;
+          clearTimeout(idle);
+          c.on("close", () => {
+            if (busy) {
+              unlink();
+              process.exit(1);
+            }
+          });
+          const pw = await ready;
+          if (!pw || warm.gone || stamp(pw.from) !== pwStamp) {
+            busy = false;
+            c.end("{}\n");
+            stop();
+            return;
+          }
+          c.write('{"taken":true}\n');
+          for (const k of Object.keys(process.env)) if (!(k in m.env)) delete process.env[k];
+          Object.assign(process.env, m.env);
+          try {
+            process.chdir(m.cwd);
+          } catch (e) {
+          }
+          const a = await answer(m.job, warm);
+          busy = false;
+          c.end(JSON.stringify(a) + "\n");
+          try {
+            const now = /* @__PURE__ */ new Date();
+            fs.utimesSync(sock, now, now);
+          } catch (e) {
+          }
+          if (warm.gone) stop();
+          else arm();
+        });
+      });
+    }
     async function main() {
+      if (process.argv[2] === "--warm") {
+        await serveWarm(process.argv[3], process.argv[4], process.argv[5]);
+        return;
+      }
       let job;
       try {
         job = JSON.parse(fs.readFileSync(0, "utf8"));
@@ -1863,20 +2098,14 @@ var require_wingman_visual = __commonJS({
         process.stdout.write(JSON.stringify({ ok: false, error: `wingman-visual: the job on stdin is not JSON (${e.message})` }) + "\n");
         process.exit(2);
       }
-      const op = OPS[job.op];
-      if (!op) {
-        process.stdout.write(JSON.stringify({ ok: false, error: `wingman-visual: unknown op ${job.op}` }) + "\n");
-        process.exit(2);
-      }
-      if (job.code_root) process.env.WINGMAN_CODE_ROOT = job.code_root;
-      try {
-        const result = await op(job);
-        process.stdout.write(JSON.stringify({ ok: true, result: result === void 0 ? null : result }) + "\n");
-        process.exit(0);
-      } catch (e) {
-        process.stdout.write(JSON.stringify({ ok: false, error: `wingman-visual ${job.op}: ${String(e && e.stack || e).split("\n").slice(0, 3).join(" | ")}` }) + "\n");
-        process.exit(1);
-      }
+      const sock = warmSocket(job);
+      const w = sock && fs.existsSync(sock) ? await viaWarm(sock, job) : {};
+      const a = w.answer || await answer(job);
+      const ran = a.ok && a.result && (job.op === "capture" ? a.result.ok : a.result.report && a.result.report.ran);
+      if (sock && !w.answer && !w.busy && ran) await startWarm(sock, job).catch(() => {
+      });
+      process.stdout.write(JSON.stringify(a) + "\n");
+      process.exit(a.ok ? 0 : OPS[job.op] ? 1 : 2);
     }
     main();
   }

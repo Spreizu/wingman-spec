@@ -2,7 +2,8 @@
 # shellcheck disable=SC2016 # expectations are single-quoted on purpose (run later by eval)
 # visual.changed_only (a visual run that passed is not repeated while the app files, scenarios, limits and pre-task capture are the same;
 # a changed test or Markdown file does not matter, a changed page does) and visual.scope: task (a task is checked against its own
-# scenarios; the change's other scenarios and the specs it does not change are checked at `finish`, against HEAD).
+# scenarios; the change's other scenarios and the specs it does not change are checked at `finish`, against HEAD), and the warm
+# helper (the next visual run is served by it with the same report; WINGMAN_SPEC_VISUAL_WARM=off; a stopped helper).
 # Needs the wingman-spec binary (tests/lib/ws.sh) and node; Playwright + axe-core (PLAYWRIGHT_NODE_MODULES) for the browser part. Usage: tests/visual-cache.sh
 set -uo pipefail
 PKG="$(cd "$(dirname "$0")/.." && pwd)"
@@ -102,11 +103,33 @@ if [ -d "$PWM/playwright" ] && [ -d "$PWM/axe-core" ]; then
   echo b > b.txt; $V check wv --task 1.2 --reported done > "$T/c.json" 2> "$T/c.err"; rc=$?
   expect "lane 1.2 passes the same way" '[ $rc = 0 ] && grep -q "grid-b-shown" "$T/c.json"'
 
+  echo "== the warm helper: one Chromium kept for the next visual run of this code root"
+  WTMP="$(mktemp -d /tmp/wv.XXXXXX)"; export TMPDIR="$WTMP"  # a socket folder of its own: other suites' helpers do not take the room
+  cat > app.js <<'JS'
+const http = require('http'); const fs = require('fs');
+fs.writeFileSync('srv.ppid', `${process.ppid} ${require('child_process').execSync(`ps -o ppid= -p ${process.ppid}`).toString().trim()}`);
+http.createServer((q, r) => { r.setHeader('content-type', 'text/html'); r.end(fs.readFileSync('page.html')); }).listen(+process.argv[2], '127.0.0.1');
+JS
+  warm() { local p; for p in $(cat srv.ppid); do ps -o args= -p "$p" 2>/dev/null | grep -q wingman-visual-warm && { echo "$p"; return; }; done; }  # the helper that ran the app server (sh -c may sit between)
+  norm() { sed -E 's/[0-9]{8}T[0-9]{6}Z(-[0-9]+)?/T/g; s/"[a-z_]*(seconds|_s)": [0-9.]+/S/g' "$1"; }
+  rc=0; WINGMAN_SPEC_VISUAL_WARM=off WINGMAN_SPEC_NO_CACHE=1 $V visual demo > "$T/cold.json" 2> "$T/v.err" || rc=$?
+  expect "WINGMAN_SPEC_VISUAL_WARM=off: the run starts no warm helper" '[ $rc = 0 ] && [ -z "$(warm)" ]'
+  WINGMAN_SPEC_NO_CACHE=1 vrun visual demo; for _ in $(seq 50); do pgrep -f "wingman-visual-warm $(pwd -P)" >/dev/null && break; sleep 0.1; done
+  WINGMAN_SPEC_NO_CACHE=1 vrun visual demo; WPID="$(warm)"
+  expect "the next run is served by the warm helper, with the same report as a run of its own" '[ $rc = 0 ] && [ -n "$WPID" ] && [ "$(norm "$T/v.json")" = "$(norm "$T/cold.json")" ]'
+  WINGMAN_SPEC_NO_CACHE=1 vrun visual demo
+  expect "and it stays the same helper" '[ $rc = 0 ] && [ "$(warm)" = "$WPID" ]'
+  kill "$WPID" 2>/dev/null; for _ in $(seq 50); do kill -0 "$WPID" 2>/dev/null || break; sleep 0.1; done
+  WINGMAN_SPEC_NO_CACHE=1 vrun visual demo
+  expect "a stopped helper: the run still passes on its own" '[ $rc = 0 ] && [ -z "$(warm)" ]'
+
   echo "== a release binary: the helper embedded in the CLI"
   mkdir -p "$T/rel/bin"; cp "$WS" "$T/rel/bin/wingman-spec"; rm -rf .wingman-spec/bin
   rc=0; env -u WINGMAN_VISUAL WINGMAN_SPEC_NO_CACHE=1 "$T/rel/bin/wingman-spec" visual demo > "$T/v.json" 2> "$T/v.err" || rc=$?
   expect "without WINGMAN_VISUAL or a source checkout, visual runs the embedded helper, written to .wingman-spec/bin" '[ $rc = 0 ] && [ -s .wingman-spec/bin/wingman-visual.mjs ] && grep -q "grid-shown" "$T/v.json"'
   expect "the written helper is gitignored" '[ -z "$(git status --porcelain .wingman-spec/bin)" ]'
+  pkill -f "wingman-visual.* $(pwd -P)\$" 2>/dev/null || true  # the warm helpers of this test, started or starting (they also stop 30 s after its folder is gone)
+  rm -rf "$WTMP"
 else
   echo "  skip: no Playwright+axe-core in $PWM (set PLAYWRIGHT_NODE_MODULES); the browser part of visual-cache is not tested"
 fi

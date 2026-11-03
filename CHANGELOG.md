@@ -4,6 +4,12 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
 ## Unreleased
 
+- **Faster visual runs.** After a visual run the helper keeps Playwright loaded and one headless Chromium running in
+  the background, so the next `visual`, `check` or `finish` of the same code root skips node start, the Playwright load
+  and the browser launch; the app server waits poll faster, a page's settle step and its ARIA snapshots take fewer
+  browser round trips. On a sample with 3 scenarios at 2 viewports a `visual` call takes about 2.1 s instead of 2.8 s.
+  Every state still opens in a fresh browser context against a freshly started app server, so reports are the same.
+  `WINGMAN_SPEC_VISUAL_WARM=off` turns the warm helper off ([reference](docs/reference.md)).
 - **Adopt with a specs repository.** `mode` counts the code of every code repo sharing the specs root (`repos:` entries
   and sibling repos whose `specs:` link points at it) and lists them as `code repos`, so a specs repository with linked
   code is brownfield instead of greenfield. A linked code repo may run `/spec-adopt` (and `mode --for adopt`) instead of
