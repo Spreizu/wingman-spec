@@ -218,10 +218,10 @@ expect "size on a spec-only change is ok and says so" 'mkdir -p .wingman-spec/ch
 echo "== install and harness"
 cd "$W" || exit
 "$WS" init --harness all >/dev/null 2>&1
-for f in spec-green-start spec-green-next spec-green-plan; do expect "command $f is rendered for cursor, claude and codex" '[ -f .cursor/commands/'$f'.md ] && [ -f .claude/commands/'$f'.md ] && ls .codex 2>/dev/null | gq . ; true'; done
+for f in spec-green-start spec-green-next spec-green-plan; do expect "command $f is rendered for cursor, claude and codex" '[ -f .agents/skills/'$f'/SKILL.md ] && [ -f .claude/commands/'$f'.md ] && ls .codex 2>/dev/null | gq . ; true'; done
 expect "the spec-reviewer agent is rendered for all three tools and read-only" '[ -f .codex/agents/spec-reviewer.toml ] && grep -rl "^name: spec-reviewer" .cursor/agents .claude/agents >/dev/null 2>&1 && grep -q "^readonly: true" .cursor/agents/spec-reviewer.md'
-expect "/spec-adopt runs the mode guard first" 'grep -q "mode --for adopt" .cursor/commands/spec-adopt.md'
-expect "/spec-green-start runs only status, never a phase by itself" 'grep -q "greenfield status" .cursor/commands/spec-green-start.md && grep -q "Done" .cursor/commands/spec-green-start.md && grep -q "Blocked by" .cursor/commands/spec-green-start.md'
+expect "/spec-adopt runs the mode guard first" 'grep -q "mode --for adopt" .agents/skills/spec-adopt/SKILL.md'
+expect "/spec-green-start runs only status, never a phase by itself" 'grep -q "greenfield status" .agents/skills/spec-green-start/SKILL.md && grep -q "Done" .agents/skills/spec-green-start/SKILL.md && grep -q "Blocked by" .agents/skills/spec-green-start/SKILL.md'
 expect "an install into a brownfield project leaves no inputs folder" 'B2="$T/bf-install"; mkdir -p "$B2"; ( cd "$B2" && git init -q && mkdir src && node -e "let s=\"\";for(let i=0;i<40;i++)s+=\"export const f\"+i+\" = 1;\n\";require(\"fs\").writeFileSync(\"src/a.ts\",s)" && "$WS" init --no-detect >/dev/null ); [ -d "$B2/.wingman-spec" ] && [ ! -d "$B2/.wingman-spec/inputs" ]'
 
 echo

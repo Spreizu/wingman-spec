@@ -14,8 +14,8 @@ The designer produced the design; you implement it with the project's own tokens
 The result must be **recognisably the same** (layout, hierarchy, spacing, colours, typography, components), not
 pixel-perfect and never a paste of Figma's generated code.
 
-`<skill-dir>` below is the folder that holds this SKILL.md (`.cursor/skills/figma-to-code`,
-`.claude/skills/figma-to-code` or `.agents/skills/figma-to-code`). Details live in `references/`:
+`<skill-dir>` below is the folder that holds this SKILL.md (`.claude/skills/figma-to-code`
+or `.agents/skills/figma-to-code`). Details live in `references/`:
 `figma-sources.md` (MCP / REST / images, limits, setup), `design-map-recipe.md` (value to class rules, responsive,
 states, assets, i18n, accessibility, update diff).
 

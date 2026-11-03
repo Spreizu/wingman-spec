@@ -4,7 +4,7 @@
 This project plans and verifies its work with Wingman Spec. The CLI is `.wingman-spec/bin/wingman-spec` (a shim to the installed
 binary); the settings are in `.wingman-spec/wingman-spec.yaml`. Managed block: `wingman-spec update` rewrites it; do not edit it by hand.
 
-Bundled skills (`.cursor/skills/`, `.claude/skills/` or `.agents/skills/`; invoke by name, follow the inline fallback if one is
+Bundled skills (`.claude/skills/` or `.agents/skills/`; invoke by name, follow the inline fallback if one is
 missing): `wingman-grilling`, `spec-writing`, `wingman-test-driven-development`, `wingman-ponytail`, `wingman-systematic-debugging`, `wingman-requesting-code-review`,
 `wingman-ponytail-review`, `wingman-verification-before-completion`, and `figma-to-code` (a Figma URL as design source).
 

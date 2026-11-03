@@ -29,20 +29,24 @@ check "run state is ignored, specs are not" bash -c 'grep -qx "runs/" .wingman-s
 check "shim installed and runs"           .wingman-spec/bin/wingman-spec root
 check "AGENTS.md has the managed block"   grep -q 'WINGMAN-SPEC:START' AGENTS.md
 for c in spec-propose spec-apply spec-sync spec-archive spec-fix spec-explore spec-adopt spec-garden spec-green-start spec-green-plan spec-green-next; do
-  check "$c in Cursor, Claude Code and Codex" test -f ".cursor/commands/$c.md" -a -f ".claude/commands/$c.md" -a -f ".agents/skills/$c/SKILL.md"
+  check "$c in Claude Code and in .agents/skills (Cursor, Codex)" test -f ".claude/commands/$c.md" -a -f ".agents/skills/$c/SKILL.md"
 done
-check "spec-explore works in plan mode and ends by offering /spec-propose, after switching to agent mode" bash -c 'grep -q "works in the agent.s plan mode" .claude/commands/spec-explore.md && grep -q "it picks up this exploration from the chat. In plan mode, switch to agent mode first." .claude/commands/spec-explore.md'
-check_not "no separate plan-mode explore command" bash -c 'test -e .claude/commands/spec-explore-plan.md -o -e .agents/skills/spec-explore-plan -o -e .cursor/commands/spec-explore-plan.md'
+check "spec-explore works in plan mode and ends by offering /spec-propose, after switching to agent mode" bash -c 'for f in .claude/commands/spec-explore.md .agents/skills/spec-explore/SKILL.md; do grep -q "works in the agent.s plan mode" "$f" && grep -q "it picks up this exploration from the chat. In plan mode, switch to agent mode first." "$f" || exit 1; done'
+check_not "no separate plan-mode explore command" bash -c 'test -e .claude/commands/spec-explore-plan.md -o -e .agents/skills/spec-explore-plan'
+check "the shared skill tells Cursor / and Codex \$" bash -c 'grep -q "^name: spec-explore" .agents/skills/spec-explore/SKILL.md && grep -qF "Invoke as \`/spec-explore [topic]\` (Cursor) or \`\$spec-explore [topic]\` (Codex)" .agents/skills/spec-explore/SKILL.md'
+check_not "Cursor gets no commands or skills folder of its own" bash -c 'test -e .cursor/commands -o -e .cursor/skills'
 for a in spec-implementer spec-reviewer spec-visual-reviewer; do
   check "subagent $a for Cursor and Claude Code" test -f ".cursor/agents/$a.md" -a -f ".claude/agents/$a.md"
 done
-check "bundled skill spec-writing"        test -f .cursor/skills/spec-writing/SKILL.md -a -f .claude/skills/spec-writing/SKILL.md -a -f .agents/skills/spec-writing/SKILL.md
+check "bundled skill spec-writing"        test -f .claude/skills/spec-writing/SKILL.md -a -f .agents/skills/spec-writing/SKILL.md
 check_not "no hook files written"         bash -c 'test -e .cursor/hooks.json -o -e .claude/settings.json -o -e .codex/hooks.json'
 check_not "no openspec/ folder and no node scripts" bash -c 'test -e openspec || find . -name "*.cjs" -not -path "./.git/*" | grep -q .'
 check_not "no box or home paths in generated files" bash -c 'grep -rlE "/(Users|workspace|home)/" .cursor .claude .agents .codex AGENTS.md'
 git add -A && git commit -qm init
 "$BIN" update > "$T/update.txt" 2>&1
-check "update right after init changes no file" bash -c 'test -z "$(git status --porcelain)"' 
+check "update right after init changes no file" bash -c 'test -z "$(git status --porcelain)"'
+check "update --check right after init reports nothing stale" bash -c '"$0" update --check --json | grep -q "\"stale\": \[\]"' "$BIN"
+check "a tool folder the developer deleted is neither stale nor brought back by update" bash -c 'rm -rf .codex && "$0" update --check --json | grep -q "\"stale\": \[\]" && "$0" update >/dev/null && ! test -e .codex; s=$?; git checkout -q -- .codex; exit $s' "$BIN"
 
 echo "== one change, new to archive"
 W=.wingman-spec/bin/wingman-spec

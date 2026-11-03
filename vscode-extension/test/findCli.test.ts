@@ -145,6 +145,33 @@ test('Set Up This Folder runs init with the bundled CLI, then the new project ge
   }
 });
 
+test('Set Up This Folder checks the agent files again, so an Update button from before init goes away', posix, async () => {
+  host.reset();
+  const bin = bundle();
+  const d = project(); // an older install: its files are stale until init rewrites them
+  let initialized = false;
+  const run: Runner = async (_cmd, args) => {
+    if (args[0] === 'init') initialized = true;
+    const stale = initialized ? [] : ['.agents/skills/spec-apply/SKILL.md'];
+    return { code: 0, stdout: args.includes('--check') ? JSON.stringify({ stale }) : 'Wrote: ...\n', stderr: '', timedOut: false };
+  };
+  (workspace as { workspaceFolders: unknown[] }).workspaceFolders = [{ uri: Uri.file(d) }];
+  host.quickPickAnswer = (items: unknown[]) => items[0];
+  const old = process.env['WINGMAN_SPEC_BIN'];
+  delete process.env['WINGMAN_SPEC_BIN'];
+  try {
+    const { disposable, agentFiles } = registerCliSetup(new VerifierClient(run, bin), () => {}, run);
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(agentFiles.list().length, 1, 'the older install shows the button');
+    await host.commands.get('wingmanSpec.init')();
+    assert.deepEqual(agentFiles.list(), [], 'no Update button right after init');
+    disposable.dispose();
+  } finally {
+    if (old !== undefined) process.env['WINGMAN_SPEC_BIN'] = old;
+    (workspace as { workspaceFolders: unknown[] }).workspaceFolders = [];
+  }
+});
+
 test('every CLI call from the editor carries WINGMAN_SPEC_SOURCE=editor, so the timeline shows the buttons', async () => {
   host.reset();
   host.trusted = true;

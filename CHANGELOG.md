@@ -26,6 +26,13 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
   timeout options, fallbacks for values the CLI always sends, its own url/port derivation the CLI already does) and shares
   one in-page visibility test between expects and `absent:` checks; the embedded bundle is a little smaller. What it
   checks, reports and prints is unchanged.
+- **One `.agents/skills` for Cursor and Codex.** Both read `.agents/skills/`, so `init` and `update` write the commands
+  and bundled skills there once and no longer write `.cursor/commands/` or `.cursor/skills/`; Cursor keeps
+  `.cursor/agents/`, Claude Code keeps `.claude/` and `CLAUDE.md` (it reads neither `.agents/skills/` nor, next to a
+  `CLAUDE.md`, `AGENTS.md`), Codex keeps `.codex/agents/`. Existing `.cursor/commands/` and `.cursor/skills/` are left
+  alone: delete them by hand, or Cursor lists each command twice. The shared skill says `/name` for Cursor and `$name`
+  for Codex. The editor's Update button now appears only for generated files that are older, not for a tool folder you
+  deleted (which `update` no longer recreates), and it is checked again right after Set Up This Folder.
 - **Explore in plan mode.** `/spec-explore` works in the agent's plan mode (Claude Code, Cursor, Codex). It runs only
   commands that read and writes no file except the design map, which stays in the chat in plan mode. It ends with the
   decisions and a proposal draft and offers `/spec-propose <slug>`, telling you to switch to agent mode first when you

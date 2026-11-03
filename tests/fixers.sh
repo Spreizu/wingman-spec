@@ -95,9 +95,9 @@ expect "a second install changes neither file" 'cp "$Q/.gitignore" "$T/gi.1"; cp
 
 echo "== install: generated harness files are overwritten"
 R="$T/gen"; mk "$R"; cd "$R" || exit; inst "$R" --harness cursor
-printf 'my own command\n' > .cursor/commands/mine.md
-printf '\n\nmy edit at the end\n' >> .cursor/commands/spec-green-start.md; cp .cursor/commands/mine.md "$T/mine.0"; find . -type f -not -path './.git/*' | sort > "$T/gen.before"
-expect "a hand-edited generated file is overwritten (no stray file); a file the installer does not own is untouched" 'inst "$R" --harness cursor; ! grep -q "my edit at the end" .cursor/commands/spec-green-start.md && cmp .cursor/commands/mine.md "$T/mine.0" && find . -type f -not -path "./.git/*" | sort | diff -q - "$T/gen.before" >/dev/null'
+mkdir -p .agents/skills/mine; printf 'my own command\n' > .agents/skills/mine/SKILL.md
+printf '\n\nmy edit at the end\n' >> .agents/skills/spec-green-start/SKILL.md; cp .agents/skills/mine/SKILL.md "$T/mine.0"; find . -type f -not -path './.git/*' | sort > "$T/gen.before"
+expect "a hand-edited generated file is overwritten (no stray file); a file the installer does not own is untouched" 'inst "$R" --harness cursor; ! grep -q "my edit at the end" .agents/skills/spec-green-start/SKILL.md && cmp .agents/skills/mine/SKILL.md "$T/mine.0" && find . -type f -not -path "./.git/*" | sort | diff -q - "$T/gen.before" >/dev/null'
 
 echo "== install: link layout (--specs) and remote hint"
 W="$T/ws"; mkdir -p "$W/code" "$W/sp"; ( cd "$W/sp" && git init -q && git remote add origin https://example.com/a/sp.git && "$WS" init --layout specs >/dev/null ); printf '{"scripts":{"test":"echo ok"}}\n' > "$W/code/package.json"

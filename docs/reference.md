@@ -46,9 +46,15 @@ See [docs/harness-support.md](harness-support.md) for the research behind the ma
 
 | Harness | Commands | Subagent | Skills | Notes |
 |---------|----------|----------|--------|-------|
-| Cursor | `.cursor/commands/spec-*.md` (`/spec-apply`) | `.cursor/agents/spec-{implementer,visual-reviewer}.md` | `.cursor/skills/` | |
+| Cursor | `.agents/skills/spec-*/` (`/spec-apply`) | `.cursor/agents/spec-{implementer,visual-reviewer}.md` | `.agents/skills/` | shares `.agents/skills` with Codex |
 | Claude Code | `.claude/commands/spec-*.md` (`/spec-apply`) | `.claude/agents/spec-{implementer,visual-reviewer}.md` | `.claude/skills/` | `CLAUDE.md` imports `AGENTS.md` |
 | Codex | `.agents/skills/spec-*/` (`$spec-apply`) | `.codex/agents/spec-{implementer,visual-reviewer}.toml` | `.agents/skills/` | |
+
+Cursor and Codex both read `.agents/skills/`, so the commands and bundled skills are written there once. Claude Code reads
+neither `.agents/skills/` nor another tool's subagents, and the three subagent formats differ, so those stay per tool.
+`.cursor/commands/` and `.cursor/skills/` from 0.12 are no longer written, and `update` leaves them as they are: delete
+them by hand, or Cursor lists each command twice. `update` refreshes only the tools whose own folder (`.cursor/agents`, `.claude/commands`, `.codex/agents`) is present, and a
+folder you delete is not offered back.
 
 Wingman Spec registers no prompt hook, so OpenSpec's `/opsx:*` commands keep working next to it. Without subagent support the
 orchestrator uses the **sequential fallback**: it does one dispatch per turn itself, and the same CLI checks it; the

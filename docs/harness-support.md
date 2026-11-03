@@ -11,7 +11,7 @@ itself is harness-independent: the main agent orchestrates, a subagent implement
 |------------|-------------|--------------------------|-----------------------|
 | Project instructions | `CLAUDE.md` (reads `AGENTS.md` only if imported) | `AGENTS.md`, `.cursor/rules/` | `AGENTS.md` (root and nested) |
 | Slash commands | `.claude/commands/<name>.md` (still supported; merged into skills) or `.claude/skills/<name>/SKILL.md`, invoked as `/name` | `.cursor/commands/<name>.md`, invoked as `/name`; skills also invocable as `/skill-name` | No project-level commands. Skills are invoked by name (`$skill` / `/skills`), or implicitly from their description |
-| Skills (Agent Skills standard) | `.claude/skills/` | `.cursor/skills/`, `.agents/skills/`; also loads `.claude/skills/` and `.codex/skills/` for compatibility | `.agents/skills/` (repo), `~/.agents/skills/` |
+| Skills (Agent Skills standard) | `.claude/skills/` (not `.agents/skills/`) | `.cursor/skills/`, `.agents/skills/`; also loads `.claude/skills/` and `.codex/skills/` for compatibility | `.agents/skills/` (repo), `~/.agents/skills/` |
 | Custom subagents | `.claude/agents/<name>.md` (YAML `name`, `description`, optional `tools`, `model`, `maxTurns`, `skills`, ...) | `.cursor/agents/<name>.md` (`name`, `description`, `model`, `readonly`, `is_background`); also loads `.claude/agents/` and `.codex/agents/`, and `.cursor/` wins on a name clash | `.codex/agents/<name>.toml` (`name`, `description`, `developer_instructions`, optional `model`, `model_reasoning_effort`) |
 | How delegation is triggered | Task/Agent tool, automatic from the description or by name | Task tool, automatic from the description or by name | When the user, `AGENTS.md` or a skill asks ("spawn one agent per task"). `/subagents` in the CLI shows threads |
 | Subagent context | Fresh context; system prompt from the agent file plus the delegation message; loads CLAUDE.md | Fresh context window; returns a result to the parent | Own thread; inherits the parent's sandbox, approvals, provider and MCP servers (an agent file cannot override them) |
@@ -22,10 +22,17 @@ itself is harness-independent: the main agent orchestrates, a subagent implement
 
 1. **One source, generated wrappers.** `harness/commands/*.md` (front matter `description`, `argument-hint`, then a
    harness-neutral body) and `harness/agents/spec-implementer.md` are the single source. `wingman-spec init --harness` renders:
-   - Cursor: `.cursor/commands/<name>.md` (body only), `.cursor/agents/spec-implementer.md`, `.cursor/skills/<skill>/`.
+   - Cursor and Codex: `.agents/skills/<name>/SKILL.md` (one skill per workflow command, `/name` in Cursor, `$name` in
+     Codex, which has no project commands) and `.agents/skills/<skill>/` for the bundled skills: one shared copy.
+   - Cursor: `.cursor/agents/spec-implementer.md` (its own format, with `readonly`).
    - Claude Code: `.claude/commands/<name>.md` (front matter + body), `.claude/agents/spec-implementer.md`, `.claude/skills/<skill>/`.
-   - Codex: `.agents/skills/<name>/SKILL.md` (one skill per workflow command, since Codex has no project commands),
-     `.agents/skills/<skill>/` for the bundled skills, and `.codex/agents/spec-implementer.toml`.
+   - Codex: `.codex/agents/spec-implementer.toml`.
+
+   Why not `.agents/` alone: Claude Code loads skills only from `.claude/skills/` (and commands from `.claude/commands/`), and
+   reads `AGENTS.md` only without a `CLAUDE.md` (default mode, 2.1.277+), so the `@AGENTS.md` import stays. Subagents have no
+   shared folder: Claude Code reads `.claude/agents/`, Codex `.codex/agents/*.toml`; Cursor reads both for compatibility, but
+   its own `.cursor/agents/` carries `readonly`. 0.12 wrote `.cursor/commands/` and `.cursor/skills/` as well; `update`
+   no longer writes nor deletes them.
 2. **Subagent per task, verified by the CLI.** The orchestrator never trusts the subagent's summary. It calls
    `wingman-spec next` (which task, plus the context packet), dispatches the subagent, then `wingman-spec check`.
    The CLI compares `tasks.md` with the pre-state, re-runs `Done when:`, runs the project tests and `wingman-spec validate`,
@@ -36,8 +43,8 @@ itself is harness-independent: the main agent orchestrates, a subagent implement
    `next` → work → `check` contract. It must re-read the files listed in the packet instead of relying on earlier context.
    The verifier is identical, so the guarantees about ticks, tests and validation do not depend on delegation.
 4. **No prompt hook.** Wingman Spec registers none, so OpenSpec's `/opsx:*` commands keep working next to it.
-5. **Duplicates in Cursor.** Cursor also reads `.claude/` and `.codex/`/`.agents/` locations. When several harnesses are installed
-   into one repo, Cursor may list the bundled skills twice. Agents dedupe by name with `.cursor/` winning (documented); for
+5. **Duplicates in Cursor.** Cursor also reads `.claude/skills/`, so with Claude Code installed in the same repo Cursor may
+   list the bundled skills twice (and each command twice while a 0.12 `.cursor/commands/` is still there). Agents dedupe by name with `.cursor/` winning (documented); for
    skills the docs do not specify precedence. Install only the harnesses a team uses (`--harness`).
 
 6. **Visual reviewer subagent.** `harness/agents/spec-visual-reviewer.md` (front matter `readonly: true`) renders to
@@ -104,7 +111,7 @@ itself is harness-independent: the main agent orchestrates, a subagent implement
 
 Everything is in the CLI (`anchors`, `drift`, `guard`, `sync`, `archive`) and in the generated
 command bodies, so Claude Code, Cursor and Codex get the same behaviour. `/spec-garden` is one more command rendered like the others
-(`.cursor/commands/`, `.claude/commands/`, `.agents/skills/spec-garden/`). `/spec-archive` calls `wingman-spec archive`
+(`.claude/commands/`, `.agents/skills/spec-garden/`). `/spec-archive` calls `wingman-spec archive`
 (gate, merge, move) in all three, and the implementer subagent writes `@spec` comments in all three. Nothing about the layer needs a hook. Gaps:
 - A change folder moved to `archive/` by hand is not stopped on any harness; drift reports it later (`unsynced-archive`).
 - The agent writes the owner-approval line after the owner agreed; the CLI cannot verify it.
@@ -115,7 +122,10 @@ command bodies, so Claude Code, Cursor and Codex get the same behaviour. `/spec-
 - Claude Code skills and commands (commands merged into skills): https://code.claude.com/docs/en/slash-commands
 - Claude Code hooks: https://code.claude.com/docs/en/hooks
 - Cursor subagents: https://cursor.com/docs/subagents
-- Cursor skills: https://cursor.com/docs/skills
+- Cursor skills (`.agents/skills/`, `.cursor/skills/`, and `.claude/skills/`/`.codex/skills/` for compatibility; `/name`): https://cursor.com/docs/skills
+- Claude Code skill locations (`.claude/skills/` only): https://code.claude.com/docs/en/skills
+- Claude Code AGENTS.md (read only when no CLAUDE.md, by default): https://code.claude.com/docs/en/memory
+- Codex skill locations (`.agents/skills/`) and custom agents (`.codex/agents/`): https://learn.chatgpt.com/docs/build-skills
 - Cursor hooks: https://cursor.com/docs/hooks
 - Codex subagents and custom agents: https://developers.openai.com/codex/subagents
 - Codex skills and AGENTS.md: https://learn.chatgpt.com/docs/customization/overview

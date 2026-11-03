@@ -78,7 +78,7 @@ expect "an observed entry is not a requirement: validate and the requirement cou
 echo "== documents: the command, the AGENTS block and the verifier help agree"
 expect "spec-adopt names the folder, the marker lines and every kind" 'f="$PKG/harness/commands/spec-adopt.md"; for w in "observed/<capability>.md" "Baseline: adopted" "Confirmed:" contradicts-doc suspected-bug debug-leftover incidental unclear untested; do gq -F -- "$w" "$f" || { echo "missing $w"; false; }; done'
 expect "the kinds drift accepts (from its help) are the kinds the command lists" 'k="$($V drift --help | sed -n "s/.*starts with one of: //p" | tr -d ".," )"; [ -n "$k" ] && for w in $k; do gq -F -- "$w" "$PKG/harness/commands/spec-adopt.md" || { echo "missing $w"; exit 1; }; done'
-expect "the rendered command reaches every harness" '( cd "$P" && "$WS" init --harness all >/dev/null 2>&1 ); m=0; for f in .cursor/commands/spec-adopt.md .claude/commands/spec-adopt.md .agents/skills/spec-adopt/SKILL.md; do gq "observed/<capability>.md" "$P/$f" 2>/dev/null || m=1; done; [ $m = 0 ]'
+expect "the rendered command reaches every harness" '( cd "$P" && "$WS" init --harness all >/dev/null 2>&1 ); m=0; for f in .claude/commands/spec-adopt.md .agents/skills/spec-adopt/SKILL.md; do gq "observed/<capability>.md" "$P/$f" 2>/dev/null || m=1; done; [ $m = 0 ]'
 expect "the AGENTS block and the help mention it" 'gq "observed/<capability>.md" "$PKG/harness/AGENTS.block.md" && $V drift --help | gq "observed-incomplete"'
 
 echo "== recorded runs on the seeded sample (answer key: tests/fixtures/adopt/ANSWER-KEY.txt)"

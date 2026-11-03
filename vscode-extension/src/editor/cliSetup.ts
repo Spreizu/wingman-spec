@@ -64,6 +64,8 @@ export function registerCliSetup(verifier: VerifierClient, changed: () => void, 
     out.show(true);
     checked.add(folder);
     sync();
+    // init rewrote the generated files: a state read before it (an Update button for an older install) is out of date
+    if (r.code === 0) await agentFiles.check(folder);
   };
   sync();
   const disposable = vscode.Disposable.from(

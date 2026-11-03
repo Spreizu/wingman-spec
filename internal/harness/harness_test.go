@@ -30,9 +30,8 @@ func TestRender(t *testing.T) {
 		}
 	}
 	for p, want := range map[string]string{
-		".cursor/commands/spec-a.md":     "---\n# " + mark + "commands/spec-a.md; edits are overwritten on update\ndescription: \"Do a\"\n---\nRun /spec-b next.\npartial line\n",
-		".claude/commands/spec-a.md":     "argument-hint: \"<x>\"\n",
-		".agents/skills/spec-a/SKILL.md": "Invoke as `$spec-a <x>`.\n\nRun $spec-b next.\n",
+		".claude/commands/spec-a.md":     "argument-hint: \"<x>\"\n---\nRun /spec-b next.\npartial line\n",
+		".agents/skills/spec-a/SKILL.md": "---\n# " + mark + "commands/spec-a.md; edits are overwritten on update\nname: spec-a\ndescription: \"Do a\"\n---\nInvoke as `/spec-a <x>` (Cursor) or `$spec-a <x>` (Codex); in Codex every `/spec-` command below is `$spec-`.\n\nRun /spec-b next.\npartial line\n",
 		".cursor/agents/spec-r.md":       "model: inherit\nreadonly: true\n",
 		".claude/agents/spec-r.md":       "tools: Read, Grep, Glob\n",
 		".codex/agents/spec-r.toml":      "description = \"Reads; see $spec-a\"\n",
@@ -53,6 +52,17 @@ func TestRender(t *testing.T) {
 		var fm map[string]string
 		if err := yaml.Unmarshal([]byte(parts[1]), &fm); err != nil || fm["description"] == "" {
 			t.Errorf("%s: frontmatter does not parse as YAML with a description: %v", p, err)
+		}
+	}
+	// Cursor and Codex share the .agents/skills command files byte for byte; Cursor gets no commands folder of its own
+	cur, _ := Render(src, "cursor")
+	cdx, _ := Render(src, "codex")
+	if string(cur[0].Data) != string(cdx[0].Data) || cur[0].Path != cdx[0].Path {
+		t.Errorf("cursor and codex render different command files: %s %s", cur[0].Path, cdx[0].Path)
+	}
+	for p := range got {
+		if strings.HasPrefix(p, ".cursor/commands/") || strings.HasPrefix(p, ".cursor/skills/") {
+			t.Errorf("rendered %s", p)
 		}
 	}
 	if !strings.HasSuffix(got[".codex/agents/spec-r.toml"], "developer_instructions = '''\nRead only.\n'''\n\n[features]\nshell_tool = false\n") {
@@ -120,13 +130,13 @@ func TestInstall(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, p := range []string{".cursor/skills/s/SKILL.md", ".agents/skills/s/SKILL.md", "CLAUDE.md", ShimFile()} {
+	for _, p := range []string{".claude/skills/s/SKILL.md", ".agents/skills/s/SKILL.md", "CLAUDE.md", ShimFile()} {
 		if _, err := os.Stat(filepath.Join(d, p)); err != nil {
 			t.Error(err)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(d, ".cursor/skills/s/SKILL.md")); err != nil {
-		t.Error("bundled skill was not installed")
+	if _, err := os.Stat(filepath.Join(d, ".cursor/skills")); err == nil {
+		t.Error("Cursor got its own skills folder; it reads .agents/skills")
 	}
 	if b, _ := os.ReadFile(filepath.Join(d, "CLAUDE.md")); string(b) != "@AGENTS.md\n" {
 		t.Errorf("CLAUDE.md %q", b)
@@ -137,19 +147,36 @@ func TestInstall(t *testing.T) {
 	if got := Installed(d); len(got) != 0 { // the test harness has no spec-apply command
 		t.Errorf("Installed = %v", got)
 	}
-	// a generated file of an older version is removed; a file the user wrote is kept
-	stale := filepath.Join(d, ".cursor/commands/spec-old.md")
+	// a generated file of an older version is removed from the folders init still writes; a file the user wrote is kept,
+	// and so are the .cursor/commands and .cursor/skills of 0.12 (deleting those is the developer's call)
+	stale := filepath.Join(d, ".claude/commands/spec-old.md")
 	_ = os.WriteFile(stale, []byte("<!-- "+mark+"commands/spec-old.md -->\n"), 0o644)
-	old := filepath.Join(d, ".cursor/commands/spec-next.md") // 0.10's, written by install.sh
+	old := filepath.Join(d, ".claude/commands/spec-next.md") // 0.10's, written by install.sh
 	_ = os.WriteFile(old, []byte("<!-- "+oldMark+"commands/spec-next.md; edits are overwritten on reinstall -->\n"), 0o644)
-	gone := filepath.Join(d, ".claude/commands/spec-gone.md") // this version's note, in the frontmatter
+	gone := filepath.Join(d, ".agents/skills/spec-gone/SKILL.md") // this version's note, in the frontmatter
+	_ = os.MkdirAll(filepath.Dir(gone), 0o755)
 	_ = os.WriteFile(gone, []byte("---\n# "+mark+"commands/spec-gone.md; edits are overwritten on update\ndescription: \"x\"\n---\nx\n"), 0o644)
-	cur := filepath.Join(d, ".cursor/commands/spec-a.md") // the 0.12 HTML-comment note is replaced by the frontmatter one
+	cur := filepath.Join(d, ".claude/commands/spec-a.md") // the 0.12 HTML-comment note is replaced by the frontmatter one
 	_ = os.WriteFile(cur, []byte("---\ndescription: \"Do a\"\n---\n<!-- "+mark+"commands/spec-a.md; edits are overwritten on update -->\nold\n"), 0o644)
-	mine := filepath.Join(d, ".cursor/commands/mine.md")
+	mine := filepath.Join(d, ".claude/commands/mine.md")
 	_ = os.WriteFile(mine, []byte("---\n# my own command\ndescription: \"mine\"\n---\n<!-- keep -->\nmine\n"), 0o644)
+	legacy := map[string]string{
+		".cursor/commands/spec-a.md":   "---\n# " + mark + "commands/spec-a.md; edits are overwritten on update\ndescription: \"Do a\"\n---\nold\n",
+		".cursor/commands/spec-old.md": "<!-- " + mark + "commands/spec-old.md -->\n",
+		".cursor/skills/s/SKILL.md":    "skill\n",
+	}
+	for p, b := range legacy {
+		if err := writeFile(filepath.Join(d, p), []byte(b)); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if _, err := Install(d, src, skills, Options{Harnesses: []string{"cursor", "claude"}}); err != nil {
 		t.Fatal(err)
+	}
+	for p, want := range legacy {
+		if b, _ := os.ReadFile(filepath.Join(d, p)); string(b) != want {
+			t.Errorf("%s of an older version was changed or removed: %q", p, b)
+		}
 	}
 	if _, err := os.Stat(gone); err == nil {
 		t.Error("stale generated file with the frontmatter note kept")
@@ -177,13 +204,53 @@ func TestStale(t *testing.T) {
 	if got, err := Stale(d, src, []string{"cursor"}); err != nil || len(got) != 0 {
 		t.Fatalf("fresh install: %v %v", got, err)
 	}
-	_ = os.WriteFile(filepath.Join(d, ".cursor/commands/spec-a.md"), []byte("old\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(d, ".agents/skills/spec-a/SKILL.md"), []byte("old\n"), 0o644)
 	_ = os.WriteFile(filepath.Join(d, "AGENTS.md"), []byte("mine\n"), 0o644)
-	if got, _ := Stale(d, src, []string{"cursor"}); strings.Join(got, ",") != "AGENTS.md,.cursor/commands/spec-a.md" {
+	if got, _ := Stale(d, src, []string{"cursor"}); strings.Join(got, ",") != "AGENTS.md,.agents/skills/spec-a/SKILL.md" {
 		t.Errorf("Stale = %v", got)
 	}
 	if got, _ := Stale(d, src, nil); len(got) != 0 {
 		t.Errorf("no harness: %v", got)
+	}
+}
+
+// After init the editor shows no Update button: the files init wrote are what update writes, for every harness, and
+// a .cursor/commands or .cursor/skills left by 0.12 changes nothing. A folder the developer deleted is not offered back;
+// a command this version added to a folder that exists is.
+func TestStaleAfterInit(t *testing.T) {
+	d := t.TempDir()
+	for p, b := range map[string]string{".cursor/commands/spec-a.md": "old\n", ".cursor/skills/s/SKILL.md": "old\n"} {
+		_ = writeFile(filepath.Join(d, p), []byte(b))
+	}
+	if _, err := Install(d, src, fsSub(src), Options{Harnesses: Names}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := Stale(d, src, Names); err != nil || len(got) != 0 {
+		t.Fatalf("right after init: %v %v", got, err)
+	}
+	_ = os.RemoveAll(filepath.Join(d, ".codex"))
+	_ = os.RemoveAll(filepath.Join(d, ".claude/agents"))
+	if got, _ := Stale(d, src, Names); len(got) != 0 {
+		t.Errorf("deleted folders reported stale: %v", got)
+	}
+	_ = os.RemoveAll(filepath.Join(d, ".agents/skills/spec-a"))
+	if got, _ := Stale(d, src, Names); strings.Join(got, ",") != ".agents/skills/spec-a/SKILL.md" {
+		t.Errorf("a missing command in .agents/skills: %v", got)
+	}
+}
+
+// Installed knows a harness by a file only it has: the shared .agents/skills alone is no tool, and Cursor installs of
+// 0.12 (commands in .cursor/commands) still count.
+func TestInstalled(t *testing.T) {
+	d := t.TempDir()
+	_ = writeFile(filepath.Join(d, ".agents/skills/spec-apply/SKILL.md"), nil)
+	if got := Installed(d); len(got) != 0 {
+		t.Errorf(".agents/skills alone: %v", got)
+	}
+	_ = writeFile(filepath.Join(d, ".cursor/commands/spec-apply.md"), nil)
+	_ = writeFile(filepath.Join(d, ".codex/agents/spec-implementer.toml"), nil)
+	if got := Installed(d); strings.Join(got, ",") != "cursor,codex" {
+		t.Errorf("Installed = %v", got)
 	}
 }
 
@@ -238,8 +305,8 @@ func TestInstallLeavesHookFilesAlone(t *testing.T) {
 
 func TestInstallRemovesOldUnprefixedSkills(t *testing.T) {
 	d := t.TempDir()
-	ours := filepath.Join(d, ".cursor/skills/ponytail/SKILL.md")
-	theirs := filepath.Join(d, ".cursor/skills/test-driven-development/SKILL.md")
+	ours := filepath.Join(d, ".agents/skills/ponytail/SKILL.md")
+	theirs := filepath.Join(d, ".agents/skills/test-driven-development/SKILL.md")
 	if err := writeFile(ours, []byte("Loaded by spec-implementer for every implementation task.\n")); err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +322,7 @@ func TestInstallRemovesOldUnprefixedSkills(t *testing.T) {
 	if _, err := os.Stat(theirs); err != nil {
 		t.Error("user's own test-driven-development was removed")
 	}
-	if _, err := os.Stat(filepath.Join(d, ".cursor/skills/s/SKILL.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(d, ".agents/skills/s/SKILL.md")); err != nil {
 		t.Error("bundled skill was not installed")
 	}
 }

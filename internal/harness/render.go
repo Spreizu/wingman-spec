@@ -96,10 +96,13 @@ func sources(src fs.FS, dir string) ([]source, error) {
 
 // Render generates one harness's commands and subagents from src (the harness/ tree). Same input, same bytes.
 //
-//	harness  commands                                       subagents
-//	cursor   .cursor/commands/<n>.md                        .cursor/agents/<a>.md (model: inherit)
-//	claude   .claude/commands/<n>.md                        .claude/agents/<a>.md
-//	codex    .agents/skills/<n>/SKILL.md (invoked as $<n>)  .codex/agents/<a>.toml
+//	harness  commands                                         subagents
+//	cursor   .agents/skills/<n>/SKILL.md (invoked as /<n>)    .cursor/agents/<a>.md (model: inherit)
+//	claude   .claude/commands/<n>.md                          .claude/agents/<a>.md
+//	codex    .agents/skills/<n>/SKILL.md (invoked as $<n>)    .codex/agents/<a>.toml
+//
+// Cursor and Codex both read .agents/skills, so they share one file per command (Cursor and Codex render the same bytes);
+// Claude Code reads neither .agents/skills nor another tool's subagents, and each tool's subagent format differs.
 //
 // An agent with `readonly: true` gets `readonly: true` in Cursor, `tools: Read, Grep, Glob` in Claude Code and
 // `[features] shell_tool = false` in Codex.
@@ -125,20 +128,20 @@ func Render(src fs.FS, h string) ([]File, error) {
 		// a YAML comment in the frontmatter: the harness strips it, so it never reaches the chat (an HTML comment did)
 		note := "# " + mark + "commands/" + c.name + ".md; edits are overwritten on update\n"
 		switch h {
-		case "cursor":
-			add(".cursor/commands/"+c.name+".md", "---\n"+note+"description: \""+d+"\"\n---\n"+c.body)
 		case "claude":
 			fm := "---\n" + note + "description: \"" + d + "\"\n"
 			if hint != "" {
 				fm += "argument-hint: \"" + hint + "\"\n"
 			}
 			add(".claude/commands/"+c.name+".md", fm+"---\n"+c.body)
-		case "codex":
+		default: // cursor, codex: one shared skill; Codex types $ where Cursor types /
 			s := "---\n" + note + "name: " + c.name + "\ndescription: \"" + d + "\"\n---\n"
+			call := c.name
 			if hint != "" {
-				s += "Invoke as `$" + c.name + " " + hint + "`.\n\n"
+				call += " " + hint
 			}
-			add(".agents/skills/"+c.name+"/SKILL.md", s+codexify(c.body))
+			s += "Invoke as `/" + call + "` (Cursor) or `$" + call + "` (Codex); in Codex every `/spec-` command below is `$spec-`.\n\n"
+			add(".agents/skills/"+c.name+"/SKILL.md", s+c.body)
 		}
 	}
 	for _, a := range agents {

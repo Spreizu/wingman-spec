@@ -24,7 +24,7 @@ git add -A && git commit -qm init
 echo "== install"
 expect "the config written by init turns traceability on" 'grep -q "^traceability: on" .wingman-spec/wingman-spec.yaml'
 "$WS" init --harness all >/dev/null 2>&1
-for h in .cursor/commands .claude/commands .agents/skills; do
+for h in .claude/commands .agents/skills; do
   f="$h/spec-garden.md"; [ "$h" = .agents/skills ] && f=".agents/skills/spec-garden/SKILL.md"
   expect "spec-garden is installed for $h" 'grep -q "drift decide" "$f"'
   f="$h/spec-archive.md"; [ "$h" = .agents/skills ] && f=".agents/skills/spec-archive/SKILL.md"
