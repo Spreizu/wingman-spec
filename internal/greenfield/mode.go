@@ -197,16 +197,24 @@ type Mode struct {
 	Started       string   `json:"started,omitempty"`
 	ConfirmedBy   string   `json:"confirmed_by,omitempty"`
 	MarkerMissing bool     `json:"marker_missing,omitempty"`
+	// CodeRepos are the other code repositories sharing the specs root (relative to the code root), the ones adopt surveys.
+	CodeRepos []string `json:"code_repos,omitempty"`
 }
 
-// ModeOf is the project mode. Pure reads; never writes.
+// linkedOK are the guarded commands a linked code repo runs; the greenfield flow itself runs in the specs repository.
+var linkedOK = map[string]bool{"adopt": true, "propose": true, "garden": true}
+
+// ModeFor is the mode cmd sees: in a linked code repo the greenfield flow is Unsupported.
+func (p *Project) ModeFor(cmd string) Mode {
+	if p.Root.Kind == layout.Linked && !linkedOK[cmd] {
+		return Mode{Mode: Unsupported, Signals: []Signal{{"layout", "the specs live in a linked specs repository"}}}
+	}
+	return p.ModeOf()
+}
+
+// ModeOf is the project mode. Pure reads; never writes. The code is that of every repository sharing the specs root.
 func (p *Project) ModeOf() Mode {
 	out := Mode{Mode: Greenfield, Signals: []Signal{}}
-	if p.Root.Kind == layout.Linked {
-		out.Mode = Unsupported
-		out.Signals = append(out.Signals, Signal{"layout", "the specs live in a linked specs repository"})
-		return out
-	}
 	if t, ok := read(p.Marker()); ok {
 		d, _, _ := parseFM("---\n" + t + "\n---\n")
 		out.Marker = true
@@ -220,9 +228,28 @@ func (p *Project) ModeOf() Mode {
 		return out
 	}
 	own := isDir(p.G()) || isDir(p.path("roadmap"))
-	code := p.Root.Code
-	s := sourceScan(code)
-	hn, hs := historyScan(code)
+	var s scan
+	var hn int
+	var hs []string
+	for _, code := range layout.CodeRepos(p.Root) {
+		name := func(f string) string { return f }
+		if rel, err := filepath.Rel(p.Root.Code, code); err == nil && code != p.Root.Code {
+			rel = filepath.ToSlash(rel)
+			out.CodeRepos = append(out.CodeRepos, rel)
+			name = func(f string) string { return rel + "/" + f }
+		}
+		c := sourceScan(code)
+		s.files, s.lines = s.files+c.files, s.lines+c.lines
+		for _, f := range c.sample {
+			s.sample = append(s.sample, name(f))
+		}
+		n, l := historyScan(code)
+		hn += n
+		for _, f := range l {
+			hs = append(hs, name(f))
+		}
+	}
+	s.sample, hs = s.sample[:min(3, len(s.sample))], hs[:min(3, len(hs))]
 	if s.lines >= 30 {
 		out.Signals = append(out.Signals, Signal{"source", fmt.Sprintf("%d source file(s), %d lines (%s)", s.files, s.lines, strings.Join(s.sample, ", "))})
 	}

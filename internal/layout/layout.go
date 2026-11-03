@@ -13,10 +13,13 @@ package layout
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"go.yaml.in/yaml/v3"
 )
 
 // Names of the files and directories that make up a layout.
@@ -188,6 +191,41 @@ func (r *Root) Rel(p string) string {
 		return filepath.ToSlash(rel)
 	}
 	return p
+}
+
+// CodeRepos lists the code repositories that share r's specs root: r's own code root, each `repos:` entry of the specs
+// config (relative to the specs root) and each sibling repo whose `specs:` link resolves to it. Only existing directories.
+func CodeRepos(r *Root) []string {
+	out := []string{}
+	add := func(d string) {
+		if d = filepath.Clean(d); isDir(d) && !slices.Contains(out, d) {
+			out = append(out, d)
+		}
+	}
+	add(r.Code)
+	if r.Kind == InRepo {
+		return out
+	}
+	if b, err := os.ReadFile(filepath.Join(r.Specs, ConfigFile)); err == nil {
+		var c struct {
+			Repos map[string]string `yaml:"repos"`
+		}
+		_ = yaml.Unmarshal(b, &c) // a broken config is reported by the config loader; here it only adds no repos
+		names := slices.Sorted(maps.Keys(c.Repos))
+		for _, n := range names {
+			if v := c.Repos[n]; v != "" {
+				add(filepath.Join(r.Specs, v))
+			}
+		}
+	}
+	ents, _ := os.ReadDir(filepath.Dir(r.Specs))
+	for _, e := range ents {
+		d := filepath.Join(filepath.Dir(r.Specs), e.Name())
+		if link, _, err := linkOf(filepath.Join(d, Dir, ConfigFile)); e.IsDir() && err == nil && link != "" && filepath.Clean(filepath.Join(d, link)) == filepath.Clean(r.Specs) {
+			add(d)
+		}
+	}
+	return out
 }
 
 // linkOf reads the `specs:` and `specs_remote:` values of a code repo config without a full parse,

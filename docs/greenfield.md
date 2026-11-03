@@ -19,7 +19,9 @@ The spec is the end state of the product. A slice carries tasks only (`Slice: <i
 
 **Mode guard.** `wingman-spec mode` says `greenfield`, `brownfield`, `greenfield-in-progress` or `implementation`. The marker
 `greenfield.yaml` in the specs root is written only after an explicit yes. A greenfield command in the wrong mode exits 6 and writes nothing;
-`/spec-adopt` refuses on an in-progress new product.
+`/spec-adopt` refuses on an in-progress new product. With a specs repository the mode counts the code of every code repo
+that shares it (its `repos:` entries and each sibling repo whose `specs:` link points at it), so a specs repository with
+linked code is brownfield. A linked code repo runs `/spec-adopt` itself; the greenfield commands run in the specs repository.
 
 **Files and parallel PRs.** Status, order and coverage are derived from the files each time, with no committed index. Every addition is
 its own file: capabilities, slices and reviews in their folders, and the analyst's questions, assumptions and environments in

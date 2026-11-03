@@ -133,7 +133,7 @@ func (e *Env) refuse(m Mode, cmd string, js bool) error {
 }
 
 func (e *Env) guard(p *Project, cmd string, o opts) (Mode, error) {
-	m := p.ModeOf()
+	m := p.ModeFor(cmd)
 	if !Allowed(m.Mode, cmd) {
 		return m, e.refuse(m, cmd, o.flags["json"])
 	}
@@ -142,7 +142,7 @@ func (e *Env) guard(p *Project, cmd string, o opts) (Mode, error) {
 
 // guardKind: read works in progress and in implementation; write only in progress.
 func (e *Env) guardKind(p *Project, kind string, o opts) error {
-	m := p.ModeOf()
+	m := p.ModeFor("next")
 	ok := m.Mode == InProgress || (kind == "read" && m.Mode == Implementation)
 	if !ok {
 		c := "next"
@@ -155,7 +155,10 @@ func (e *Env) guardKind(p *Project, kind string, o opts) error {
 }
 
 func (e *Env) cmdMode(p *Project, o opts) error {
-	m := p.ModeOf()
+	m := p.ModeFor(strings.TrimPrefix(strings.TrimPrefix(o.val["for"], "/"), "spec-"))
+	if o.val["for"] == "" {
+		m = p.ModeOf()
+	}
 	if m.Mode == Unsupported {
 		if o.flags["json"] {
 			e.json(map[string]any{"mode": Unsupported, "refused": true, "alternative": Alternative[Unsupported], "wrote": "nothing"})
@@ -197,6 +200,9 @@ func (e *Env) cmdMode(p *Project, o opts) error {
 	e.out(l)
 	for _, s := range m.Signals {
 		e.out("  " + s.Kind + ": " + s.Detail)
+	}
+	if len(m.CodeRepos) > 0 {
+		e.out("  code repos: " + strings.Join(m.CodeRepos, ", "))
 	}
 	if f != "" {
 		e.out("allowed: /" + strings.TrimPrefix(f, "/"))
@@ -248,7 +254,7 @@ func (e *Env) cmdStart(p *Project, o opts) error {
 }
 
 func (e *Env) cmdReadme(p *Project, _ opts) error {
-	m := p.ModeOf()
+	m := p.ModeFor("start")
 	if m.Mode != Greenfield && m.Mode != InProgress {
 		e.out("not a greenfield project (" + m.Mode + "); nothing written")
 		return nil
@@ -670,7 +676,7 @@ func (e *Env) cmdHandover(p *Project, o opts) error {
 
 // InputsReadme writes inputs/README.md when the project is a new product (init calls it); it returns the step line or "".
 func (p *Project) InputsReadme() string {
-	if m := p.ModeOf(); m.Mode != Greenfield && m.Mode != InProgress {
+	if m := p.ModeFor("start"); m.Mode != Greenfield && m.Mode != InProgress {
 		return ""
 	}
 	f := p.path("inputs", "README.md")

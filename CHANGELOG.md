@@ -2,6 +2,13 @@
 
 Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
+## Unreleased
+
+- **Adopt with a specs repository.** `mode` counts the code of every code repo sharing the specs root (`repos:` entries
+  and sibling repos whose `specs:` link points at it) and lists them as `code repos`, so a specs repository with linked
+  code is brownfield instead of greenfield. A linked code repo may run `/spec-adopt` (and `mode --for adopt`) instead of
+  being refused as an unsupported layout; the greenfield commands still run in the specs repository.
+
 ## 0.12.1
 
 - **CLI performance.** `check`, `drift` and `anchors` share one code-file index per command (git `ls-files -z`, parallel reads). Unreadable files are listed as `skipped` instead of silently dropped.

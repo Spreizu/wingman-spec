@@ -15,7 +15,7 @@ This command records **current behavior as evidence, not as intent**. Existing c
 
 ## Steps
 
-0. **Guard.** Run `.wingman-spec/bin/wingman-spec mode --for adopt`. If it exits 6 (an in-progress new-product spec, which has no code to document yet) print its text and stop: nothing is written; use `/spec-green-start` instead.
+0. **Guard.** Run `.wingman-spec/bin/wingman-spec mode --for adopt`. If it exits 6 (an in-progress new-product spec, which has no code to document yet) print its text and stop: nothing is written; use `/spec-green-start` instead. In a specs repository, the code to survey is in the `code repos` it lists.
 
 1. **Check readiness.** Run `.wingman-spec/bin/wingman-spec config` (if it reports no root, tell the user to run `wingman-spec init` and stop). Read its `context` (stack, test command) and list `specs/` and `adrs/` so you know what is already recorded.
 

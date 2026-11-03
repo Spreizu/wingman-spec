@@ -176,7 +176,7 @@ Unknown keys are errors, so a typo never becomes a silent default. Lookup order 
 | `visual.browsers_path` | where Chromium is, if not in `PLAYWRIGHT_BROWSERS_PATH` or the default cache | |
 | `visual.roles` | logins for gated features, see [Visual roles](#visual-roles-gated-features) | none |
 | `specs`, `specs_remote` | a code repository linked to a specs repository: its relative path and git URL (`doctor` prints the clone line) | |
-| `repos` | a specs repository: its code repositories (name and relative path); a note for people, nothing reads it yet | |
+| `repos` | a specs repository: its code repositories (name and path relative to it); `mode` counts their code (as it does a sibling repo that links here), and adopt surveys them | |
 
 | `test_files` | extra test-file globs for `trace`, `check` and `finish` (`**`, `*`, `?`; `!glob` drops files), on top of the built-in detection ([docs/test-files.md](test-files.md)) | none |
 | `commands.junit` | a JUnit XML report the test command writes; `run-checks`, `check` and `finish` read it for the failure list | none |

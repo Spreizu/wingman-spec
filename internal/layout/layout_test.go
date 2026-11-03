@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -93,5 +94,29 @@ func TestCleanURL(t *testing.T) {
 		if got := CleanURL(in); got != want {
 			t.Errorf("CleanURL(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestCodeRepos(t *testing.T) {
+	base := t.TempDir()
+	specs := filepath.Join(base, "specs")
+	write(t, filepath.Join(specs, ConfigFile), "repos:\n  api: ../api\n  gone: ../gone\n")
+	write(t, filepath.Join(base, "api", "main.go"), "package main\n")
+	write(t, filepath.Join(base, "web", Dir, ConfigFile), "specs: ../specs\n")
+	write(t, filepath.Join(base, "other", Dir, ConfigFile), "specs: ../elsewhere\n")
+	write(t, filepath.Join(base, "plain", "x.go"), "package x\n")
+	want := []string{specs, filepath.Join(base, "api"), filepath.Join(base, "web")}
+	got := CodeRepos(&Root{Kind: SpecsRepo, Code: specs, Specs: specs})
+	if !slices.Equal(got, want) {
+		t.Fatalf("specs repo: got %v, want %v (a repos: entry, a sibling linked here; not a missing entry, another link or a plain dir)", got, want)
+	}
+	web := filepath.Join(base, "web")
+	got = CodeRepos(&Root{Kind: Linked, Code: web, Specs: specs})
+	if want := []string{web, filepath.Join(base, "api")}; !slices.Equal(got, want) {
+		t.Fatalf("linked: got %v, want %v", got, want)
+	}
+	app := filepath.Join(base, "plain")
+	if got := CodeRepos(&Root{Kind: InRepo, Code: app, Specs: filepath.Join(app, Dir)}); !slices.Equal(got, []string{app}) {
+		t.Fatalf("in-repo: got %v", got)
 	}
 }

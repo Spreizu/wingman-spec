@@ -378,7 +378,7 @@ func (p *Project) phaseHandover() *step {
 
 // Derive is the state of the flow, from the files only.
 func (p *Project) Derive() *Status {
-	m := p.ModeOf()
+	m := p.ModeFor("status")
 	out := &Status{Mode: m.Mode, Marker: m.Marker, Phases: []PhaseState{}, BlockedBy: []Block{}, Done: []string{}}
 	if m.Mode == Implementation {
 		rm := p.Roadmap()
