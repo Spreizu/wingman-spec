@@ -124,6 +124,8 @@ func (e *Env) archiveGate(changeDir string) []gateCheck {
 		g.Skipped = "spec-only change: no code to check"
 	case !runstate.ReadJSON(filepath.Join(e.runsDir(), "finished.json"), &fin):
 		g.Problem = fmt.Sprintf("finish has not passed: run `wingman-spec finish %s`", e.O.Change)
+	case fin.Affected:
+		g.Problem = fmt.Sprintf("the last finish ran only the affected tests (--affected): run `wingman-spec finish %s` for the full suite", e.O.Change)
 	case now == "":
 		g.Skipped = "not a git checkout: cannot tell whether the code changed since finish passed"
 	case fin.Gate == "":

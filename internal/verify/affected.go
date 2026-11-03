@@ -91,6 +91,6 @@ func (e *Env) affectedCmd(changeDir, full string, o *outcome) (string, *Obj) {
 		o.warn("finish --affected ran the full suite: no test file was found for the change's requirements")
 		return full, O("full_suite", "no affected test file")
 	}
-	o.warn(fmt.Sprintf("finish --affected ran %d test file(s) for %d requirement(s); %s.", len(a.files), len(a.keys), AffectedNote))
+	o.warn(fmt.Sprintf("finish --affected ran %d test file(s) for %d requirement(s); %s; the archive gate needs a plain `finish`.", len(a.files), len(a.keys), AffectedNote))
 	return testpaths.WithFiles(tpl, a.files), O("files", a.files, "requirements", a.keys, "note", AffectedNote)
 }

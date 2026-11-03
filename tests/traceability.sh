@@ -399,6 +399,8 @@ rm -f ran.txt; rc=0; $V finish clear --affected > "$T/f.json" 2>/dev/null || rc=
 expect "finish --affected runs the tests of the change's own requirement and of the one whose anchored code changed, nothing else" '[ $rc = 0 ] && [ "$(sort ran.txt | tr "\n" " ")" = "test/clear.test.js test/remove.test.js " ]'
 expect "...names the files and the requirements in the tests check, and warns that unmarked code is not followed" 'grep -q "\"requirements\": \[" "$T/f.json" && grep -q "todo/remove-a-todo" "$T/f.json" && grep -q "a test of changed code that carries no marker" "$T/f.json"'
 expect "...and records only what ran" '[ "$(J .wingman-spec/cache/test-results.json requirements.todo/remove-a-todo.scenarios.todo/removed)" = passed ] && [ "$(J .wingman-spec/cache/test-results.json requirements.todo/add-a-todo)" = undefined ]'
+$V archive clear > "$T/ar.out" 2>&1 || true
+expect "...and is not enough for the archive gate" 'grep -q "the last finish ran only the affected tests" "$T/ar.out" && [ -d .wingman-spec/changes/clear ]'
 rm -f ran.txt .wingman-spec/runs -r; $V finish clear > /dev/null 2>&1 || true
 expect "plain finish still runs the full suite" '[ "$(wc -l < ran.txt)" = 4 ]'
 

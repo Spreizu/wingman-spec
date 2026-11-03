@@ -306,7 +306,7 @@ func (e *Env) Finish() error {
 		fp := runstate.Fingerprinted(e.code, true)
 		var rr runstate.Run
 		runstate.ReadJSON(filepath.Join(run, "run.json"), &rr)
-		rec := runstate.Record{At: runstate.Now(), Run: filepath.Base(run), Session: rr.Session, Head: fp.Head, Branch: fp.Branch, Tree: fp.Tree, Gate: runstate.GateTree(e.code), Worktree: e.code}
+		rec := runstate.Record{At: runstate.Now(), Run: filepath.Base(run), Session: rr.Session, Head: fp.Head, Branch: fp.Branch, Tree: fp.Tree, Gate: runstate.GateTree(e.code), Worktree: e.code, Affected: affected != nil}
 		_ = runstate.WriteJSON(filepath.Join(base, "finished.json"), rec)
 		var appr any = Skip
 		var akeys []string

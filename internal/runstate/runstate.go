@@ -522,6 +522,7 @@ type Record struct {
 	Gate      string `json:"gate,omitempty"` // GateTree when finish passed (finished.json)
 	Worktree  string `json:"worktree"`
 	FilesHash string `json:"files_hash,omitempty"`
+	Affected  bool   `json:"affected,omitempty"` // finish --affected: not enough for the archive gate
 }
 
 // Judge says whether a record is still good here: valid, or foreign (another branch or checkout).
