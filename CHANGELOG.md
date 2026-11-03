@@ -4,6 +4,10 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
 ## Unreleased
 
+- **`Verify:` line.** A requirement that no test can prove (a manual, a legal text, a performance budget checked by
+  hand) may say `Verify: inspection`, `Verify: analysis` or `Verify: demonstration` under its SHALL sentence, with an
+  optional note. Its scenarios count as verified in `trace` (`N verified without a test`), and `drift`, the anchor lint
+  and the extension's Requirements view no longer call it untested; any other method is a lint error.
 - **Faster visual runs.** After a visual run the helper keeps Playwright loaded and one headless Chromium running in
   the background, so the next `visual`, `check` or `finish` of the same code root skips node start, the Playwright load
   and the browser launch; the app server waits poll faster, a page's settle step and its ARIA snapshots take fewer

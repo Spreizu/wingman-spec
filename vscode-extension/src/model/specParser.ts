@@ -2,8 +2,8 @@ import { blankComments } from './markdown.ts';
 
 export type RequirementSection = 'BASE' | 'ADDED' | 'MODIFIED' | 'REMOVED' | 'RENAMED';
 
-/** `Why:`, `Accepted:` and `Confirmed:` lines under the SHALL sentence are about the requirement, not part of its statement. */
-const META_LINE_RE = /^\s*(?:[-*]\s*)?\**(?:Why|Accepted|Confirmed)\**:/i;
+/** `Why:`, `Accepted:`, `Confirmed:` and `Verify:` lines under the SHALL sentence are about the requirement, not part of its statement. */
+const META_LINE_RE = /^\s*(?:[-*]\s*)?\**(?:Why|Accepted|Confirmed|Verify)\**:/i;
 
 export interface ScenarioStep {
   keyword: string;

@@ -19,6 +19,7 @@ var specInputs = []struct{ Name, Text string }{
 	{"living", "## Purpose\nWhat it is for.\n\n## Requirements\n\n### Requirement: B\nB MUST y.\n\n#### Scenario: S\n\n## Notes\n\n### Requirement: C\nC SHALL z\n#### Scenario: T\n"},
 	{"removed and renamed", "## REMOVED\n\n### Requirement: Gone\n**Reason**: x\n\n## RENAMED\n\n- Old -> New\n"},
 	{"modified", "## MODIFIED\n\n### Requirement: M\nM SHALL z.\n\n#### Scenario: One\n#### Scenario: Two\n"},
+	{"verify", "## ADDED\n\n### Requirement: V\nThe manual SHALL list every flag.\nVerify: **Inspection** of the manual\n\n#### Scenario: Read\n\n### Requirement: W\nW SHALL x.\nVerify: test\n#### Scenario: S\n"},
 	{"fenced headings", "## ADDED\n\n### Requirement: F\nF SHALL a.\n\n```md\n### Requirement: Not one\n#### Scenario: Not one\n```\n\n#### Scenario: Real\n"},
 }
 
@@ -47,6 +48,7 @@ type goldenReq struct {
 	Name      string   `json:"name"`
 	Op        string   `json:"op"`
 	Why       *string  `json:"why"`
+	Verify    *string  `json:"verify"`
 	Scenarios []string `json:"scenarios"`
 }
 
@@ -83,7 +85,11 @@ func TestGrammarGoldenForEditor(t *testing.T) {
 			for _, s := range r.Scenarios {
 				sc = append(sc, s.Name)
 			}
-			reqs = append(reqs, goldenReq{r.Name, r.Op, r.Why, sc})
+			var v *string
+			if m := r.Verified(); m != "" {
+				v = &m
+			}
+			reqs = append(reqs, goldenReq{r.Name, r.Op, r.Why, v, sc})
 		}
 		ren := [][2]string{}
 		for _, r := range p.Renames {

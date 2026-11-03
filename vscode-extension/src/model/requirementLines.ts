@@ -36,3 +36,15 @@ export function whyOf(raw: string): string | null {
   }
   return null;
 }
+
+/** The method of the `Verify:` line of one requirement block (inspection, analysis or demonstration: verified without a test), or null. Same reading as the CLI. */
+export function verifyOf(raw: string): string | null {
+  for (const l of raw.split('\n')) {
+    if (/^####\s+Scenario:/.test(l)) break;
+    const m = /^\s*(?:[-*]\s*)?\**Verify\**:\s*(.*?)\s*$/i.exec(l);
+    if (!m) continue;
+    const w = ((m[1] ?? '').replace(/[*`]/g, '').trim().toLowerCase().split(' ')[0] ?? '').replace(/[.,;:]+$/, '');
+    return ['inspection', 'analysis', 'demonstration'].includes(w) ? w : null;
+  }
+  return null;
+}

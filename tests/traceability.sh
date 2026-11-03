@@ -57,6 +57,9 @@ expect "a requirement with a Why line passes lint" '[ $rc = 0 ] && [ "$(J "$T/li
 expect "validate accepts Why lines" '$WS validate todo >/dev/null 2>&1'
 mk "${REQ/Why: A person wants to keep a list of things to do, so that nothing is forgotten./}"; lint
 expect "a requirement without a Why line is an error that shows the format" '[ $rc = 1 ] && lintmsg "Why:" && lintmsg "Add a todo"'
+mk "${REQ/so that nothing is forgotten./so that nothing is forgotten.
+Verify: tests}"; lint
+expect "a Verify: line must name inspection, analysis or demonstration" '[ $rc = 1 ] && lintmsg "verify-method" && lintmsg "inspection, analysis, demonstration"'
 mk "${REQ/Why: A person wants to keep a list of things to do, so that nothing is forgotten./Why: a list}"; lint
 expect "a Why under 5 words is an error (it names no one and no reason)" '[ $rc = 1 ] && lintmsg "too short"'
 mk "${REQ/Why: A person wants to keep a list of things to do, so that nothing is forgotten./Why: }"; lint
@@ -178,6 +181,11 @@ expect "seed 5, stale test tag: stale-test-tag" '[ $rc = 1 ] && gap stale-test-t
 git checkout -q test
 printf '' > test/todo.test.js; drift
 expect "seed 6, tests lost their tags: untested requirement" '[ $rc = 1 ] && gap untested-requirement:todo/add-a-todo'
+sed -i 's/^Why: A person wants to keep a list.*/&\nVerify: inspection of the stored list in a review/' .wingman-spec/specs/todo.md; drift
+expect "a Verify: line (inspection, analysis, demonstration) exempts the requirement from untested" '[ $rc = 0 ] && ! gap untested-requirement:todo/add-a-todo'
+$V trace --text > "$T/tr.txt" 2>&1
+expect "trace counts the scenarios of a Verify: requirement as verified without a test, not untested" 'grep -q "2 verified without a test, 0 untested" "$T/tr.txt"'
+git checkout -q .wingman-spec/specs
 git checkout -q test
 drift; expect "restoring everything gives a clean report again" '[ $rc = 0 ]'
 

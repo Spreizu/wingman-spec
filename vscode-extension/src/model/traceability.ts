@@ -10,7 +10,7 @@ import chrono from '../core/chronology.ts';
 import { archiveDir, changesDir as changesOf, configFiles, livingSpecsDir } from '../core/paths.ts';
 import { nearest, scanCode, slug } from './anchors.ts';
 import type { ScannedFile } from './anchors.ts';
-import { acceptedOf, proposalApproval, whyOf } from './requirementLines.ts';
+import { acceptedOf, proposalApproval, verifyOf, whyOf } from './requirementLines.ts';
 import { parseSpec } from './specParser.ts';
 import { parseTasks } from './tasksParser.ts';
 
@@ -46,6 +46,8 @@ export interface TraceRequirement {
   why: string | null;
   /** The reason of its `Accepted:` line, or null. */
   accepted: string | null;
+  /** The method of its `Verify:` line (inspection, analysis, demonstration): verified without a test. */
+  verify: string | null;
   scenarios: TraceScenario[];
   /** Comment-free source of the whole requirement block (the words `anchor_fit` compares a unit with). */
   block: string;
@@ -210,6 +212,7 @@ function reqsOfSpec(cap: string, file: string, text: string, sections: string[])
       statement: r.statement.trim(),
       why: whyOf(r.raw),
       accepted: acceptedOf(r.raw),
+      verify: verifyOf(r.raw),
       block: r.raw,
       scenarios: r.scenarios.map((s) => ({ name: s.name, slug: slug(s.name), line: s.line, steps: s.steps.map((st) => ({ keyword: st.keyword, text: st.text })) })),
       file,
@@ -315,7 +318,7 @@ export function buildTrace(root: string, codeRoot: string, opts: { scan?: Scanne
   for (const r of reqs.values()) {
     if (r.why === null) r.flags.push('no-why');
     if (!r.code.length) r.flags.push('no-code-anchor');
-    if (!r.tests.length) r.flags.push('no-test-anchor');
+    if (!r.tests.length && !r.verify) r.flags.push('no-test-anchor');
   }
 
   // pending changes
@@ -364,7 +367,7 @@ export function buildTrace(root: string, codeRoot: string, opts: { scan?: Scanne
   for (const r of reqs.values()) {
     const acc = r.accepted === null ? {} : { accepted: r.accepted };
     if (!r.code.length) add('unanchored-requirement', r.key, `requirement "${r.name}" has no code anchor`, { file: r.file, line: r.line, ...acc });
-    else if (!r.tests.length) add('untested-requirement', r.key, `requirement "${r.name}" has code anchors but no test anchor`, { file: r.file, line: r.line, ...acc });
+    else if (!r.tests.length && !r.verify) add('untested-requirement', r.key, `requirement "${r.name}" has code anchors but no test anchor`, { file: r.file, line: r.line, ...acc });
   }
   const seen = new Set<string>();
   for (const u of unresolved) {

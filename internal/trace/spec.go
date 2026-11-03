@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Spreizu/wingman-spec/internal/config"
+	"github.com/Spreizu/wingman-spec/internal/quality"
 	"github.com/Spreizu/wingman-spec/internal/spec"
 )
 
@@ -23,6 +24,7 @@ type Requirement struct {
 	Why        *string    `json:"why"`
 	Confirmed  *string    `json:"confirmed,omitempty"`
 	Accepted   *string    `json:"accepted,omitempty"`
+	Verify     *string    `json:"verify,omitempty"` // the `Verify:` line's value
 	acceptedAt int        // 0-based line of the Accepted: line, -1 when none
 	Scenarios  []Scenario `json:"scenarios"`
 	Block      string     `json:"-"`
@@ -39,6 +41,14 @@ func (r *Requirement) WhyText() string {
 		return ""
 	}
 	return *r.Why
+}
+
+// Verified is the `Verify:` method (inspection, analysis or demonstration) that proves the requirement without a test, or "".
+func (r *Requirement) Verified() string {
+	if r.Verify == nil {
+		return ""
+	}
+	return quality.VerifyMethod(*r.Verify)
 }
 
 // Scenario is one scenario heading.
@@ -165,6 +175,12 @@ func ParseSpec(text string) Parsed {
 			if m := acceptedRE.FindStringSubmatch(l); m != nil {
 				req.Accepted = new(strings.ReplaceAll(m[1], "*", ""))
 				req.acceptedAt = i
+				continue
+			}
+		}
+		if req.Verify == nil {
+			if m := quality.VerifyRE.FindStringSubmatch(l); m != nil {
+				req.Verify = new(strings.TrimSpace(strings.ReplaceAll(m[1], "*", "")))
 				continue
 			}
 		}

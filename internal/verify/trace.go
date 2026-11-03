@@ -107,16 +107,16 @@ func (e *Env) Trace() error {
 		if !ok {
 			verdict = "FAILED"
 		}
-		fmt.Fprintf(e.Out, "trace %s: %d scenarios, %d tagged, %d visual, %d untested, %d unknown tags: %s\n", scope, res.Total, len(res.Covered), len(res.Visual), len(res.Missing), len(unknown), verdict)
+		fmt.Fprintf(e.Out, "trace %s: %d scenarios, %d tagged, %d visual, %d verified without a test, %d untested, %d unknown tags: %s\n", scope, res.Total, len(res.Covered), len(res.Visual), len(res.Verified), len(res.Missing), len(unknown), verdict)
 		if !ok {
 			return quit(Fail)
 		}
 		return nil
 	}
 	x := O("ok", ok, "scope", scope, "scenarios", res.Total, "test_files", len(files), "tagged", res.Covered, "visual", res.Visual,
-		"untested", untested, "unknown_tags", unknown, "problems", list(lines), "skipped", e.skippedObj())
+		"verified", res.Verified, "untested", untested, "unknown_tags", unknown, "problems", list(lines), "skipped", e.skippedObj())
 	if !ok {
-		x.Set("next", "tag a test of each untested scenario with `[<capability>/<scenario-slug>]` in its title; fix or drop each unknown tag")
+		x.Set("next", "tag a test of each untested scenario with `[<capability>/<scenario-slug>]` in its title (or, when no test can prove the requirement, add `Verify: inspection|analysis|demonstration` to it); fix or drop each unknown tag")
 	}
 	var fs []report.Finding
 	for _, s := range res.Missing {

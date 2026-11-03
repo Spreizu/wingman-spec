@@ -53,7 +53,8 @@ function anchorNode(codeRoot: string, kind: 'code' | 'test', a: AnchorRef, id: s
 export function requirementNode(model: TraceModel, r: TraceRequirement, prefix: string): TraceNode {
   // A requirement that only exists in a pending change's delta has no anchors yet.
   const pending = model.requirements.get(r.key) !== r;
-  const bits = pending ? [r.cap, 'in this change'] : [r.cap, plural(r.code.length, 'code anchor'), plural(r.tests.length, 'test')];
+  const tests = r.verify && !r.tests.length ? `verified by ${r.verify}` : plural(r.tests.length, 'test');
+  const bits = pending ? [r.cap, 'in this change'] : [r.cap, plural(r.code.length, 'code anchor'), tests];
   const flags = r.flags.filter((f) => !pending || f === 'no-why').map((f) => REQUIREMENT_FLAG_TEXT[f]);
   const children: TraceNode[] = [
     ...(pending ? [] : r.code).map((a, i) => anchorNode(model.codeRoot, 'code', a, `${prefix}/c${i}`)),

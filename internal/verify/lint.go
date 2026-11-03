@@ -363,6 +363,7 @@ func (e *Env) planReport(changeDir string, vl vlint) planRep {
 	edgeItems, edgeProbs := quality.EdgeLint(changeDir, e.R.LivingSpecs(), vm, ui)
 	nr := e.whyReport(changeDir)
 	inv := pf(quality.InvariantLint(filepath.Join(changeDir, "specs")), nil)
+	inv = append(inv, pf(e.tr().LineLint(changeDir), nil)...)
 	purpose := pf(append(quality.PurposeLint(changeDir, e.R.LivingSpecs()), quality.ThenLint(changeDir)...), nil)
 	inChange := func(p *PlanFinding) {
 		if p.File != "" {

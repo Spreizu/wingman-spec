@@ -100,3 +100,16 @@ test('an empty project does not throw', async () => {
   assert.ok(!m.hasLayer);
   assert.deepEqual(m.gaps, []);
 });
+
+test('a Verify: line verifies a requirement without a test: no test flag, no untested gap', async () => {
+  const { readFileSync, writeFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const dir = traceProject();
+  const p = join(dir, 'specs/billing.md');
+  writeFileSync(p, readFileSync(p, 'utf8').replace('### Requirement: Remove an item\n', '### Requirement: Remove an item\nVerify: inspection of the receipt\n'));
+  const m = buildTrace(dir, dir);
+  const r = m.requirements.get('billing/remove-an-item');
+  assert.equal(r?.verify, 'inspection');
+  assert.deepEqual(r?.flags, ['no-code-anchor']);
+  assert.ok(!r?.statement.includes('Verify'));
+});

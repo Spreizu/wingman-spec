@@ -111,6 +111,7 @@ type Scenario struct {
 	Line        int    `json:"line"`
 	Visual      bool   `json:"visual"`
 	NotVisual   string `json:"not_visual,omitempty"` // the reason of a `Not visual: <reason>` line
+	Verify      string `json:"verify,omitempty"`     // the requirement's `Verify:` method: verified without a test
 	Shows       bool   `json:"-"`                    // a THEN/AND line names a [data-testid] element
 	Text        string `json:"-"`                    // the name and the WHEN/THEN lines
 }
@@ -126,7 +127,7 @@ var removedRenamedRE = regexp.MustCompile(`(?i)^(REMOVED|RENAMED)\b`)
 func SpecScenarios(dir string) []*Scenario {
 	var out []*Scenario
 	for _, sf := range SpecFiles(dir) {
-		section, req := "", ""
+		section, req, verify := "", "", ""
 		var cur *Scenario
 		fence := byte(0)
 		for i, l := range lines(sf.File) {
@@ -149,7 +150,7 @@ func SpecScenarios(dir string) []*Scenario {
 				continue
 			}
 			if m := reqNameRE.FindStringSubmatch(l); m != nil {
-				req, cur = m[1], nil
+				req, verify, cur = m[1], "", nil
 				continue
 			}
 			if m := scenNameRE.FindStringSubmatch(l); m != nil {
@@ -157,8 +158,12 @@ func SpecScenarios(dir string) []*Scenario {
 					cur = nil
 					continue
 				}
-				cur = &Scenario{ID: sf.Cap + "/" + spec.Slug(m[1]), Capability: sf.Cap, Requirement: req, Name: m[1], File: sf.File, Line: i + 1, Text: m[1]}
+				cur = &Scenario{ID: sf.Cap + "/" + spec.Slug(m[1]), Capability: sf.Cap, Requirement: req, Name: m[1], File: sf.File, Line: i + 1, Text: m[1], Verify: verify}
 				out = append(out, cur)
+			} else if cur == nil && req != "" {
+				if m := VerifyRE.FindStringSubmatch(l); m != nil {
+					verify = VerifyMethod(m[1])
+				}
 			} else if cur != nil {
 				if m := notVisualRE.FindStringSubmatch(l); m != nil {
 					cur.NotVisual = m[1]

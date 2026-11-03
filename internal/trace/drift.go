@@ -277,9 +277,9 @@ func (c Ctx) Drift(pendingDir string, light bool) DriftReport {
 		switch {
 		case len(x.Code) == 0:
 			add(Gap{Type: "unanchored-requirement", Subject: k, Text: fmt.Sprintf("requirement %q has no code anchor", r.Name), Hint: "put `@spec " + k + "` on the code that implements it (the code may have lost its marker when moved); if the code is gone, rebuild it test-first or retire the requirement in a change; if it is knowingly unanchored: `wingman-spec drift decide unanchored-requirement:" + k + " --accept --note \"<why>\"`"})
-		case len(x.Tests) == 0:
+		case len(x.Tests) == 0 && r.Verified() == "":
 			cp, _, _ := strings.Cut(k, "/")
-			add(Gap{Type: "untested-requirement", Subject: k, Files: sortedKeys(x.Code), Text: fmt.Sprintf("requirement %q has code anchors but no test anchor (no test tagged for its scenarios, no @spec marker in a test)", r.Name), Hint: "tag a test `[" + cp + "/<scenario-slug>]` or put `@spec " + k + "` in it; if it is knowingly untested: `wingman-spec drift decide untested-requirement:" + k + " --accept --note \"<why>\"`"})
+			add(Gap{Type: "untested-requirement", Subject: k, Files: sortedKeys(x.Code), Text: fmt.Sprintf("requirement %q has code anchors but no test anchor (no test tagged for its scenarios, no @spec marker in a test)", r.Name), Hint: "tag a test `[" + cp + "/<scenario-slug>]` or put `@spec " + k + "` in it; if a test cannot prove it, say how it is verified with a `Verify: inspection|analysis|demonstration` line in a change; if it is knowingly untested: `wingman-spec drift decide untested-requirement:" + k + " --accept --note \"<why>\"`"})
 		}
 	}
 	seenOrphan := map[string]bool{}

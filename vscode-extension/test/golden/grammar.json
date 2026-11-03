@@ -8,6 +8,7 @@
           "name": "A",
           "op": "ADDED",
           "why": "The owner wants x, because y.",
+          "verify": null,
           "scenarios": [
             "One"
           ]
@@ -23,6 +24,7 @@
           "name": "B",
           "op": "LIVING",
           "why": null,
+          "verify": null,
           "scenarios": [
             "S"
           ]
@@ -31,6 +33,7 @@
           "name": "C",
           "op": "LIVING",
           "why": null,
+          "verify": null,
           "scenarios": [
             "T"
           ]
@@ -46,6 +49,7 @@
           "name": "Gone",
           "op": "REMOVED",
           "why": null,
+          "verify": null,
           "scenarios": []
         }
       ],
@@ -64,9 +68,35 @@
           "name": "M",
           "op": "MODIFIED",
           "why": null,
+          "verify": null,
           "scenarios": [
             "One",
             "Two"
+          ]
+        }
+      ],
+      "renames": []
+    },
+    {
+      "name": "verify",
+      "text": "## ADDED\n\n### Requirement: V\nThe manual SHALL list every flag.\nVerify: **Inspection** of the manual\n\n#### Scenario: Read\n\n### Requirement: W\nW SHALL x.\nVerify: test\n#### Scenario: S\n",
+      "reqs": [
+        {
+          "name": "V",
+          "op": "ADDED",
+          "why": null,
+          "verify": "inspection",
+          "scenarios": [
+            "Read"
+          ]
+        },
+        {
+          "name": "W",
+          "op": "ADDED",
+          "why": null,
+          "verify": null,
+          "scenarios": [
+            "S"
           ]
         }
       ],
@@ -80,6 +110,7 @@
           "name": "F",
           "op": "ADDED",
           "why": null,
+          "verify": null,
           "scenarios": [
             "Real"
           ]

@@ -28,19 +28,19 @@ test('test and UI file kinds match the CLI', () => {
 });
 
 interface Grammar {
-  specs: { name: string; text: string; reqs: { name: string; op: string; why: string | null; scenarios: string[] }[]; renames: [string, string][] }[];
+  specs: { name: string; text: string; reqs: { name: string; op: string; why: string | null; verify: string | null; scenarios: string[] }[]; renames: [string, string][] }[];
   markers: { file: string; text: string; markers: { key: string; line: number }[] }[];
   approvals: { text: string; approval: string }[];
   adrs: { file: string; text: string; none: boolean }[];
 }
 
-test('spec grammar: requirements, sections, scenarios, renames and Why read the same as the CLI', async () => {
+test('spec grammar: requirements, sections, scenarios, renames, Why and Verify read the same as the CLI', async () => {
   const { parseSpec } = await import('../src/model/specParser.ts');
-  const { whyOf } = await import('../src/model/requirementLines.ts');
+  const { verifyOf, whyOf } = await import('../src/model/requirementLines.ts');
   for (const c of golden<Grammar>('grammar.json').specs) {
     const ext = parseSpec(c.text);
     assert.deepEqual(
-      ext.requirements.map((r) => ({ name: r.name, op: r.section === 'BASE' ? 'LIVING' : r.section, why: whyOf(r.raw), scenarios: r.scenarios.map((s) => s.name) })),
+      ext.requirements.map((r) => ({ name: r.name, op: r.section === 'BASE' ? 'LIVING' : r.section, why: whyOf(r.raw), verify: verifyOf(r.raw), scenarios: r.scenarios.map((s) => s.name) })),
       c.reqs,
       c.name,
     );

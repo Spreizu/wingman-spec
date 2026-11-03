@@ -195,7 +195,7 @@ func (e *Env) Finish() error {
 	for _, s := range res.Missing {
 		untested = append(untested, s.ID)
 	}
-	o.check(O("check", "trace", "ok", len(untested) == 0, "scenarios", res.Total, "tagged", len(res.Covered), "visual", len(res.Visual), "untested", list(untested), "seconds", time.Since(tq0).Seconds()))
+	o.check(O("check", "trace", "ok", len(untested) == 0, "scenarios", res.Total, "tagged", len(res.Covered), "visual", len(res.Visual), "verified", len(res.Verified), "untested", list(untested), "seconds", time.Since(tq0).Seconds()))
 	if len(untested) > 0 {
 		o.fail(fmt.Sprintf("%d of %d scenarios have no tagged test: %s. Write (or tag) a test that proves each one. %s", len(untested), res.Total, bracket(untested), tagHelp))
 	}
@@ -407,7 +407,7 @@ func (e *Env) testEvidence(o *outcome, ran bool, out string, scens []*quality.Sc
 	}
 	var sc []anchors.EvidenceScenario
 	for _, s := range scens {
-		if !s.Visual && s.Requirement != "" {
+		if !s.Visual && s.Verify == "" && s.Requirement != "" {
 			sc = append(sc, anchors.EvidenceScenario{ID: s.ID, Requirement: s.Capability + "/" + spec.Slug(s.Requirement)})
 		}
 	}

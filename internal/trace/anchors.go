@@ -287,7 +287,7 @@ func (c Ctx) AnchorLint(changeDir string) LintResult {
 		if len(x.Code) == 0 {
 			noCode = append(noCode, k)
 		}
-		if len(x.Tests) == 0 {
+		if r, _ := eff.Get(k); len(x.Tests) == 0 && r.Verified() == "" {
 			noTest = append(noTest, k)
 		}
 	}
@@ -295,7 +295,7 @@ func (c Ctx) AnchorLint(changeDir string) LintResult {
 		P("error", "no-code-anchor", "requirement(s) without a code anchor: "+strings.Join(noCode, ", ")+". Add a comment `@spec <capability>/<requirement-slug>` next to the code that implements each (any comment syntax).")
 	}
 	if len(noTest) > 0 {
-		P("error", "no-test-anchor", "requirement(s) without a test anchor: "+strings.Join(noTest, ", ")+". Tag a test of one of its scenarios `[capability/scenario-slug]`, or put `@spec <capability>/<requirement-slug>` in a test file.")
+		P("error", "no-test-anchor", "requirement(s) without a test anchor: "+strings.Join(noTest, ", ")+". Tag a test of one of its scenarios `[capability/scenario-slug]`, or put `@spec <capability>/<requirement-slug>` in a test file (or, when no test can prove it, add `Verify: inspection|analysis|demonstration` to the requirement).")
 	}
 	for _, u := range facts.Unresolved {
 		P("error", "unresolved-marker", fmt.Sprintf("%s:%d: `@spec %s` does not resolve to a requirement (the slug is the requirement name lower-cased with dashes; run `wingman-spec anchors <change>` to list the valid ones)", u.File, u.Line, u.Key))

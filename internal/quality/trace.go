@@ -88,6 +88,22 @@ func TraceTags(files []string, root string) map[string][]string {
 	return tags
 }
 
+// VerifyRE is a requirement's `Verify: <method>` line (under its SHALL sentence, before the first scenario).
+var VerifyRE = regexp.MustCompile(`(?i)^\s*(?:[-*]\s*)?\**Verify\**:\s*(.*?)\s*$`)
+
+// VerifyMethods verify a requirement without a test: it is not "untested" in trace, drift and the anchor lint.
+var VerifyMethods = []string{"inspection", "analysis", "demonstration"}
+
+// VerifyMethod is the method a `Verify:` value names (its first word, lower-cased), or "" when it names none.
+func VerifyMethod(v string) string {
+	w, _, _ := strings.Cut(strings.ToLower(strings.TrimSpace(strings.NewReplacer("*", "", "`", "").Replace(v))), " ")
+	w = strings.TrimRight(w, ".,;:")
+	if slices.Contains(VerifyMethods, w) {
+		return w
+	}
+	return ""
+}
+
 // Covered is a scenario with the test files that tag it.
 type Covered struct {
 	ID string   `json:"id"`
@@ -96,21 +112,25 @@ type Covered struct {
 
 // TraceResult says which scenarios tests tag, which the visual check covers and which nothing covers.
 type TraceResult struct {
-	Total   int         `json:"total"`
-	Covered []Covered   `json:"covered"`
-	Visual  []string    `json:"visual"`
-	Missing []*Scenario `json:"missing"`
+	Total    int         `json:"total"`
+	Covered  []Covered   `json:"covered"`
+	Visual   []string    `json:"visual"`
+	Verified []string    `json:"verified"`
+	Missing  []*Scenario `json:"missing"`
 }
 
-// Trace matches scenarios with tags; visual scenarios count as covered when visualCovers.
+// Trace matches scenarios with tags; visual scenarios count as covered when visualCovers, and the scenarios of a
+// requirement with a `Verify:` method are verified without a test.
 func Trace(scenarios []*Scenario, tags map[string][]string, visualCovers bool) TraceResult {
-	r := TraceResult{Total: len(scenarios), Covered: []Covered{}, Visual: []string{}, Missing: []*Scenario{}}
+	r := TraceResult{Total: len(scenarios), Covered: []Covered{}, Visual: []string{}, Verified: []string{}, Missing: []*Scenario{}}
 	for _, s := range scenarios {
 		switch by, ok := tags[s.ID]; {
 		case ok:
 			r.Covered = append(r.Covered, Covered{s.ID, by})
 		case s.Visual && visualCovers:
 			r.Visual = append(r.Visual, s.ID)
+		case s.Verify != "":
+			r.Verified = append(r.Verified, s.ID)
 		default:
 			r.Missing = append(r.Missing, s)
 		}
