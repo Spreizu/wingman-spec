@@ -8,7 +8,7 @@ Explore an idea, requirement or problem before planning it, with the `wingman-gr
 
 **Input**: optional topic or change name after `/spec-explore`. If a change name is given (check `.wingman-spec/bin/wingman-spec list`), read its existing artifacts for context.
 
-This is a thinking mode. Do NOT write application code and do NOT create change artifacts here; that is `/spec-propose`.
+This is a thinking mode, and it works in the agent's plan mode (Claude Code, Cursor, Codex). Run only commands that read (`.wingman-spec/bin/wingman-spec config`, `list`, `design-system`, `git log`) and write no file: no code and no change artifacts (that is `/spec-propose`). The design map of step 2b is the one exception; in plan mode, where nothing can be written, put its full content in the chat instead.
 
 **Slug.** Use a kebab-case slug for the topic (the topic after `/spec-explore`, or ask for one). It names the design map (`explore-design/<slug>.md` in the specs root) and the change `/spec-propose <slug>` creates.
 
@@ -37,8 +37,9 @@ This is a thinking mode. Do NOT write application code and do NOT create change 
    - Capabilities identified (kebab-case) and a proposed first slice
    - With a design input: the design map path, how many regions map to tokens / components / framework / arbitrary, and the open Gaps
    - Anything deliberately deferred
-   Then offer: "Ready to plan? Run `/spec-propose <slug>`." That propose uses **this slug only**. Do not start planning without the user's confirmation.
+   - A draft of the proposal sections: Why, What Changes, Capabilities (new and modified), Impact, Edge cases
+   Then offer: "Ready to plan? Run `/spec-propose <slug>`; it picks up this exploration from the chat. In plan mode, switch to agent mode first." That propose uses **this slug only**. Do not start planning without the user's confirmation.
 
 **Guardrails**
 - Never guess product or architecture decisions; ask.
-- No code, no planning artifacts. The design map (`explore-design/<slug>.md`) is the exception.
+- No code, no planning artifacts. The design map (`explore-design/<slug>.md`) is the exception; in plan mode it stays in the chat.

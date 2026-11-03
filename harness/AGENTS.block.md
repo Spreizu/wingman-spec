@@ -14,7 +14,7 @@ In Codex they are skills: `$spec-apply <change>` instead of `/spec-apply <change
 
 | Command | What it does |
 |---------|--------------|
-| `/spec-explore [topic]` | Think and decide, driven by `wingman-grilling`. No code, no artifacts. |
+| `/spec-explore [topic]` | Think and decide, driven by `wingman-grilling`. No code, no artifacts; works in plan mode. |
 | `/spec-propose <change>` | Creates the change and its artifacts: proposal, specs, tasks, plus app-map, design and ADRs unless the change is on the fast path (Size S, `Risk: none`, no sensitive path, no UI). |
 | `/spec-apply <change>` | Test-first, one fresh `spec-implementer` subagent per dispatch (the change at Size S, a task group at M/L, parallel waves for tasks with separate files); `wingman-spec check` decides each one. |
 | `/spec-fix [change] [findings]` | Post-QA: classify findings (`code-bug` redo, `spec-mistake` amend, accepted deviation, `new-work`), confirm with the user, patch specs and tasks or open a follow-up change. Never writes `specs/` or `adrs/`. |

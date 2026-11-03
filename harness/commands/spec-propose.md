@@ -18,12 +18,12 @@ Confirm the kebab-case change name first; that name is also the exploration slug
    - Do this before planning: `/spec-apply` refuses to start while they are placeholders.
    Show doctor's `warnings` to the user, for example "Playwright not installed, so the visual check would be skipped".
 
-1. **Check readiness.** If product or architecture decisions are still open, run the `wingman-grilling` skill with the user first. Do not guess answers.
+1. **Check readiness.** If `/spec-explore` ran in this chat, take its decisions, proposal draft and any design map from the chat. If product or architecture decisions are still open, run the `wingman-grilling` skill with the user first. Do not guess answers.
 
 2. **Create the change.** Run `.wingman-spec/bin/wingman-spec new <name>`, then `.wingman-spec/bin/wingman-spec status <name>` to see the artifacts (`app-map, proposal, specs, design, adrs, tasks`).
    Then record the start in the timeline: `.wingman-spec/bin/wingman-spec log <name> start "<the request, one line>"`, and `log <name> grill "<questions asked and the answers, one line>"` (or `explore`) for what step 1 settled. The CLI records each artifact it sees written or rewritten, and every `validate`, `lint` and `size` run.
 
-2b. **Design map.** If `explore-design/<name>.md` exists in the specs root, move it to `changes/<name>/design-map.md`. If the request includes a design (image, prototype, export) and there is no map yet, build it now, before the app-map:
+2b. **Design map.** If `explore-design/<name>.md` exists in the specs root, move it to `changes/<name>/design-map.md`. A map that `/spec-explore` left in the chat (plan mode) is written there. If the request includes a design (image, prototype, export) and there is no map yet, build it now, before the app-map:
 
 {{> design-map}}
 

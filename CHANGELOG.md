@@ -26,6 +26,10 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
   timeout options, fallbacks for values the CLI always sends, its own url/port derivation the CLI already does) and shares
   one in-page visibility test between expects and `absent:` checks; the embedded bundle is a little smaller. What it
   checks, reports and prints is unchanged.
+- **Explore in plan mode.** `/spec-explore` works in the agent's plan mode (Claude Code, Cursor, Codex). It runs only
+  commands that read and writes no file except the design map, which stays in the chat in plan mode. It ends with the
+  decisions and a proposal draft and offers `/spec-propose <slug>`, telling you to switch to agent mode first when you
+  are in plan mode; `/spec-propose` picks the exploration up from the chat.
 - **Faster stale-anchor check.** The `git blame` runs behind the stale-anchor rule (`problems`, `drift`, and the
   extension's Problems refresh after opening) run up to 8 at a time instead of one after another. Without a blame cache,
   a project with 13,000 anchored files and 3,000 commits takes 41 s instead of 273 s, and one with 3,000 files takes

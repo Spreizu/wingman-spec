@@ -31,6 +31,8 @@ check "AGENTS.md has the managed block"   grep -q 'WINGMAN-SPEC:START' AGENTS.md
 for c in spec-propose spec-apply spec-sync spec-archive spec-fix spec-explore spec-adopt spec-garden spec-green-start spec-green-plan spec-green-next; do
   check "$c in Cursor, Claude Code and Codex" test -f ".cursor/commands/$c.md" -a -f ".claude/commands/$c.md" -a -f ".agents/skills/$c/SKILL.md"
 done
+check "spec-explore works in plan mode and ends by offering /spec-propose, after switching to agent mode" bash -c 'grep -q "works in the agent.s plan mode" .claude/commands/spec-explore.md && grep -q "it picks up this exploration from the chat. In plan mode, switch to agent mode first." .claude/commands/spec-explore.md'
+check_not "no separate plan-mode explore command" bash -c 'test -e .claude/commands/spec-explore-plan.md -o -e .agents/skills/spec-explore-plan -o -e .cursor/commands/spec-explore-plan.md'
 for a in spec-implementer spec-reviewer spec-visual-reviewer; do
   check "subagent $a for Cursor and Claude Code" test -f ".cursor/agents/$a.md" -a -f ".claude/agents/$a.md"
 done
