@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016 # expectations are single-quoted on purpose (run later by eval)
 # scripts/prose-lint.cjs: each rule fires on a seeded sentence and stays quiet on a clean one; code fences, tables,
-# YAML keys and quoted words are skipped; --strict fails only on a sentence above 60 words; the shipped prose has none.
+# YAML keys, quoted words and HTML-only lines are skipped (alt text is still linted); --strict fails only on a
+# sentence above 60 words; the shipped prose has none.
 # Usage: tests/prose-lint.sh   (needs node)
 set -uo pipefail
 PKG="$(cd "$(dirname "$0")/.." && pwd)"; L="node $PKG/scripts/prose-lint.cjs"
@@ -41,6 +42,8 @@ expect "a quoted word is a mention, not a use" 'grep -q "prose-lint: 0 warnings"
 
 { printf '| a | %s |\n|---|---|\n\n```\n%s.\n```\n' "$(w 70)" "$(w 70)"; printf -- '---\ndescription: "Short."\n---\nBody.\n'; } > "$T/skip.md"; lint "$T/skip.md"
 expect "table rows and code fences are skipped" 'grep -q "prose-lint: 0 warnings" "$T/o"'
+printf '<p align="center">\n  <img src="a.png" alt="Overview: four changes.">\n  <img src="b.png" alt="The next task.">\n</p>\n<p align="center">\n  <img src="c.png" alt="A %s end.">\n</p>\n' "$(w 63)" > "$T/html.md"; lint "$T/html.md"
+expect "HTML-only lines are skipped; a long alt is linted on its own" 'grep -q "html.md:6 sentence-hard: 65 words" "$T/o" && ! grep -q "html.md:[1-5] " "$T/o"'
 printf -- '---\nname: x\ndescription: "A %s end."\n---\nBody.\n' "$(w 48)" > "$T/fm.md"; lint "$T/fm.md"
 expect "front matter: only the description is prose, and it is linted on its own" 'grep -q "fm.md:3 sentence-long" "$T/o"'
 printf 'key: value\nlist:\n  - %s\nrule: x  # A short comment.\n' "'Rules are kept and linted, really.'" > "$T/c.yaml"; lint "$T/c.yaml"

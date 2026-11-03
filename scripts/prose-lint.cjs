@@ -5,7 +5,8 @@
 //   default    print one warning per sentence that breaks a limit, then a summary; exit 0
 //   --metrics  print sentence counts per area (sentences, mean words, 30+ and 45+ words, vague words, 2+ parentheses)
 //   --strict   exit 1 when a sentence has more than 60 words
-// Skips code fences, table rows and YAML keys. All skills/ SKILL.md files are linted.
+// Skips code fences, table rows, YAML keys and HTML-only lines (an image's alt text is still linted).
+// All skills/ SKILL.md files are linted.
 'use strict';
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
@@ -51,6 +52,12 @@ function units(text, yaml) {
       else if (/^\s*[\w.-]+:\s*(\||>-?)?\s*$/.test(l) || /^\s*[\w.-]+:\s+[^\s'"][^\s]*\s*$/.test(l)) { flush(); return; }
       l = l.replace(/^\s*-\s+'(.*)'\s*$/, '- $1').replace(/^\s*[\w.-]+:\s+(?=\S)/, ''); }
     if (/^\s*\|/.test(l) || /^\s*$/.test(l) || /^\s*#{1,6}\s/.test(l) || /^\s*<!--.*-->\s*$/.test(l) && !/\b(WHEN|THEN)\b|\s\w+\s\w+\s\w+\s/.test(l)) { flush(); if (/^\s*#{1,6}\s/.test(l)) out.push({ line: i + 1, t: l.replace(/^\s*#+\s*/, '') }); return; }
+    // A line of tags only (a screenshot gallery) is not a sentence. Alt text is prose, so it is linted on its own.
+    if (/<[^>]+>/.test(l) && l.replace(/<[^>]+>/g, '').trim() === '') {
+      flush();
+      for (const m of l.matchAll(/\balt="([^"]*)"/g)) if (m[1].trim()) out.push({ line: i + 1, t: m[1] });
+      return;
+    }
     const item = /^\s*([-*+]|\d+\.)\s+/.test(l);
     if (item || !cur) { flush(); cur = { line: i + 1, t: '' }; }
     cur.t += ' ' + l.replace(/^\s*([-*+]|\d+\.)\s+/, '').replace(/<!--|-->/g, ' ').trim();
