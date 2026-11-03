@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Spreizu/wingman-spec/internal/runstate"
+	"github.com/Spreizu/wingman-spec/internal/shell"
 )
 
 const (
@@ -81,11 +82,11 @@ func (e *Env) runCmd(cmd, dir string, limit int, label string) Result {
 	t0 := time.Now()
 	ctx, cancel := context.WithTimeout(e.Ctx, time.Duration(limit)*time.Second)
 	defer cancel()
-	c := exec.Command("sh", "-c", cmd)
+	c := shell.Command(ctx, cmd)
 	c.Dir = dir
 	// PWDEBUG makes Playwright open a headed browser with the inspector and wait: checks stay headless
 	c.Env = slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "PWDEBUG=") })
-	setGroup(c)
+	shell.SetGroup(c)
 	var out capture
 	c.Stdout, c.Stderr = &out, &out
 	if err := c.Start(); err != nil {
@@ -110,7 +111,7 @@ loop:
 			beat.Reset(15 * time.Second)
 		case <-ctx.Done():
 			timedOut = true
-			killGroup(c)
+			shell.KillGroup(c)
 			werr = <-done
 			break loop
 		}

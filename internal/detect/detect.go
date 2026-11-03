@@ -10,11 +10,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Spreizu/wingman-spec/internal/shell"
 )
 
 // Result is what was detected. Visual is "off" (no UI), "" (a UI that cannot be started automatically) or set
@@ -221,12 +222,7 @@ var missingRE = regexp.MustCompile(`No module named|command not found|could not 
 func Probe(dir, cmd string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	var c *exec.Cmd
-	if runtime.GOOS == "windows" {
-		c = exec.CommandContext(ctx, "cmd", "/C", cmd)
-	} else {
-		c = exec.CommandContext(ctx, "sh", "-c", cmd)
-	}
+	c := shell.Command(ctx, cmd)
 	c.Dir = dir
 	out, err := c.CombinedOutput()
 	if err == nil {
