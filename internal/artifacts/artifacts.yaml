@@ -10,7 +10,7 @@ artifacts:
       You are a senior analyst. Produce the map that places THIS change inside the WHOLE app,
       so that later changes stay consistent with each other.
 
-      If the user has not yet resolved the open decisions, stop and run the `grilling`
+      If the user has not yet resolved the open decisions, stop and run the `wingman-grilling`
       skill with them first. Do not guess answers to product or architecture questions.
 
       Sections (follow the template):
@@ -316,7 +316,7 @@ artifacts:
       - **Risks / Trade-offs**: `[Risk] → Mitigation`.
       - **Migration Plan**: if applicable.
       - **Open Questions**: only deferrable unknowns. If a question would change the specs,
-        the approach, or the task breakdown, resolve it now with the user (use `grilling`).
+        the approach, or the task breakdown, resolve it now with the user (use `wingman-grilling`).
 
       Do not restate the proposal or specs; point to them.
     requires:
@@ -442,23 +442,23 @@ apply:
 
     Per task, in this order:
     1. Pick the first unchecked `- [ ]` task. Do ONLY that task.
-    2. Use the `test-driven-development` skill: write the failing test named in `Test first:`,
+    2. Use the `wingman-test-driven-development` skill: write the failing test named in `Test first:`,
        run it and watch it fail for the right reason, write the minimal code to pass, then
        refactor with tests green. Tag each test title with the id of the scenario it proves
        (`[capability/scenario-slug]`) and test behaviour, not source text. Anchor the
        code: write a comment `@spec <capability>/<requirement-slug>` (any comment syntax) next to
        the code that implements each requirement of the task and in its test (the packet lists
-       the markers; where a marker goes: see `spec-implementer`); the verifier rejects a marker that does not resolve. Apply the `ponytail` skill (full): implement only what the
+       the markers; where a marker goes: see `spec-implementer`); the verifier rejects a marker that does not resolve. Apply the `wingman-ponytail` skill (full): implement only what the
        spec requires; skip unrequested options; name skipped extras in your reply.
     3. If anything fails unexpectedly, or a fix attempt fails twice, stop guessing and use the
-       `systematic-debugging` skill to find the root cause before changing more code.
-    4. For `Request code review` tasks, use the `requesting-code-review` skill with the
-       BASE_SHA and HEAD_SHA the prompt gives (never `git rev-parse HEAD~1`) and the `ponytail-review` skill (YAGNI/lean). Treat ponytail-review Must fix as Critical and
+       `wingman-systematic-debugging` skill to find the root cause before changing more code.
+    4. For `Request code review` tasks, use the `wingman-requesting-code-review` skill with the
+       BASE_SHA and HEAD_SHA the prompt gives (never `git rev-parse HEAD~1`) and the `wingman-ponytail-review` skill (YAGNI/lean). Treat ponytail-review Must fix as Critical and
        Should fix (including lean/yagni) as Important. Fix Critical/Important findings before
        checking the box. A review task may edit any file named in the change's tasks' `Files:`
        lines (the visual guard allows ARIA changes there), so fix in-change findings now
        instead of deferring them to `/spec-fix`.
-    5. Run the `Done when:` command, and use the `verification-before-completion` skill
+    5. Run the `Done when:` command, and use the `wingman-verification-before-completion` skill
        before claiming success. For a task with a `Visual:` line (or one that changes UI files),
        run `wingman-spec visual <change>` and fix every defect it lists,
        including failed `expect:` lines (match the mapped token or literal value; never edit the

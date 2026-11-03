@@ -27,10 +27,10 @@ You do not implement tasks yourself (except when no subagent can run); you dispa
    Then tell the user: "Run `/spec-archive <change>`; it gates, merges the specs and ADRs, and stops on a problem." Include the number of rejected attempts from the run's timeline.
 
 **Per-task discipline** (carried by the `spec-implementer` subagent):
-- every implementation task: `test-driven-development`, then `ponytail` (full, YAGNI);
-- an unexpected failure, or two failed fixes: `systematic-debugging`;
-- review tasks: `requesting-code-review` plus `ponytail-review`;
-- before a box is ticked: `verification-before-completion`.
+- every implementation task: `wingman-test-driven-development`, then `wingman-ponytail` (full, YAGNI);
+- an unexpected failure, or two failed fixes: `wingman-systematic-debugging`;
+- review tasks: `wingman-requesting-code-review` plus `wingman-ponytail-review`;
+- before a box is ticked: `wingman-verification-before-completion`.
 
 **Guardrails**
 - One prompt per subagent; several subagents at once only for the packets of one wave.

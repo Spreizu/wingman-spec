@@ -5,7 +5,7 @@
 //   default    print one warning per sentence that breaks a limit, then a summary; exit 0
 //   --metrics  print sentence counts per area (sentences, mean words, 30+ and 45+ words, vague words, 2+ parentheses)
 //   --strict   exit 1 when a sentence has more than 60 words
-// Skips code fences, table rows, YAML keys and the vendored skills (skills/VENDORED.md).
+// Skips code fences, table rows and YAML keys. All skills/ SKILL.md files are linted.
 'use strict';
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
@@ -31,9 +31,8 @@ function defaultFiles() {
   out.push('internal/artifacts/artifacts.yaml'); walk('internal/artifacts/templates', /\.md$/); walk('harness', /\.md$/);
   out.push('internal/scaffold/wingman-spec.yaml.tmpl', 'README.md');
   for (const f of fs.readdirSync(path.join(ROOT, 'docs'))) if (f.endsWith('.md')) out.push('docs/' + f);
-  const vendored = fs.readFileSync(path.join(ROOT, 'skills/VENDORED.md'), 'utf8');
   for (const s of fs.readdirSync(path.join(ROOT, 'skills'), { withFileTypes: true }))
-    if (s.isDirectory() && !vendored.includes('`' + s.name + '`') && fs.existsSync(path.join(ROOT, 'skills', s.name, 'SKILL.md'))) out.push(`skills/${s.name}/SKILL.md`);
+    if (s.isDirectory() && fs.existsSync(path.join(ROOT, 'skills', s.name, 'SKILL.md'))) out.push(`skills/${s.name}/SKILL.md`);
   return out;
 }
 // Text units (paragraphs and list items) with their first line number; code fences, tables and YAML keys removed.

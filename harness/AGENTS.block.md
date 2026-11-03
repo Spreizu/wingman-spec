@@ -5,8 +5,8 @@ This project plans and verifies its work with Wingman Spec. The CLI is `.wingman
 binary); the settings are in `.wingman-spec/wingman-spec.yaml`. Managed block: `wingman-spec update` rewrites it; do not edit it by hand.
 
 Bundled skills (`.cursor/skills/`, `.claude/skills/` or `.agents/skills/`; invoke by name, follow the inline fallback if one is
-missing): `grilling`, `spec-writing`, `test-driven-development`, `ponytail`, `systematic-debugging`, `requesting-code-review`,
-`ponytail-review`, `verification-before-completion`, and `figma-to-code` (a Figma URL as design source).
+missing): `wingman-grilling`, `spec-writing`, `wingman-test-driven-development`, `wingman-ponytail`, `wingman-systematic-debugging`, `wingman-requesting-code-review`,
+`wingman-ponytail-review`, `wingman-verification-before-completion`, and `figma-to-code` (a Figma URL as design source).
 
 ### Commands
 
@@ -14,7 +14,7 @@ In Codex they are skills: `$spec-apply <change>` instead of `/spec-apply <change
 
 | Command | What it does |
 |---------|--------------|
-| `/spec-explore [topic]` | Think and decide, driven by `grilling`. No code, no artifacts. |
+| `/spec-explore [topic]` | Think and decide, driven by `wingman-grilling`. No code, no artifacts. |
 | `/spec-propose <change>` | Creates the change and its artifacts: proposal, specs, tasks, plus app-map, design and ADRs unless the change is on the fast path (Size S, `Risk: none`, no sensitive path, no UI). |
 | `/spec-apply <change>` | Test-first, one fresh `spec-implementer` subagent per dispatch (the change at Size S, a task group at M/L, parallel waves for tasks with separate files); `wingman-spec check` decides each one. |
 | `/spec-fix [change] [findings]` | Post-QA: classify findings (`code-bug` redo, `spec-mistake` amend, accepted deviation, `new-work`), confirm with the user, patch specs and tasks or open a follow-up change. Never writes `specs/` or `adrs/`. |
@@ -46,11 +46,11 @@ In Codex they are skills: `$spec-apply <change>` instead of `/spec-apply <change
 
 ### Per task: test-first, smallest change, verified
 
-- `test-driven-development`: a failing test from `Test first:`, then minimal code.
-- `ponytail` (full): name skipped extras, do not question the spec.
-- `systematic-debugging` on an unexpected failure or after two failed fixes.
-- `verification-before-completion`: run `Done when:` and read its output.
-- A `Request code review` task: reviewer subagent (`requesting-code-review`), then `ponytail-review`. **Must fix** is Critical, **Should fix** Important; fix both before ticking.
+- `wingman-test-driven-development`: a failing test from `Test first:`, then minimal code.
+- `wingman-ponytail` (full): name skipped extras, do not question the spec.
+- `wingman-systematic-debugging` on an unexpected failure or after two failed fixes.
+- `wingman-verification-before-completion`: run `Done when:` and read its output.
+- A `Request code review` task: reviewer subagent (`wingman-requesting-code-review`), then `wingman-ponytail-review`. **Must fix** is Critical, **Should fix** Important; fix both before ticking.
 
 `spec-implementer` has the detail.
 

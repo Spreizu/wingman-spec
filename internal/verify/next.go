@@ -537,7 +537,7 @@ func (e *Env) packetPrompt(changeDir string, st *State, batch []PacketTask, read
 		add("This change implements a design: build the UI with exactly what design-map.md names (project tokens, then components and their variants, framework defaults only where it says so). No new hex colours, px values or arbitrary classes (`p-[13px]`) unless the map lists them under Gaps; the verifier rejects hard-coded values that equal a project token, and the visual check measures its `expect:` lines.")
 	}
 	if r, ok := rr.(*runstate.Range); ok {
-		add(fmt.Sprintf("Code review range for the requesting-code-review skill: BASE_SHA=%s HEAD_SHA=%s. HEAD_SHA is a snapshot of the working tree with every uncommitted and untracked file; `git diff BASE_SHA HEAD_SHA` is the whole change. Use these two values; do not run git rev-parse or git merge-base for the range.", r.Base, r.Head))
+		add(fmt.Sprintf("Code review range for the wingman-requesting-code-review skill: BASE_SHA=%s HEAD_SHA=%s. HEAD_SHA is a snapshot of the working tree with every uncommitted and untracked file; `git diff BASE_SHA HEAD_SHA` is the whole change. Use these two values; do not run git rev-parse or git merge-base for the range.", r.Base, r.Head))
 	}
 	for _, w := range warnings {
 		add("WARNING: " + w)

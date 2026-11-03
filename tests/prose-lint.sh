@@ -65,8 +65,7 @@ expect "vague THEN/AND lines are info findings with the fix; quoted values, numb
 lint --strict
 expect "the shipped prose has no sentence above 60 words" '[ $rc = 0 ]'
 lint
-expect "the default file set skips the vendored skills" '! grep -q "skills/\(grilling\|ponytail\|test-driven-development\|systematic-debugging\|requesting-code-review\|verification-before-completion\)/" "$T/o"'
-expect "the default file set includes the first-party skills" 'grep -q "in [0-9]* files" "$T/o" && node -e "process.exit(require(\"$PKG/scripts/prose-lint.cjs\").defaultFiles().some((f)=>f.includes(\"spec-writing\"))?0:1)"'
+expect "the default file set includes every skill SKILL.md" 'grep -q "in [0-9]* files" "$T/o" && node -e "const d=require(\"$PKG/scripts/prose-lint.cjs\").defaultFiles(); process.exit([\"spec-writing\",\"wingman-grilling\",\"wingman-ponytail\",\"wingman-test-driven-development\"].every((n)=>d.some((f)=>f.includes(n)))?0:1)"'
 
 echo; echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" = 0 ]

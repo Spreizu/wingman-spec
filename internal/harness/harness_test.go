@@ -11,12 +11,11 @@ import (
 )
 
 var src = fstest.MapFS{
-	"commands/spec-a.md":        {Data: []byte("---\ndescription: \"Do a\"\nargument-hint: \"<x>\"\n---\nRun /spec-b next.\n{{> p}}\n")},
-	"agents/spec-r.md":          {Data: []byte("---\nname: spec-r\ndescription: \"Reads; see /spec-a\"\nreadonly: true\n---\nRead only.\n")},
-	"partials/p.md":             {Data: []byte("partial line\n")},
-	"AGENTS.block.md":           {Data: []byte(BlockStart + "\nblock\n" + BlockEnd + "\n")},
-	"skills/s/SKILL.md":         {Data: []byte("skill\n")},
-	"skills/s/test-academic.md": {Data: []byte("x")},
+	"commands/spec-a.md": {Data: []byte("---\ndescription: \"Do a\"\nargument-hint: \"<x>\"\n---\nRun /spec-b next.\n{{> p}}\n")},
+	"agents/spec-r.md":   {Data: []byte("---\nname: spec-r\ndescription: \"Reads; see /spec-a\"\nreadonly: true\n---\nRead only.\n")},
+	"partials/p.md":      {Data: []byte("partial line\n")},
+	"AGENTS.block.md":    {Data: []byte(BlockStart + "\nblock\n" + BlockEnd + "\n")},
+	"skills/s/SKILL.md":  {Data: []byte("skill\n")},
 }
 
 func TestRender(t *testing.T) {
@@ -126,8 +125,8 @@ func TestInstall(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(d, ".cursor/skills/s/test-academic.md")); err == nil {
-		t.Error("authoring-only skill file installed")
+	if _, err := os.Stat(filepath.Join(d, ".cursor/skills/s/SKILL.md")); err != nil {
+		t.Error("bundled skill was not installed")
 	}
 	if b, _ := os.ReadFile(filepath.Join(d, "CLAUDE.md")); string(b) != "@AGENTS.md\n" {
 		t.Errorf("CLAUDE.md %q", b)
@@ -234,5 +233,29 @@ func TestInstallLeavesHookFilesAlone(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(d, ".codex/hooks.json")); err == nil {
 		t.Error("init wrote .codex/hooks.json")
+	}
+}
+
+func TestInstallRemovesOldUnprefixedSkills(t *testing.T) {
+	d := t.TempDir()
+	ours := filepath.Join(d, ".cursor/skills/ponytail/SKILL.md")
+	theirs := filepath.Join(d, ".cursor/skills/test-driven-development/SKILL.md")
+	if err := writeFile(ours, []byte("Loaded by spec-implementer for every implementation task.\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFile(theirs, []byte("Use TDD. Write a failing test first.\n")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Install(d, src, fsSub(src, "skills"), Options{Harnesses: []string{"cursor"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Dir(ours)); err == nil {
+		t.Error("bundled unprefixed ponytail was kept")
+	}
+	if _, err := os.Stat(theirs); err != nil {
+		t.Error("user's own test-driven-development was removed")
+	}
+	if _, err := os.Stat(filepath.Join(d, ".cursor/skills/s/SKILL.md")); err != nil {
+		t.Error("bundled skill was not installed")
 	}
 }

@@ -16,7 +16,7 @@ This command is the approved path to edit specs after apply. `/spec-apply` and i
 
    **UI findings** ("looks broken on my phone", "the drawer covers the header"): reproduce them first with `.wingman-spec/bin/wingman-spec visual <change>` (or `--scenario <id>`). It opens the scenarios and lists DOM, accessibility and runtime defects. With screenshots on, it also saves clip images of the key elements. Name the scenario, state and viewport in the finding. A UI problem that no visual scenario covers is a **spec-mistake** too: add the missing ```` ```visual ```` block (or the missing key element, state or viewport), so the check catches it from now on.
 
-2. **Classify each finding.** Use a short round of the `grilling` skill, not a full `/spec-explore`. For every finding, recommend one class and wait for the user to confirm before writing anything.
+2. **Classify each finding.** Use a short round of the `wingman-grilling` skill, not a full `/spec-explore`. For every finding, recommend one class and wait for the user to confirm before writing anything.
    Every finding ends in one of the outcomes `/spec-garden` uses for drift:
    - **redo**: the spec is right; fix the implementation.
    - **amend**: the requirement was wrong; change it.

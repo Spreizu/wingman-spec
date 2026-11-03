@@ -69,13 +69,13 @@ for (const s of skills) {
   for (const [name, text] of Object.entries({ 'docs/reference.md': docRef, 'figma-sources.md': read('skills/figma-to-code/references/figma-sources.md') }))
     if (!text.includes('https://mcp.figma.com/mcp')) problems.push(`${name} lacks the Figma MCP URL`);
   for (const t of ['claude mcp add', 'codex mcp add figma', 'mcp.json']) if (!docRef.includes(t)) problems.push(`docs/reference.md lacks the Figma MCP setup for ${t}`);
-  if (/figma-to-code/.test(read('skills/VENDORED.md'))) problems.push('figma-to-code is first party: it must not be listed in skills/VENDORED.md');
+  if (fs.existsSync(path.join(pkg, 'skills/VENDORED.md')) || fs.existsSync(path.join(pkg, 'skills/vendor.lock'))) problems.push('vendored skill lock files must not exist; skills are first-party');
 }
 // spec-writing (first-party skill): loaded by the proposal instructions and /spec-propose; not vendored; passes the prose lint.
 { const sk = read('skills/spec-writing/SKILL.md');
   if (!/^name: spec-writing$/m.test(sk)) problems.push('skills/spec-writing/SKILL.md: name is not spec-writing');
   for (const f of ['internal/artifacts/artifacts.yaml', 'harness/commands/spec-propose.md']) if (!read(f).includes('`spec-writing` skill')) problems.push(`${f} does not load the spec-writing skill`);
-  if (/spec-writing/.test(read('skills/VENDORED.md') + read('skills/vendor.lock'))) problems.push('spec-writing is first party: it must not be listed in skills/VENDORED.md or vendor.lock');
+  if (!fs.existsSync(path.join(pkg, 'skills/NOTICE.md'))) problems.push('skills/NOTICE.md (upstream MIT credit) is missing');
   const PL = require(path.join(pkg, 'scripts/prose-lint.cjs')); const w = PL.lintFile('skills/spec-writing/SKILL.md', sk).findings;
   if (w.length) problems.push(`skills/spec-writing/SKILL.md breaks its own rules: ${w.map((x) => x.rule).join(', ')}`);
   // The shipped prose: warnings are advisory (node scripts/prose-lint.cjs lists them); a sentence above 60 words is drift.

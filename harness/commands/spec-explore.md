@@ -1,8 +1,8 @@
 ---
-description: "Explore an idea or problem with the grilling skill before planning a wingman-spec change."
+description: "Explore an idea or problem with the wingman-grilling skill before planning a wingman-spec change."
 argument-hint: "[topic]"
 ---
-Explore an idea, requirement or problem before planning it, with the `grilling` skill driving the conversation.
+Explore an idea, requirement or problem before planning it, with the `wingman-grilling` skill driving the conversation.
 
 {{> specs-root}}
 
@@ -16,7 +16,7 @@ This is a thinking mode. Do NOT write application code and do NOT create change 
 
 1. **Load context.** Read the project context (`.wingman-spec/bin/wingman-spec config`, its `context:`), skim `specs/` for existing capabilities, and, if exploring an existing change, its artifacts. If the project has no app-map yet (no earlier change contains one), note that the first planning pass should map the whole app.
 
-2. **Grill.** Invoke the `grilling` skill by name and work it with the user:
+2. **Grill.** Invoke the `wingman-grilling` skill by name and work it with the user:
    - Build the design tree; ask each round's whole frontier of open decisions, each with your recommended answer.
    - Answer from the repo first: before each question, look for the answer in the code, specs, docs, config and git log, and state what you found (file, line) instead of asking. Ask only what the repo cannot answer: a decision, a priority, an external fact.
    - Cover, as relevant: product goal and users, capability boundaries, build order (thin vertical slices), data and integration constraints, cross-cutting concerns, which decisions deserve an ADR, and what "done" means for junior developers to test.

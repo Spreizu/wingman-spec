@@ -18,7 +18,7 @@ Confirm the kebab-case change name first; that name is also the exploration slug
    - Do this before planning: `/spec-apply` refuses to start while they are placeholders.
    Show doctor's `warnings` to the user, for example "Playwright not installed, so the visual check would be skipped".
 
-1. **Check readiness.** If product or architecture decisions are still open, run the `grilling` skill with the user first. Do not guess answers.
+1. **Check readiness.** If product or architecture decisions are still open, run the `wingman-grilling` skill with the user first. Do not guess answers.
 
 2. **Create the change.** Run `.wingman-spec/bin/wingman-spec new <name>`, then `.wingman-spec/bin/wingman-spec status <name>` to see the artifacts (`app-map, proposal, specs, design, adrs, tasks`).
    Then record the start in the timeline: `.wingman-spec/bin/wingman-spec log <name> start "<the request, one line>"`, and `log <name> grill "<questions asked and the answers, one line>"` (or `explore`) for what step 1 settled. The CLI records each artifact it sees written or rewritten, and every `validate`, `lint` and `size` run.
@@ -57,7 +57,7 @@ Confirm the kebab-case change name first; that name is also the exploration slug
 
 {{> ux-completeness}}
 
-4. **Ask only when it matters.** If a question would change the specs, the approach or the task breakdown, look for the answer in the repo first. Ask the user (use `grilling`) only when the repo cannot answer it. Decide wording choices yourself. Record each answer: `wingman-spec log <name> grill "<question> -> <answer>"`. Record an owner approval the same way: `log <name> approval "<what was approved>"`.
+4. **Ask only when it matters.** If a question would change the specs, the approach or the task breakdown, look for the answer in the repo first. Ask the user (use `wingman-grilling`) only when the repo cannot answer it. Decide wording choices yourself. Record each answer: `wingman-spec log <name> grill "<question> -> <answer>"`. Record an owner approval the same way: `log <name> approval "<what was approved>"`.
 
 5. **Validate.** Run `.wingman-spec/bin/wingman-spec lint <name> --text` and fix what it reports until it exits 0. Each line names the file, line and rule. A Size below what the specs need means raising the size and writing the full artifacts.
 

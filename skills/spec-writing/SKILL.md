@@ -20,7 +20,7 @@ A spec is read by an agent that does exactly what it says. Write so that every s
 7. State a rule once, where it belongs, and point to it elsewhere.
 8. A finding or error message ends with the action that fixes it.
 9. No filler or hedges: "really", "just", "simply", "in order to", "as needed", "where relevant", "properly",
-   "gracefully", "appropriate".
+   "gracefully", "appropriately", "as expected".
 10. Name a thing the same way every time.
 
 ## Before and after

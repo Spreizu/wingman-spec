@@ -44,11 +44,6 @@ const (
 
 var skillDirs = map[string]string{"cursor": ".cursor/skills", "claude": ".claude/skills", "codex": ".agents/skills"}
 
-// skipSkillFile reports the authoring-only files of a vendored skill (not instructions; not installed).
-func skipSkillFile(name string) bool {
-	return name == "CREATION-LOG.md" || name == "test-academic.md" || strings.HasPrefix(name, "test-pressure-") || name == "VENDORED.md" || name == "vendor.lock"
-}
-
 // Installed lists the harnesses whose generated files exist in dir.
 func Installed(dir string) []string {
 	var out []string
@@ -136,12 +131,23 @@ func Install(dir string, src, skills fs.FS, o Options) (*Result, error) {
 		if err != nil {
 			return nil, err
 		}
-		r.say("skills      -> %d bundled skills in %s", n, skillDirs[h])
+		dropped, err := pruneOldSkills(dir, skillDirs[h])
+		if err != nil {
+			return nil, err
+		}
+		extra := ""
+		if dropped > 0 {
+			extra = fmt.Sprintf(" (%d unprefixed copies removed)", dropped)
+		}
+		r.say("skills      -> %d bundled skills in %s%s", n, skillDirs[h], extra)
 		if h == "claude" {
 			if err := claudeImport(dir); err != nil {
 				return nil, err
 			}
 		}
+	}
+	if slices.Contains(o.Harnesses, "cursor") && len(o.Harnesses) > 1 {
+		r.say("note        -> Cursor also reads .claude/skills and .agents/skills; install only the harnesses you use if skills appear twice")
 	}
 	return r, nil
 }
@@ -225,7 +231,7 @@ func installSkills(dir string, skills fs.FS, destRoot string) (int, error) {
 			return n, err
 		}
 		err := fs.WalkDir(skills, e.Name(), func(p string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() || skipSkillFile(d.Name()) {
+			if err != nil || d.IsDir() {
 				return err
 			}
 			b, err := fs.ReadFile(skills, p)
@@ -244,6 +250,43 @@ func installSkills(dir string, skills fs.FS, destRoot string) (int, error) {
 		n++
 	}
 	return n, nil
+}
+
+// oldSkillFolders are the unprefixed names 0.12 copied into projects. update removes a folder
+// only when its SKILL.md still looks like the bundled copy, so a user's own ponytail stays.
+var oldSkillFolders = []string{
+	"test-driven-development",
+	"systematic-debugging",
+	"requesting-code-review",
+	"verification-before-completion",
+	"grilling",
+	"ponytail",
+	"ponytail-review",
+}
+
+func pruneOldSkills(dir, destRoot string) (int, error) {
+	n := 0
+	for _, name := range oldSkillFolders {
+		p := filepath.Join(dir, filepath.FromSlash(destRoot), name)
+		b, err := os.ReadFile(filepath.Join(p, "SKILL.md"))
+		if err != nil {
+			continue
+		}
+		if !ourBundledSkill(b) {
+			continue
+		}
+		if err := os.RemoveAll(p); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}
+
+func ourBundledSkill(b []byte) bool {
+	return bytes.Contains(b, []byte("Rewritten for wingman-spec")) ||
+		bytes.Contains(b, []byte("Loaded by spec-implementer")) ||
+		bytes.Contains(b, []byte("Loaded by /spec-explore"))
 }
 
 // WriteShim points .wingman-spec/bin/wingman-spec at exe: a symlink, or a .cmd file on Windows.
