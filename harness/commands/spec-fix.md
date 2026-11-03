@@ -37,7 +37,7 @@ This command is the approved path to edit specs after apply. `/spec-apply` and i
 
    Never write `specs/` or `adrs/` here; `/spec-archive` merges and promotes them.
 
-4. **Validate.** Run `.wingman-spec/bin/wingman-spec lint <name> --text` and fix what it reports in files this command wrote.
+4. **Validate.** Run `.wingman-spec/bin/wingman-spec lint <name> --fix --text` (it writes the `ID:` lines) and fix what it reports in files this command wrote.
 
 5. **Implement only new work.** If `tasks.md` has unchecked `- [ ]` items this command added, you are the **orchestrator**, exactly as in `/spec-apply`. Earlier tasks are already ticked, so `next` starts at the first new one. The loop ends with `finish`, as in `/spec-apply`. If an earlier finish ran out of attempts, delete the file its `exhausted` message names first.
 

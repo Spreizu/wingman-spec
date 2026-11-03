@@ -23,7 +23,7 @@ flowchart LR
 3. **Finish.** `wingman-spec finish` runs the full test suite and every declared scenario once more, and lists what blocks the archive.
 4. **Archive.** `/spec-archive` merges the delta specs into the living specs, promotes the ADRs and archives the change, once `wingman-spec archive`'s gate passes.
 
-`@spec` markers in code and tests anchor each requirement. `wingman-spec drift` lists requirements without code or tests and code that changed without its requirement.
+Each requirement is linked twice. **Trace** links specs to tests: a test tagged `[capability/scenario-slug]` proves a scenario, and `finish` records whether it passed. **Anchors** link specs to code: a `@spec <capability>/<requirement-slug>` (or `@spec <ID>`) comment marks the code that implements it. `wingman-spec drift` lists requirements without code or tests, tests that failed or went stale, and code that changed without its requirement ([reference](docs/reference.md#traceability-the-why-anchors-drift)).
 
 ## In the editor
 
@@ -47,7 +47,8 @@ The extension dashboard on a small billing project. `add-invoice-export` is in p
 - Fast by default. Each check runs only the task's targeted tests. Typecheck and lint run when a task group ends, the full suite at the review task and at finish.
 - Visual check for UI work: the app is opened in headless Chromium, and accessibility, layout and console defects fail the task.
 - ADRs for every significant decision, promoted to `adrs/` when the change is archived.
-- Traceability: each requirement's Why, code and test anchors, and drift reports.
+- Traceability: each requirement's Why, a stable ID (`ID: BILLING-7KQ3`) that survives renames, code and test anchors, the last test result per requirement, and drift reports. `next` rewrites markers when a requirement is renamed, and `lint` warns when two active changes change the same requirement.
+- `finish --affected` reruns only the tests of the requirements a change touches; the archive still needs a full `finish`.
 - A timeline of every build step and every plan change made during the build, with its reason.
 - Starts from any point: `/spec-green-start` for a new product, `/spec-adopt` for an existing codebase. Specs can live next to the code or in their own repository shared by 2 or more code repositories.
 - VS Code and Cursor extension: dashboard, tasks, specs, ADRs, history, timeline and requirement traceability in the editor. It bundles the CLI.

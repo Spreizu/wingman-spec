@@ -35,7 +35,7 @@ Open the dashboard from the **Wingman Spec** status bar item or with **Wingman S
 | Specs | Each capability's requirements and scenarios, with pending changes. |
 | History | Archived changes by month, each with its tasks, specs, ADRs and timeline. |
 | Roadmap | For a new product: slices in build order and the one that is next. |
-| Requirements & Traceability (Explorer) | Requirements with their Why and code and test anchors, pending changes, drift gaps. |
+| Requirements & Traceability (Explorer) | Requirements with their Why, code and test anchors, last test result ("2 tests passed", "failed", "stale"), pending changes, drift gaps. |
 | In the editor | Problems, CodeLens, hover and go-to-definition for spec files, tasks, ADRs and `@spec` markers in code. |
 
 Buttons with a prompt sign run the CLI here: Validate, Status, Sync and Archive on a change, Doctor on the Overview. A
@@ -53,6 +53,7 @@ workspace the CLI is not run.
 | Promote Change ADRs, Promote ADR | Copy change ADRs into the project ADR folder. |
 | Refresh, Refresh Problems | Read the files and CLI findings again. |
 | Run Tests for Requirement, Tag a Test with a Scenario, Accept Drift Gap | Act on one requirement or gap. |
+| Go to Requirement ID | Pick a requirement by its `ID:` (e.g. `BILLING-7KQ3`) and open it. |
 
 All commands start with **Wingman Spec:** in the Command Palette.
 

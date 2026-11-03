@@ -7,6 +7,8 @@ APPLY LOOP (the orchestrating agent drives it; a subagent implements; the CLI de
   check <change> --reported done|failed|blocked [--task <label>]   verify the dispatch and tick it on a pass
   review <change> --reply FILE | --reviewer none   record the spec-visual-reviewer's verdict after exit 5
   finish <change>                 after the last task: full commands, validate, every visual scenario, traceability, test evidence
+                                  (records each scenario's test result); --affected: only the tests of the requirements the change
+                                  touches (not enough for the archive gate)
   visual <change> [--scenario ID] the implementer's own visual check, any time
   progress <change> [--task ID] --note TEXT   the only writer of progress.md: [--status done|partial|blocked],
                                   --review-fix SLUG [--untestable WHY] (a review task), --reviewed-anchor CAP/REQ; a progress event
@@ -40,7 +42,9 @@ PLANNING (lint <change>, size <change>, validate <change>; no command runs)
   optional After: <label> (needs that task's result). Delta specs: ## ADDED / MODIFIED / REMOVED / RENAMED (`- Old -> New`).
 
 CHECKS AND ARCHIVE
-  lint <change> --text             every plan problem as file:line: severity: text (task IDs, Files:, After:, visual-reach, ...)
+  lint <change> --text             every plan problem as file:line: severity: text (task IDs, Files:, After:, visual-reach, ...);
+                                   --fix writes ID: lines, a missing Why: placeholder and a new capability's ## Purpose; overlap:
+                                   another active change changes the same requirement (the one archived later wins)
   trace [<change>] [--text]        scenarios without a [cap/slug] test tag; tags that name no scenario (test_files: extra globs)
   run-checks [<change>] [--only lint,typecheck,test,visual] [--text]   logs in runs/<change>/checks/, parsed failures
                                    (TAP, JUnit via commands.junit, node --test, vitest, jest, pytest, go, eslint, tsc), a checks timeline event
@@ -66,6 +70,8 @@ TRACEABILITY (traceability: on|warn|off)
   Every ADDED or MODIFIED requirement has `Why: <who wants it, and why>` under its SHALL sentence. Rewriting a living Why or removing a
   requirement needs `Owner approval: <name>, <date>` in proposal.md (lint fails until then; finish lists why_owner_approval).
   `@spec <capability>/<requirement-slug>` in one comment on the deciding function, and in the test (or a [capability/scenario-slug] tag).
+  `ID: <CAPABILITY>-XXXX` is written by lint --fix, never changes or is reused; `@spec <ID>` works like the slug (any case).
+  RENAMED: next rewrites the old key's markers. `Verify: inspection|analysis|demonstration` replaces a test that cannot exist.
   anchor_placement, anchor_guard, anchor_fit: warn|error|off; test_evidence: warn|strict|off; anchor_stale: info|warn|error|off.
   drift lists the gaps; `drift decide <key> --accept --note TEXT` (or --all <type>) writes an Accepted: line on the requirement.
   Adopted specs (Purpose says `Baseline: adopted <date>`): a requirement without Why: needs `Confirmed: test <file>: <name> | doc

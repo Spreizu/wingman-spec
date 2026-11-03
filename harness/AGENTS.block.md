@@ -80,7 +80,8 @@ requirement, or removing a requirement, needs `Owner approval: <name>, <date>` i
 Put `@spec <capability>/<requirement-slug>` in one comment on the function that decides the requirement's behaviour, once per code
 path. Never on an import, constant, type, string table or log line. Put it in the test that proves it too, or tag the test
 `[capability/scenario-slug]`. The CLI checks both. `/spec-garden` fixes or accepts each drift gap. Where a marker goes: the
-`spec-implementer` agent.
+`spec-implementer` agent. A requirement's `ID:` line is written by `lint --fix`; never edit or reuse one. `@spec <ID>` works
+like the slug and survives renames.
 
 Apply runs: pass `--session <id>` (one id per conversation) to every `wingman-spec` call. A run owned by another session or
 worktree is refused (`run-owned`), and so is a command already running on the change (`busy`). Never start a second run. Use

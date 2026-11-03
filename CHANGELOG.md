@@ -4,6 +4,9 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
 ## Unreleased
 
+- **Docs: trace and anchors.** The README and the reference explain the two links (trace: specs to tests; anchors:
+  specs to code) and document IDs, renames, `Verify:`, test results, overlap and `finish --affected`. `/spec-propose`,
+  `/spec-fix` and `/spec-garden` run `lint --fix` (it writes the `ID:` lines), and `/spec-garden` handles the new gaps.
 - **Stable requirement IDs.** A requirement may carry an `ID: <CAPABILITY>-XXXX` line (upper case, 4 random characters
   without 0, O, 1 or I). `lint --fix` gives each ADDED requirement a new one, restores the living ID on MODIFIED and
   REMOVED entries, and upper-cases a lower-case one; an ID never changes on a rename or move and is never reused (an

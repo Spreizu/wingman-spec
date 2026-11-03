@@ -35,13 +35,15 @@ Spec gardening. Specs and code drift apart: a requirement nobody implemented, co
 
 3. **Decide per gap.** Recommend one outcome with your reason. The user confirms before anything is written.
    - **fix the code or the test (redo)**: the requirement is right; the code or test is missing or wrong. Fix it test-first: add tasks to a new change (`garden-<YYYY-MM-DD>`, or the open change that owns it) and run `/spec-apply`. For a one-line fix use `/spec-fix`. Nothing is recorded; the gap disappears once the anchors exist.
-   - **amend the requirement**: the requirement is wrong, obsolete or renamed. Change the living spec through a change `garden-<YYYY-MM-DD>` with MODIFIED/REMOVED/RENAMED deltas, keep the `Why:` lines valid, then `/spec-archive` it. Never write `specs/` by hand. **An amendment that rewrites a requirement's Why or removes a requirement needs the owner's approval**: show the old and new wording, and add the `Owner approval:` line to the proposal only after they agree. Never remove a requirement on your own.
+   - **amend the requirement**: the requirement is wrong, obsolete or renamed. Change the living spec through a change `garden-<YYYY-MM-DD>` with MODIFIED/REMOVED/RENAMED deltas, keep the `Why:` lines valid, run `W lint <change> --fix --text`, then `/spec-archive` it. Never write `specs/` by hand. **An amendment that rewrites a requirement's Why or removes a requirement needs the owner's approval**: show the old and new wording, and add the `Owner approval:` line to the proposal only after they agree. Never remove a requirement on your own.
    - **accept**: only for `unanchored-requirement`, `untested-requirement` and `stale-anchor`, when the difference is fine. Examples: legacy code that predates anchors, a requirement implemented elsewhere or intentionally unanchored, a changed unit whose requirement still holds.
    Every other gap is fixed or removed, never accepted:
    - `orphan-anchor`, `stale-test-tag`: retarget or delete the marker or tag.
    - `misplaced-marker`: move or delete it. `over-anchored`: prune or move it.
    - `unsynced-archive`: re-add the requirement, or retire it with a REMOVED delta in a change.
    - `unconfirmed-requirement`: add `Confirmed:` or move it to `observed/`. `observed-incomplete`: complete the entry.
+   - `duplicate-id`: keep the ID on the requirement that had it first (`git log -S "ID: <id>"`). In the garden change, put the other under `## MODIFIED` without its `ID:` line and run `W lint <change> --fix`: it gets a new ID.
+   - `failing-test` and `stale-test-result` are advisory: they report the last recorded test run. Run `W finish <change>` (or the test suite through a change) to refresh them; a failing test is a **redo**.
 
 4. **Record an acceptance**: `W drift decide <gap-key> --accept --note "<why, one sentence>"`. The note is required. `W drift` lists the gap keys, e.g. `unanchored-requirement:todo/add-a-todo`.
    - It writes one line, `Accepted: <why>`, on the requirement in `specs/<capability>.md`, below its `Confirmed:` line and above its first scenario. Nothing else changes, and a repeated call changes nothing. Commit the spec.
