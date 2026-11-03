@@ -3,7 +3,8 @@
 # visual.changed_only (a visual run that passed is not repeated while the app files, scenarios, limits and pre-task capture are the same;
 # a changed test or Markdown file does not matter, a changed page does) and visual.scope: task (a task is checked against its own
 # scenarios; the change's other scenarios and the specs it does not change are checked at `finish`, against HEAD), and the warm
-# helper (the next visual run is served by it with the same report; WINGMAN_SPEC_VISUAL_WARM=off; a stopped helper).
+# helper (the next visual run is served by it with the same report; WINGMAN_SPEC_VISUAL_WARM=off; a stopped helper; its code root
+# deleted mid-run: it ends within 10 s with its Chromium and app server).
 # Needs the wingman-spec binary (tests/lib/ws.sh) and node; Playwright + axe-core (PLAYWRIGHT_NODE_MODULES) for the browser part. Usage: tests/visual-cache.sh
 set -uo pipefail
 PKG="$(cd "$(dirname "$0")/.." && pwd)"
@@ -123,12 +124,26 @@ JS
   WINGMAN_SPEC_NO_CACHE=1 vrun visual demo
   expect "a stopped helper: the run still passes on its own" '[ $rc = 0 ] && [ -z "$(warm)" ]'
 
+  echo "== the warm helper stops when its code root is deleted, also in the middle of a run"
+  cp -a "$(pwd -P)" "$T/gone"; G="$(cd "$T/gone" && pwd -P)"; hp() { pgrep -f "^wingman-visual-warm $G\$"; }
+  ( cd "$G" && WINGMAN_SPEC_NO_CACHE=1 $V visual demo >/dev/null 2>&1 ); for _ in $(seq 50); do [ -n "$(hp)" ] && break; sleep 0.1; done
+  sed -i -e 's/^  command: .*/  command: sleep 297/' -e 's/^  ready_timeout: 20$/  ready_timeout: 200/' "$G/$WCFG"
+  ( cd "$G" && WINGMAN_SPEC_NO_CACHE=1 $V visual demo > "$T/g.out" 2>&1; echo $? > "$T/g.rc" ) &
+  for _ in $(seq 100); do AP="$(pgrep -fx 'sleep 297')"; [ -n "$AP" ] && break; sleep 0.1; done
+  HP="$(hp)"; CH="$(pgrep -P "$HP" | tr '\n' ' ')"; APP="$(ps -o ppid= -p "$AP" 2>/dev/null | tr -d ' ')"
+  expect "a run waits for its app server in the warm helper (setup)" '[ -n "$HP" ] && [ -n "$AP" ] && [ -n "$CH" ] && { [ "$APP" = "$HP" ] || [ "$(ps -o ppid= -p "$APP" | tr -d " ")" = "$HP" ]; }'
+  rm -rf "$G"; s0=$(date +%s); for _ in $(seq 250); do kill -0 "$HP" 2>/dev/null || break; sleep 0.1; done; gone=$(( $(date +%s) - s0 )); wait
+  left() { local p; for p in $HP $CH $AP; do kill -0 "$p" 2>/dev/null && echo "$p"; done; }
+  expect "the code root deleted mid-run: the helper ends within 10 s, with its Chromium and app server" '[ -z "$(left)" ] && [ "$gone" -le 12 ]'
+  expect "and the run fails, naming the deleted code root" '[ "$(cat "$T/g.rc")" != 0 ] && grep -q "is gone" "$T/g.out"'
+  kill $(left) 2>/dev/null || true
+
   echo "== a release binary: the helper embedded in the CLI"
   mkdir -p "$T/rel/bin"; cp "$WS" "$T/rel/bin/wingman-spec"; rm -rf .wingman-spec/bin
   rc=0; env -u WINGMAN_VISUAL WINGMAN_SPEC_NO_CACHE=1 "$T/rel/bin/wingman-spec" visual demo > "$T/v.json" 2> "$T/v.err" || rc=$?
   expect "without WINGMAN_VISUAL or a source checkout, visual runs the embedded helper, written to .wingman-spec/bin" '[ $rc = 0 ] && [ -s .wingman-spec/bin/wingman-visual.mjs ] && grep -q "grid-shown" "$T/v.json"'
   expect "the written helper is gitignored" '[ -z "$(git status --porcelain .wingman-spec/bin)" ]'
-  pkill -f "wingman-visual.* $(pwd -P)\$" 2>/dev/null || true  # the warm helpers of this test, started or starting (they also stop 30 s after its folder is gone)
+  pkill -f "wingman-visual.* $(pwd -P)( |\$)" 2>/dev/null || true  # the warm helpers of this test, started or starting (a starting one ends in an empty argument; they also stop 10 s after its folder is gone)
   rm -rf "$WTMP"
 else
   echo "  skip: no Playwright+axe-core in $PWM (set PLAYWRIGHT_NODE_MODULES); the browser part of visual-cache is not tested"

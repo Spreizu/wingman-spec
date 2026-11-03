@@ -16,7 +16,8 @@
  * Warm helper: after a capture or run, this helper starts `node wingman-visual.cjs --warm` for the code root, detached. It keeps
  * Playwright loaded and one headless Chromium running, listens on a socket in a private temp folder, and takes the next capture
  * or run (with the caller's environment and directory), one at a time, each state still in a fresh browser context. It exits
- * after WINGMAN_SPEC_VISUAL_WARM seconds idle (default 300; `off`: none is started), when the code root is gone, this file or
+ * after WINGMAN_SPEC_VISUAL_WARM seconds idle (default 300; `off`: none is started), within 10 s of its code root being deleted
+ * (a job running there then fails, and its app server and Chromium stop with the helper), when this file or
  * Playwright changed, or a third code root needs the room. Busy, missing, stale or stopped mid-job: the job runs here as
  * before. Not on Windows.
  */
@@ -204,10 +205,13 @@ async function serveWarm(sock, codeRoot, browsersPath) {
     if (e.code !== 'EADDRINUSE' || (await new Promise((r) => { const c = net.connect(sock, () => { c.destroy(); r(true); }); c.on('error', () => r(false)); }))) return;
     try { fs.unlinkSync(sock); await listen(); } catch (e2) { return; }
   }
-  const warm = {}; let busy = false; let idle = null; let pwStamp = null;
+  const warm = {}; let busy = false; let idle = null; let pwStamp = null; let caller = null;
   const stamp = (f) => { try { return fs.statSync(f).mtimeMs; } catch (e) { return null; } };
   const unlink = () => { srv.close(); try { fs.unlinkSync(sock); } catch (e) { /* gone */ } };
-  const stop = () => { unlink(); Promise.resolve(warm.browser && warm.browser.close()).catch(() => {}).finally(() => process.exit(0)); };
+  const stop = () => {  // a browser that does not close in 5 s is killed by Playwright's exit hook, as are app servers ('exit')
+    unlink(); setTimeout(() => process.exit(0), 5000);
+    Promise.resolve(warm.browser && warm.browser.close()).catch(() => {}).finally(() => process.exit(0));
+  };
   const idleMs = (Number(process.env.WINGMAN_SPEC_VISUAL_WARM) || 300) * 1000;
   const arm = () => { clearTimeout(idle); idle = setTimeout(stop, idleMs); };
   const ready = (async () => {
@@ -220,7 +224,12 @@ async function serveWarm(sock, codeRoot, browsersPath) {
   })().catch(() => null);
   arm();
   const self = stamp(__filename);
-  setInterval(() => { if (!busy && (!fs.existsSync(codeRoot) || stamp(__filename) !== self)) stop(); }, 30000).unref();  // code root gone, or wingman-spec updated
+  setInterval(() => {  // code root gone (mid-job too: that job cannot finish there), or wingman-spec updated (between jobs)
+    if (!fs.existsSync(codeRoot)) {
+      if (busy && caller) { busy = false; caller.end(JSON.stringify({ ok: false, error: `wingman-visual: the code root ${codeRoot} is gone` }) + '\n'); }
+      stop();
+    } else if (!busy && stamp(__filename) !== self) stop();
+  }, 10000).unref();
   srv.on('connection', (c) => {
     let buf = '';
     c.setEncoding('utf8'); c.on('error', () => {});
@@ -230,7 +239,7 @@ async function serveWarm(sock, codeRoot, browsersPath) {
       let m; try { m = JSON.parse(buf.slice(0, i)); } catch (e) { c.end('{}\n'); return; }
       if (busy) { c.end('{"busy":true}\n'); return; }
       if (m.job && m.job.quit) { c.end('{}\n'); stop(); return; }  // room for another code root's helper
-      busy = true; clearTimeout(idle);
+      busy = true; caller = c; clearTimeout(idle);
       c.on('close', () => { if (busy) { unlink(); process.exit(1); } });  // the caller was stopped mid-job, as a helper of its own would be
       const pw = await ready;
       if (!pw || warm.gone || stamp(pw.from) !== pwStamp) { busy = false; c.end('{}\n'); stop(); return; }  // no browser, or Playwright was reinstalled: a new helper
@@ -239,6 +248,7 @@ async function serveWarm(sock, codeRoot, browsersPath) {
       Object.assign(process.env, m.env);
       try { process.chdir(m.cwd); } catch (e) { /* stays */ }
       const a = await answer(m.job, warm);
+      if (!busy) return;  // given up: the code root is gone
       busy = false; c.end(JSON.stringify(a) + '\n');
       try { const now = new Date(); fs.utimesSync(sock, now, now); } catch (e) { /* the order of use only */ }
       if (warm.gone) stop(); else arm();

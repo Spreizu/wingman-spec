@@ -1983,6 +1983,7 @@ var require_wingman_visual = __commonJS({
       let busy = false;
       let idle = null;
       let pwStamp = null;
+      let caller = null;
       const stamp = (f) => {
         try {
           return fs.statSync(f).mtimeMs;
@@ -1999,6 +2000,7 @@ var require_wingman_visual = __commonJS({
       };
       const stop = () => {
         unlink();
+        setTimeout(() => process.exit(0), 5e3);
         Promise.resolve(warm.browser && warm.browser.close()).catch(() => {
         }).finally(() => process.exit(0));
       };
@@ -2023,8 +2025,14 @@ var require_wingman_visual = __commonJS({
       arm();
       const self = stamp(__filename);
       setInterval(() => {
-        if (!busy && (!fs.existsSync(codeRoot) || stamp(__filename) !== self)) stop();
-      }, 3e4).unref();
+        if (!fs.existsSync(codeRoot)) {
+          if (busy && caller) {
+            busy = false;
+            caller.end(JSON.stringify({ ok: false, error: `wingman-visual: the code root ${codeRoot} is gone` }) + "\n");
+          }
+          stop();
+        } else if (!busy && stamp(__filename) !== self) stop();
+      }, 1e4).unref();
       srv.on("connection", (c) => {
         let buf = "";
         c.setEncoding("utf8");
@@ -2052,6 +2060,7 @@ var require_wingman_visual = __commonJS({
             return;
           }
           busy = true;
+          caller = c;
           clearTimeout(idle);
           c.on("close", () => {
             if (busy) {
@@ -2074,6 +2083,7 @@ var require_wingman_visual = __commonJS({
           } catch (e) {
           }
           const a = await answer(m.job, warm);
+          if (!busy) return;
           busy = false;
           c.end(JSON.stringify(a) + "\n");
           try {
