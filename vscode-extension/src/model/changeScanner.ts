@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
-import { CONFIG, adrsDir, changesDir as changesOf, deltaSpec, livingSpec } from '../core/paths.ts';
+import { CONFIG, adrsDir, archiveDir, changesDir as changesOf, deltaSpec, livingSpec } from '../core/paths.ts';
 import { scanArchive } from './archiveScanner.ts';
 import { computeAdrSync, isSynced, noDecisionReason, parseRootAdr, parseSourceAdr } from './adrSync.ts';
 import { countTasks, parseTasks } from './tasksParser.ts';
@@ -176,18 +176,20 @@ async function scanChange(
 
 /** Scans one specs root (specs/, changes/, archive/, adrs/). */
 export async function scanProject(root: string): Promise<ProjectModel> {
+  const changesDir = changesOf(root);
+  const git = chrono.preloadGit([changesDir, archiveDir(root)]); // both git logs run while the files are read
   const adrDir = adrsDir(root);
   const adrs = await readRootAdrs(adrDir);
 
-  const changesDir = changesOf(root);
   const entries = await listDir(changesDir);
   const changes = await Promise.all(
     entries
       .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
       .map((e) => scanChange(root, e.name, join(changesDir, e.name), adrs)),
   );
-  const git = chrono.gitAdded(changesDir);
-  for (const c of changes) c.created = chrono.createdStamp(c.dir, git);
+  await git;
+  const added = chrono.gitAdded(changesDir);
+  for (const c of changes) c.created = chrono.createdStamp(c.dir, added);
   const ordered = chrono.sortByTime(changes, (c) => c.created ?? { at: '', ms: 0, source: 'none' }, (c) => c.name, true);
   changes.splice(0, changes.length, ...ordered);
   const archive = await scanArchive(root);

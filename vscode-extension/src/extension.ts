@@ -33,10 +33,10 @@ async function openFile(path: string, line?: number): Promise<void> {
 
 export function activate(context: vscode.ExtensionContext): void {
   const store = new ProjectStore();
-  const traceCache = new TraceCache(store);
+  const traceCache = new TraceCache(store, context.storageUri && { dir: context.storageUri.fsPath, version: String(context.extension.packageJSON.version) });
   const verifier = new VerifierClient(execRunner, join(context.extensionPath, 'bin'));
   const data = new PanelData(store, verifier);
-  const panel = new SpecPanel(store, () => traceCache.all(), data, vscode.Uri.joinPath(context.extensionUri, 'images', 'icon.png'));
+  const panel = new SpecPanel(store, () => traceCache.ready().then(() => traceCache.all()), data, vscode.Uri.joinPath(context.extensionUri, 'images', 'icon.png'));
   data.onReady = () => panel.refresh();
   const cliSetup = registerCliSetup(verifier, () => panel.refresh());
   panel.agentFiles = cliSetup.agentFiles;

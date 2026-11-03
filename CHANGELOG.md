@@ -16,6 +16,12 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 - **Branch Review removed.** The extension's Branch Review page, its `Open Branch Review` command, its node in the
   traceability tree and the settings `wingmanSpec.branchReviewBase` and `wingmanSpec.branchReviewGit` are gone, and the
   extension no longer runs git for it. `wingman-spec guard --base` and the other CLI commands are unchanged.
+- **Extension opens faster.** The first `@spec` scan of a folder runs in slices of a few milliseconds after the projects
+  load, and the Requirements view, CodeLens, diagnostics and the panel wait for it instead of the editor stalling (on a
+  10,000-file project the longest pause drops from about 220 ms to about 40 ms). The scan is kept in the workspace storage
+  and every entry is checked against its file's size and modification time, so a reopen reads only changed files and
+  the Requirements view appears about 40% sooner. The `git log` calls behind change and archive times run in parallel
+  without blocking. The views show the same content.
 - **Extension package.** The README screenshots load from GitHub instead of being packed into the vsix (about 1.1 MB
   smaller per platform), which also fixes the broken images on the Marketplace and Open VSX pages.
 

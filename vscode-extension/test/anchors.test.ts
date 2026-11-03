@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { forgetScan, isScannable, isTestPath, itemAt, markersIn, nearest, scanCode, slug, tagsIn } from '../src/model/anchors.ts';
+import { dumpScan, forgetScan, isScannable, isTestPath, itemAt, markersIn, nearest, scanCode, scanCodeAsync, seedScan, slug, tagsIn } from '../src/model/anchors.ts';
 
 test('slug matches the verifier rule', () => {
   assert.equal(slug('Add an Item!'), 'add-an-item');
@@ -98,5 +98,33 @@ test('scanCode patches listed paths into the cache', () => {
   put('src/b.ts', '// @spec billing/list\n');
   const patched = scanCode(dir, 20000, ['src/b.ts']).map((f) => f.file).sort();
   assert.deepEqual(patched, ['src/a.ts', 'src/b.ts']);
+  forgetScan(dir);
+});
+
+test('scanCodeAsync gives what scanCode gives, and a seeded cache is checked file by file, in walk order', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wsx-scan-async-'));
+  const put = (f: string, text: string): void => {
+    mkdirSync(dirname(join(dir, f)), { recursive: true });
+    writeFileSync(join(dir, f), text);
+    utimesSync(join(dir, f), 1000, 1000);
+  };
+  put('src/z.ts', '// @spec billing/add-item\n');
+  put('src/a.ts', '// @spec billing/list\n');
+  put('tests/a.test.ts', "it('x [billing/add-item]', () => {})\n");
+  forgetScan(dir);
+  const sync = scanCode(dir);
+  forgetScan(dir);
+  assert.deepEqual(await scanCodeAsync(dir), sync);
+
+  const dump = dumpScan(dir).reverse();
+  forgetScan(dir);
+  put('src/a.ts', '// @spec billing/remove\n'); // same mtime, other size: read again
+  const z = dump.find(([f]) => f === 'src/z.ts')?.[1];
+  if (z?.hit) z.hit.markers = []; // same size and mtime: the seeded entry is kept
+  seedScan(dir, dump);
+  const files = await scanCodeAsync(dir);
+  assert.deepEqual(files.map((f) => f.file), sync.map((f) => f.file));
+  assert.deepEqual(files.find((f) => f.file === 'src/a.ts')?.markers.map((m) => m.key), ['billing/remove']);
+  assert.deepEqual(files.find((f) => f.file === 'src/z.ts')?.markers, []);
   forgetScan(dir);
 });

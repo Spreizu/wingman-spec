@@ -36,8 +36,11 @@ class TraceProvider implements vscode.TreeDataProvider<TraceNode> {
   getTreeItem(node: TraceNode): vscode.TreeItem {
     return new Item(node, node.id !== 'requirements');
   }
-  getChildren(node?: TraceNode): TraceNode[] {
+  getChildren(node?: TraceNode): TraceNode[] | Promise<TraceNode[]> {
     if (node) return node.children;
+    return this.cache.ready().then(() => this.roots());
+  }
+  private roots(): TraceNode[] {
     const models = this.cache.all();
     if (models.length === 1 && models[0]) return buildTraceNodes(models[0]);
     return models.map((m) => ({

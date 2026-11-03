@@ -141,3 +141,26 @@ test('run tests without a trusted workspace does not start a terminal', async ()
   host.trusted = true;
   assert.equal(host.terminals.length, 0);
 });
+
+test('a store change scans a new code root off the event loop: no model until it lands, then the same model, kept for the next session', async () => {
+  const { mkdtempSync, readdirSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { forgetScan } = await import('../src/model/anchors.ts');
+  const saved = { dir: mkdtempSync(join(tmpdir(), 'wsx-saved-')), version: '1.2.3' };
+  for (const round of [1, 2]) {
+    forgetScan(dir);
+    const listeners: (() => void)[] = [];
+    const live = new TraceCache({ ...store, onDidChange: (l: () => void) => (listeners.push(l), new stub.Disposable()) } as never, saved);
+    let fired = 0;
+    live.onDidChange(() => fired++);
+    for (const l of listeners) l();
+    assert.deepEqual(live.all(), [], `round ${round}: nothing while the scan runs`);
+    assert.equal(live.forFile(join(dir, addSrc)), undefined);
+    await live.ready();
+    assert.ok(fired >= 2, 'fires again when the scan lands');
+    assert.deepEqual(live.all(), [buildTrace(dir, dir)]);
+    if (round === 1) await new Promise((done) => setTimeout(done, 2100)); // saved two seconds after the scan
+    assert.equal(readdirSync(saved.dir).length, 1);
+    live.dispose();
+  }
+});

@@ -1,8 +1,11 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve as resolvePath, sep } from 'node:path';
 import * as vscode from 'vscode';
 import { anchorProblems, resolve, reverseTitle } from '../model/anchorView.ts';
-import { isScannable, isTestFile, isTestPath, itemAt, markersIn, scanCode } from '../model/anchors.ts';
+import { dumpScan, isScannable, isTestFile, isTestPath, itemAt, markersIn, scanCode, scanCodeAsync, seedScan } from '../model/anchors.ts';
+import type { ScanDump, ScannedFile } from '../model/anchors.ts';
 import { HOVER_COMMANDS, hoverInsight, hoverUnresolved } from '../model/hoverText.ts';
 import { insightOf, lensText, lensTooltip, readTestCommand, unresolvedInfo, unresolvedLensText } from '../model/reqInsight.ts';
 import type { ReqInsight } from '../model/reqInsight.ts';
@@ -21,7 +24,11 @@ const inside = (root: string, file: string): boolean => {
   return r !== '' && !r.startsWith('..') && !isAbsolute(r);
 };
 
-/** The traceability model of each project, built lazily and rebuilt (debounced) when files or the store change. */
+/**
+ * The traceability model of each project, built lazily and rebuilt (debounced) when files or the store change.
+ * A code root seen for the first time is scanned in slices off the event loop; until then its project has no model
+ * (views wait on ready()) and onDidChange fires when it lands.
+ */
 export class TraceCache implements vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<void>();
   readonly onDidChange = this.emitter.event;
@@ -29,11 +36,22 @@ export class TraceCache implements vscode.Disposable {
   private timer: NodeJS.Timeout | undefined;
   private readonly subs: vscode.Disposable[];
   private readonly store: ProjectStore;
+  /** Code roots whose first scan is running, and finished first scans not yet built into a model. */
+  private readonly loading = new Map<string, Promise<void>>();
+  private readonly loaded = new Map<string, ScannedFile[]>();
+  private readonly known = new Set<string>();
 
-  constructor(store: ProjectStore) {
+  /** `saved`: where the code scan is kept between sessions (the workspace storage) and the version it must match. */
+  private readonly saved: { dir: string; version: string } | undefined;
+
+  constructor(store: ProjectStore, saved?: { dir: string; version: string }) {
     this.store = store;
+    this.saved = saved;
     this.subs = [
-      store.onDidChange(() => this.invalidate(0)),
+      store.onDidChange(() => {
+        this.load(store.projects.filter((p) => !p.error).map((p) => p.workspaceFolder));
+        this.invalidate(0);
+      }),
       vscode.workspace.onDidSaveTextDocument(() => this.invalidate(500)),
       vscode.workspace.onDidCreateFiles(() => this.invalidate(500)),
       vscode.workspace.onDidDeleteFiles(() => this.invalidate(500)),
@@ -92,7 +110,58 @@ export class TraceCache implements vscode.Disposable {
       this.emitter.fire();
     };
     if (delay === 0) run();
-    else this.timer = setTimeout(run, delay);
+    else
+      this.timer = setTimeout(() => {
+        this.loading.clear(); // files changed: build from a fresh walk
+        this.loaded.clear();
+        run();
+      }, delay);
+  }
+
+  /** Starts the first scan of code roots not seen before. */
+  load(roots: string[]): void {
+    for (const root of roots) {
+      if (this.known.has(root)) continue;
+      this.known.add(root);
+      const file = this.saved && join(this.saved.dir, `scan-${createHash('sha1').update(root).digest('hex').slice(0, 16)}.json`);
+      let before = '';
+      const job: Promise<void> = (file ? readFile(file, 'utf8') : Promise.reject(new Error('no storage')))
+        .then((text) => {
+          const saved = JSON.parse(text) as { version?: string; scan?: ScanDump };
+          if (saved.version === this.saved?.version && Array.isArray(saved.scan)) {
+            seedScan(root, saved.scan);
+            before = text;
+          }
+        })
+        .catch(() => undefined)
+        .then(() => scanCodeAsync(root))
+        .then((scan) => scan, () => undefined)
+        .then((scan) => {
+          if (this.loading.get(root) !== job) return; // a file changed meanwhile: the next build walks again
+          this.loading.delete(root);
+          if (scan) this.loaded.set(root, scan);
+          this.emitter.fire();
+          if (file && scan) setTimeout(() => void this.save(root, file, before), 2000).unref();
+        });
+      this.loading.set(root, job);
+    }
+  }
+
+  /** Keeps the code scan for the next session, when it changed. */
+  private async save(root: string, file: string, before: string): Promise<void> {
+    const text = JSON.stringify({ version: this.saved?.version, scan: dumpScan(root) });
+    if (text === before) return;
+    try {
+      await mkdir(join(file, '..'), { recursive: true });
+      await writeFile(file, text);
+    } catch {
+      // storage unavailable: the next session scans from scratch
+    }
+  }
+
+  /** Settles once no first scan is running. */
+  async ready(): Promise<void> {
+    while (this.loading.size) await Promise.all(this.loading.values());
   }
 
   /** Patch the code scan for these files, then rebuild models that use those code roots. */
@@ -107,6 +176,8 @@ export class TraceCache implements vscode.Disposable {
       }
       if (rels.length) {
         scanCode(p.workspaceFolder, 20000, rels);
+        this.loading.delete(p.workspaceFolder);
+        this.loaded.delete(p.workspaceFolder);
         roots.add(`${p.root}\n${p.workspaceFolder}`);
       }
     }
@@ -119,14 +190,16 @@ export class TraceCache implements vscode.Disposable {
 
   /** Models of all projects (one per specs root). */
   all(): TraceModel[] {
-    return this.store.projects.filter((p) => !p.error).map((p) => this.of(p.root, p.workspaceFolder));
+    return this.store.projects.filter((p) => !p.error && !this.loading.has(p.workspaceFolder)).map((p) => this.of(p.root, p.workspaceFolder));
   }
 
   private of(root: string, codeRoot: string): TraceModel {
     const k = `${root}\n${codeRoot}`;
     let m = this.models.get(k);
     if (!m) {
-      m = buildTrace(root, codeRoot);
+      const scan = this.loaded.get(codeRoot);
+      this.loaded.delete(codeRoot);
+      m = buildTrace(root, codeRoot, scan ? { scan } : {});
       this.models.set(k, m);
     }
     return m;
@@ -136,6 +209,7 @@ export class TraceCache implements vscode.Disposable {
   forFile(fsPath: string): { model: TraceModel; rel: string } | undefined {
     for (const p of this.store.projects) {
       if (p.error || !inside(p.workspaceFolder, fsPath)) continue;
+      if (this.loading.has(p.workspaceFolder)) return undefined;
       return { model: this.of(p.root, p.workspaceFolder), rel: relative(p.workspaceFolder, fsPath).split(sep).join('/') };
     }
     return undefined;

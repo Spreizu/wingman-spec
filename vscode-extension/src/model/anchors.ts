@@ -4,6 +4,7 @@
  * editor agrees with `wingman-spec anchors|drift`. Pure Node, no VS Code.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import type { Stats } from 'node:fs';
 import { join } from 'node:path';
 import placement from '../core/placement.ts';
 import quality from '../core/plan.ts';
@@ -103,27 +104,32 @@ export interface ScannedFile {
 type CacheEnt = { mtimeMs: number; size: number; hit?: ScannedFile };
 const scanCaches = new Map<string, Map<string, CacheEnt>>();
 
-function readOne(codeRoot: string, rel: string): CacheEnt | undefined {
+/** The cache entry of one file from its stat and (when small enough) its text. */
+function entryOf(rel: string, st: Stats, text: string | undefined): CacheEnt {
+  const base = { mtimeMs: st.mtimeMs, size: st.size };
+  if (text === undefined || text.includes('\0')) return base;
+  const markers = text.includes('@spec') ? markersIn(text) : [];
+  const tags = isTestFile(rel) ? tagsIn(text) : [];
+  return markers.length || tags.length ? { ...base, hit: { file: rel, test: isTestPath(rel), markers, tags } } : base;
+}
+
+const readable = (st: Stats): boolean => st.isFile() && st.size <= MAX_BYTES;
+
+function readOne(codeRoot: string, rel: string, known?: Stats): CacheEnt | undefined {
   const full = join(codeRoot, rel);
-  let st;
+  let st = known;
   try {
-    st = statSync(full);
+    st ??= statSync(full);
   } catch {
     return undefined;
   }
-  if (!st.isFile() || st.size > MAX_BYTES) return { mtimeMs: st.mtimeMs, size: st.size };
-  let text: string;
+  let text: string | undefined;
   try {
-    text = readFileSync(full, 'utf8');
+    if (readable(st)) text = readFileSync(full, 'utf8');
   } catch {
-    return { mtimeMs: st.mtimeMs, size: st.size };
+    text = undefined;
   }
-  if (text.includes('\0')) return { mtimeMs: st.mtimeMs, size: st.size };
-  const test = isTestPath(rel);
-  const markers = text.includes('@spec') ? markersIn(text) : [];
-  const tags = isTestFile(rel) ? tagsIn(text) : [];
-  const hit = markers.length || tags.length ? { file: rel, test, markers, tags } : undefined;
-  return { mtimeMs: st.mtimeMs, size: st.size, ...(hit ? { hit } : {}) };
+  return entryOf(rel, st, text);
 }
 
 /** Drop cached scan data (tests, or a deleted file). */
@@ -141,11 +147,7 @@ export function forgetScan(codeRoot?: string, rel?: string): void {
 
 /** Scans the code root for markers (every scannable file) and tags (test files). Bounded, no git needed. `only` patches those relative paths into the cache. */
 export function scanCode(codeRoot: string, maxFiles = 20000, only?: Iterable<string>): ScannedFile[] {
-  let cache = scanCaches.get(codeRoot);
-  if (!cache) {
-    cache = new Map();
-    scanCaches.set(codeRoot, cache);
-  }
+  const cache = cacheOf(codeRoot);
   if (only) {
     for (const raw of only) {
       const rel = raw.split('\\').join('/');
@@ -158,42 +160,99 @@ export function scanCode(codeRoot: string, maxFiles = 20000, only?: Iterable<str
       else cache.set(rel, ent);
     }
   } else {
-    const seenRel = new Set<string>();
-    let seen = 0;
-    const walk = (dir: string, rel: string): void => {
-      let entries: import('node:fs').Dirent[];
-      try {
-        entries = readdirSync(dir, { withFileTypes: true });
-      } catch {
-        return;
-      }
-      for (const e of entries) {
-        if (seen > maxFiles) return;
-        const r = rel ? `${rel}/${e.name}` : e.name;
-        if (e.isDirectory()) {
-          if (isScannable(`${r}/.`)) walk(join(dir, e.name), r);
-          continue;
-        }
-        if (!e.isFile() || !isScannable(r)) continue;
-        seen++;
-        seenRel.add(r);
-        const full = join(dir, e.name);
-        let st;
-        try {
-          st = statSync(full);
-        } catch {
-          continue;
-        }
-        const prev = cache.get(r);
-        if (prev && prev.mtimeMs === st.mtimeMs && prev.size === st.size) continue;
-        const ent = readOne(codeRoot, r);
-        if (ent) cache.set(r, ent);
-        else cache.delete(r);
-      }
-    };
-    walk(codeRoot, '');
-    for (const k of [...cache.keys()]) if (!seenRel.has(k)) cache.delete(k);
+    const files = listScannable(codeRoot, maxFiles);
+    for (const r of files) refresh(codeRoot, cache, r);
+    prune(cache, files);
   }
+  return hitsOf(cache);
+}
+
+/** scanCode of the whole code root without holding the event loop: the same walk, cache and result, in slices of a few milliseconds. */
+export async function scanCodeAsync(codeRoot: string, maxFiles = 20000): Promise<ScannedFile[]> {
+  await new Promise((done) => setImmediate(done));
+  const files = listScannable(codeRoot, maxFiles);
+  let slice = performance.now();
+  for (const r of files) {
+    if (performance.now() - slice > 8) {
+      await new Promise((done) => setImmediate(done));
+      slice = performance.now();
+    }
+    refresh(codeRoot, cacheOf(codeRoot), r);
+  }
+  const cache = cacheOf(codeRoot);
+  const ordered = new Map<string, CacheEnt>(); // walk order, also when the cache was seeded from the last session
+  for (const r of files) {
+    const ent = cache.get(r);
+    if (ent) ordered.set(r, ent);
+  }
+  scanCaches.set(codeRoot, ordered);
+  return hitsOf(ordered);
+}
+
+export type ScanDump = [string, CacheEnt][];
+/** The scan cache of a code root, to seed the next session (every entry is checked again against its file's size and mtime). */
+export function dumpScan(codeRoot: string): ScanDump {
+  return [...(scanCaches.get(codeRoot) ?? [])];
+}
+/** Seeds the scan cache of a code root not scanned yet in this session. */
+export function seedScan(codeRoot: string, dump: ScanDump): void {
+  if (!scanCaches.has(codeRoot)) scanCaches.set(codeRoot, new Map(dump));
+}
+
+function cacheOf(codeRoot: string): Map<string, CacheEnt> {
+  let cache = scanCaches.get(codeRoot);
+  if (!cache) {
+    cache = new Map();
+    scanCaches.set(codeRoot, cache);
+  }
+  return cache;
+}
+
+/** Re-reads one listed file into the cache unless its size and mtime are unchanged; a file that cannot be stat'ed keeps its entry. */
+function refresh(codeRoot: string, cache: Map<string, CacheEnt>, r: string): void {
+  let st;
+  try {
+    st = statSync(join(codeRoot, r));
+  } catch {
+    return;
+  }
+  const prev = cache.get(r);
+  if (prev && prev.mtimeMs === st.mtimeMs && prev.size === st.size) return;
+  const ent = readOne(codeRoot, r, st);
+  if (ent) cache.set(r, ent);
+  else cache.delete(r);
+}
+
+/** The scannable files under the code root in walk order, at most maxFiles + 1 (the verifier's skip rules). */
+function listScannable(codeRoot: string, maxFiles: number): string[] {
+  const files: string[] = [];
+  const walk = (dir: string, rel: string): void => {
+    let entries: import('node:fs').Dirent[];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (files.length > maxFiles) return;
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) {
+        if (isScannable(`${r}/.`)) walk(join(dir, e.name), r);
+        continue;
+      }
+      if (e.isFile() && isScannable(r)) files.push(r);
+    }
+  };
+  walk(codeRoot, '');
+  return files;
+}
+
+function prune(cache: Map<string, CacheEnt>, files: string[]): void {
+  const seen = new Set(files);
+  for (const k of [...cache.keys()]) if (!seen.has(k)) cache.delete(k);
+}
+
+function hitsOf(cache: Map<string, CacheEnt>): ScannedFile[] {
   const out: ScannedFile[] = [];
   for (const ent of cache.values()) if (ent.hit) out.push(ent.hit);
   return out;

@@ -54,7 +54,7 @@ export class SpecPanel implements vscode.Disposable {
   private rendering = false;
   private dirty = false;
   private readonly store: ProjectStore;
-  private readonly traces: () => TraceModel[];
+  private readonly traces: () => TraceModel[] | Promise<TraceModel[]>;
   private readonly extras: PanelExtras | undefined;
   private revealTick = 0;
   private readonly results: Record<string, ActionResult> = {};
@@ -65,7 +65,7 @@ export class SpecPanel implements vscode.Disposable {
   agentFiles: Pick<AgentFiles, 'list' | 'update'> | undefined;
 
   /** `logo`: the extension icon (images/icon.png), shown in the header and on the panel tab. */
-  constructor(store: ProjectStore, traces: () => TraceModel[] = () => [], extras?: PanelExtras, logo?: vscode.Uri) {
+  constructor(store: ProjectStore, traces: () => TraceModel[] | Promise<TraceModel[]> = () => [], extras?: PanelExtras, logo?: vscode.Uri) {
     this.logo = logo;
     this.store = store;
     this.traces = traces;
@@ -103,6 +103,7 @@ export class SpecPanel implements vscode.Disposable {
   }
 
   private async loadData(): Promise<ViewData> {
+    const trace = await this.traces();
     const projects = this.store.projects;
     const baseSpecs: Record<string, string[]> = {};
     for (const p of projects) baseSpecs[p.root] = this.store.baseSpecNames.get(p.root) ?? [];
@@ -161,7 +162,7 @@ export class SpecPanel implements vscode.Disposable {
       dashboard = dash();
     }
     const agentUpdates = vscode.workspace.isTrusted ? (this.agentFiles?.list() ?? []) : [];
-    return { projects, route, texts, baseSpecs, setup: setupStatus(workspaceRoots(this.store)), trace: this.traces(), revealTick: this.revealTick, ...(agentUpdates.length ? { agentUpdates } : {}), ...(roadmap ? { roadmap } : {}), ...(greenfield ? { greenfield } : {}), ...(dashboard ? { dashboard } : {}), ...(this.extras?.runAction ? { actions: { trusted: vscode.workspace.isTrusted, results: this.results, ...(this.running ? { running: this.running } : {}) } } : {}) };
+    return { projects, route, texts, baseSpecs, setup: setupStatus(workspaceRoots(this.store)), trace, revealTick: this.revealTick, ...(agentUpdates.length ? { agentUpdates } : {}), ...(roadmap ? { roadmap } : {}), ...(greenfield ? { greenfield } : {}), ...(dashboard ? { dashboard } : {}), ...(this.extras?.runAction ? { actions: { trusted: vscode.workspace.isTrusted, results: this.results, ...(this.running ? { running: this.running } : {}) } } : {}) };
   }
 
   async render(): Promise<void> {

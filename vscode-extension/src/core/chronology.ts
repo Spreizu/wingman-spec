@@ -10,7 +10,7 @@
  * Run ids (`runs/<change>/<id>`) are UTC stamps `YYYYMMDDTHHMMSSZ`.
  */
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import { basename, dirname, join } from 'node:path';
 
 /** `source`: where the time came from (`file` = recorded by the archive step; `git`/`birth`/`mtime`/`name` = fallbacks; `none` = nothing known). */
@@ -44,30 +44,51 @@ function nameOf(dirName: string): string {
 }
 
 const memo = new Map<string, { t: number; v: GitAdded }>();
+const gitArgs = (dir: string): string[] => ['-c', 'core.quotepath=off', '-C', dir, 'log', '--diff-filter=A', '--no-renames', '--relative', '--format=@%cI', '--name-only', '--', '.'];
+const gitOpts = { encoding: 'utf8', timeout: 20000, maxBuffer: 1 << 26 } as const;
 /** One `git log` for a whole directory, remembered for a few seconds: folder name -> the earliest commit that added a file in it. */
 function gitAdded(dir: string): GitAdded {
   const hit = memo.get(dir);
   if (hit && Date.now() - hit.t < 20000) return hit.v;
-  const v: GitAdded = new Map();
+  let out: string | undefined;
   try {
-    const r = spawnSync('git', ['-c', 'core.quotepath=off', '-C', dir, 'log', '--diff-filter=A', '--no-renames', '--relative', '--format=@%cI', '--name-only', '--', '.'], { encoding: 'utf8', timeout: 20000, maxBuffer: 1 << 26 });
-    if (r.status === 0) {
-      let at = '';
-      let ms = NaN;
-      for (const line of r.stdout.split('\n')) {
-        if (!line) continue;
-        if (line.startsWith('@')) {
-          at = line.slice(1);
-          ms = Date.parse(at);
-          continue;
-        }
-        const seg = line.split('/')[0] ?? '';
-        const old = v.get(seg);
-        if (!Number.isNaN(ms) && (!old || ms < old.ms)) v.set(seg, { at, ms });
-      }
-    }
+    const r = spawnSync('git', gitArgs(dir), gitOpts);
+    if (r.status === 0) out = r.stdout;
   } catch {
     // no git: the next fallback
+  }
+  return remember(dir, out);
+}
+/** gitAdded for these directories without blocking, so the calls that follow are answered from memory. */
+function preloadGit(dirs: string[]): Promise<void> {
+  return Promise.all(dirs.map((dir) => new Promise<void>((done) => {
+    const hit = memo.get(dir);
+    if (hit && Date.now() - hit.t < 20000) return done();
+    try {
+      execFile('git', gitArgs(dir), gitOpts, (err, stdout) => {
+        remember(dir, err ? undefined : stdout);
+        done();
+      });
+    } catch {
+      remember(dir, undefined);
+      done();
+    }
+  }))).then(() => undefined);
+}
+function remember(dir: string, out: string | undefined): GitAdded {
+  const v: GitAdded = new Map();
+  let at = '';
+  let ms = NaN;
+  for (const line of (out ?? '').split('\n')) {
+    if (!line) continue;
+    if (line.startsWith('@')) {
+      at = line.slice(1);
+      ms = Date.parse(at);
+      continue;
+    }
+    const seg = line.split('/')[0] ?? '';
+    const old = v.get(seg);
+    if (!Number.isNaN(ms) && (!old || ms < old.ms)) v.set(seg, { at, ms });
   }
   memo.set(dir, { t: Date.now(), v });
   return v;
@@ -181,5 +202,5 @@ const SOURCE_TEXT: Record<string, string> = {
   none: '',
 };
 
-const chronology = { isoLocal, parseTime, nameOf, gitAdded, archiveStamp, createdStamp, sortByTime, archiveOrder, sortRuns, latestRun, sortRecords, clock, when, SOURCE_TEXT };
+const chronology = { isoLocal, parseTime, nameOf, gitAdded, preloadGit, archiveStamp, createdStamp, sortByTime, archiveOrder, sortRuns, latestRun, sortRecords, clock, when, SOURCE_TEXT };
 export default chronology;
