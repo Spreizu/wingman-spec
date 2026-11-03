@@ -146,6 +146,7 @@ type Env struct {
 	wave   int // the wave and lane (1-based) this command works on, for the timeline
 	lane   int
 	idx    *codeindex.Index
+	moved  []trace.Rewrite // markers `next` rewrote for the change's RENAMED entries
 }
 
 // New prepares a command run.
@@ -196,6 +197,9 @@ func (e *Env) print(v any) {
 func (e *Env) emit(x *Obj) {
 	if e.status != "" && !x.Has("run_status") {
 		x.Set("run_status", e.status)
+	}
+	if len(e.moved) > 0 {
+		x.Set("renamed_markers", e.moved)
 	}
 	e.timelineOf(x)
 	if e.O.Report != "" && e.O.Report != "json" {

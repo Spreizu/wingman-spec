@@ -4,6 +4,9 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
 ## Unreleased
 
+- **RENAMED rewrites the markers.** `next` rewrites the `@spec` markers (code and tests) of each requirement a
+  RENAMED entry renames to the new key, prints each rewrite and lists them as `renamed_markers` in its JSON; it only
+  touches marker lines and is idempotent. Test tags stay: they name scenarios, which a rename keeps.
 - **`finish --affected`.** Runs only the tests of the requirements the change touches: its ADDED, MODIFIED and
   renamed requirements, and those whose `@spec`-anchored code units changed since the change began; their tests are the
   files tagged with their scenarios or carrying their markers, plus changed test files and tests named after changed

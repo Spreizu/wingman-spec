@@ -106,6 +106,13 @@ func (e *Env) Next() error {
 		e.emit(O("result", "plan", "problems", pbad, "fix", "Re-plan with /spec-fix (raise Size: in proposal.md and write the full artifacts for that size; Why problems: fix the Why lines of the delta specs and the Owner approval line), then rerun."))
 		return quit(Usage)
 	}
+	if e.moved, err = e.tr().RenameMarkers(changeDir); err != nil {
+		return err
+	}
+	for _, m := range e.moved {
+		e.idx, e.memo = nil, nil
+		e.say("renamed: %s:%d @spec %s -> %s", m.File, m.Line, m.From, m.To)
+	}
 	if e.O.NewRun {
 		if old := e.currentRun(false); old != "" {
 			closeRun(e, old, "superseded")

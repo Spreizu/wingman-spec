@@ -401,6 +401,20 @@ expect "...names the files and the requirements in the tests check, and warns th
 expect "...and records only what ran" '[ "$(J .wingman-spec/cache/test-results.json requirements.todo/remove-a-todo.scenarios.todo/removed)" = passed ] && [ "$(J .wingman-spec/cache/test-results.json requirements.todo/add-a-todo)" = undefined ]'
 rm -f ran.txt .wingman-spec/runs -r; $V finish clear > /dev/null 2>&1 || true
 expect "plain finish still runs the full suite" '[ "$(wc -l < ran.txt)" = 4 ]'
+
+echo "== a RENAMED entry rewrites the @spec markers (next)"
+mkdir -p "$T/ren" && cd "$T/ren" && ws_project . && V="$WS"
+mkdir -p src test .wingman-spec/changes/rename/specs && cp -r "$T/cov/.wingman-spec/specs" .wingman-spec/ && cp "$T/cov/src/todo.js" src/
+printf '/** @spec todo/remove-a-todo */\nit("[todo/removed] removes", () => {});\n// @spec todo/remove-a-todo-twice is another key\n' > test/remove.test.js
+printf '## RENAMED\n\n- Remove a todo -> Delete a todo\n' > .wingman-spec/changes/rename/specs/todo.md
+printf 'Size: S\nRisk: none\n\n## Why\nA clearer name.\n\n## What Changes\n- Renames a requirement.\n' > .wingman-spec/changes/rename/proposal.md
+printf '## 1. Rename\n- [ ] 1.1 rename\n  - Spec: todo/delete-a-todo\n  - Files: src/todo.js\n  - Done when: `true` exits 0\n' > .wingman-spec/changes/rename/tasks.md
+ws_cmd test "true"; git add -A && git commit -qm init
+rc=0; $V next rename > "$T/n.json" 2>"$T/n.err" || rc=$?
+expect "next rewrites the old key in code and test markers and lists each rewrite" 'grep -q "@spec todo/delete-a-todo" src/todo.js && ! grep -q "todo/remove-a-todo$" src/todo.js && grep -q "^/\*\* @spec todo/delete-a-todo \*/" test/remove.test.js && [ "$(J "$T/n.json" renamed_markers.length)" = 2 ] && grep -q "renamed: src/todo.js" "$T/n.err"'
+expect "...leaves a longer key and the scenario tags alone" 'grep -q "todo/remove-a-todo-twice" test/remove.test.js && grep -q "\[todo/removed\]" test/remove.test.js'
+$V next rename > "$T/n.json" 2>/dev/null || true
+expect "...and is idempotent: a second next rewrites nothing" '[ "$(J "$T/n.json" renamed_markers)" = undefined ]'
 cd "$T/p" || exit 1
 
 echo
