@@ -282,8 +282,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .sum .pills { margin-top: 0; }
 /* timeline */
 .timeline { display: flex; flex-direction: column; gap: var(--section-gap); }
+.tl-run { margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
+.tl-run-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.tl-run .tl-task { margin: 6px 0 0; }
+.tl-run p { margin: 0; }
+.tl-jump { text-align: left; }
+.tl-files { margin: 2px 0 4px 12px; }
+.tl-files ul { margin: 2px 0 0; padding-left: 18px; }
 .tl-phase { display: flex; flex-direction: column; gap: 12px; }
-.tl-phase-title { font-size: 13px; font-weight: 600; margin: 0; }
+.tl-phase-title, .tl-run-title { font-size: 13px; font-weight: 600; margin: 0; }
 .tl-chain { margin: 0 0 12px; padding: 8px 12px; border-left: 3px solid var(--vscode-charts-yellow, #d29922); color: var(--muted); }
 .tl-task { font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
 .tl-list { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--line); }

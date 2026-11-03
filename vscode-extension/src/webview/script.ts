@@ -43,6 +43,20 @@ export const SCRIPT = `
     var a = t.closest('a[href]');
     if (a) { e.preventDefault(); post({ type: 'external', url: a.getAttribute('href') }); return; }
 
+    var jump = t.closest('[data-jump]');
+    if (jump) {
+      // a run summary line: open and show the timeline entry it comes from
+      e.stopPropagation();
+      var to = document.getElementById(jump.getAttribute('data-jump') || '');
+      if (to) {
+        var d = to.querySelector('details');
+        if (d) d.open = true;
+        document.querySelectorAll('.focused').forEach(function (f) { f.classList.remove('focused'); });
+        to.classList.add('focused');
+        to.scrollIntoView({ block: 'center' });
+      }
+      return;
+    }
     var toggle = t.closest('[data-toggle]');
     if (toggle) {
       e.preventDefault(); e.stopPropagation();

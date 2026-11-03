@@ -22,6 +22,8 @@ export interface TimelineDetail {
 }
 
 export interface TimelineEntry {
+  /** Position in the parsed timeline (oldest first): the entry's anchor in the Timeline tab. */
+  index: number;
   at: string;
   ms: number;
   /** HH:MM:SS, local time. */
@@ -43,6 +45,8 @@ export interface TimelineEntry {
   /** The phase the event belongs to (events like validate join the phase they happen in). */
   phase: Phase;
   details: TimelineDetail[];
+  /** The event's raw details, for the run summary. */
+  data: Record<string, unknown>;
 }
 
 export type Phase = 'propose' | 'build' | 'verify' | 'sync' | 'archive';
@@ -152,6 +156,7 @@ export function parseTimeline(text: string | undefined): TimelineEntry[] {
     const ok = r['ok'];
     phase = PHASE_OF[event] ?? phase;
     out.push({
+      index: out.length,
       at: r.at,
       ms,
       time: chrono.clock(r.at),
@@ -168,6 +173,7 @@ export function parseTimeline(text: string | undefined): TimelineEntry[] {
       decision: event === 'decision',
       phase,
       details,
+      data: d,
     });
   }
   return out;

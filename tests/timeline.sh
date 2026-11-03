@@ -65,6 +65,8 @@ echo "== archive keeps the timeline"
 printf '\nOwner approval: the owner, 2026-10-25\n' >> "$C/proposal.md"
 mkdir -p test; printf 'test("[demo/greet] greets", () => {});\ntest("[demo/greet-by-name] greets by name", () => {});\n' > test/demo.test.js
 rm -f .wingman-spec/runs/demo/finish.json; $V finish demo >/dev/null 2>&1
+FIN=$(grep '"event":"finish"' "$TLF" | tail -1)
+expect "the passing finish records each check's verdict and the code diff since the run's base, for the editor's run summary" 'echo "$FIN" | node -e '"'"'const d=JSON.parse(require("fs").readFileSync(0,"utf8")).details; const t=d.checks.find(c=>c.name==="validate"); const f=d.diff.list.map(x=>x.file+" +"+x.added+" -"+x.removed).join(","); process.exit(d.ok!==false && t && typeof t.ok==="boolean" && d.diff.files===3 && d.diff.added===5 && d.diff.removed===0 && f==="src/cart.js +1 -0,src/user.js +2 -0,test/demo.test.js +2 -0" ? 0 : (console.error(JSON.stringify(d)),1))'"'"''
 $V sync demo >/dev/null 2>&1
 expect "sync is recorded" 'tail -1 "$TLF" | grep -q "\"event\":\"sync\",.*\"ok\":true"'
 git add -A >/dev/null; git commit -qm built >/dev/null

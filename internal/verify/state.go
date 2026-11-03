@@ -438,6 +438,14 @@ func (e *Env) timelineOf(x *Obj) {
 		if result == "finished" {
 			sum = "change verified"
 		}
+		if cs := finishChecks(x.Get("checks")); len(cs) > 0 {
+			fails["checks"] = cs
+		}
+		if result == "finished" {
+			if d := e.diffSinceBase(); d != nil {
+				fails["diff"] = d
+			}
+		}
 		e.tl(timeline.Event{Event: "finish", OK: new(result == "finished"), Seconds: sec, Summary: sum, Details: fails})
 	case "sync", "sync-check":
 		synced, _ := x.Get("synced").(bool)

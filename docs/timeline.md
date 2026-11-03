@@ -27,3 +27,7 @@ This is evidence, not protection. Anyone who can write the file can rewrite it w
 ## In the editor
 
 The change page and every archived change have a **Timeline** tab. It groups the events by phase (Propose, Build, Verify, Sync, Archive), then by task, and shows results, durations and the gap since the previous step. Idle periods over 15 minutes are marked; details open on click.
+
+Once the last run has finished (its last `finish` passed and no run started after it), a **Run summary** card sits above the timeline. It shows the run's duration and idle time, the tasks completed, the checks at finish, and the task checks with their fix rounds. It also shows the visual scenarios and defects, the review findings fixed (from the `Review fix` progress entries and the review proof), the code files changed with their added and removed lines, and the open items. Each line scrolls to the timeline entry it comes from.
+
+Everything comes from the timeline. A passing `finish` event records `details.checks`: `[{name, ok, skipped?, untested?}]`, in finish's order. It also records `details.diff`: `{files, added, removed, list: [{file, added, removed}]}`. The diff is `git diff --numstat` from the change's base commit over the working tree plus untracked files, without the specs and `.wingman-spec/`. Files are sorted by path, and at most 40 are listed. A timeline from an older CLI gets a shorter card without them.

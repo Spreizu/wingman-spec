@@ -37,6 +37,12 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
   commands that read and writes no file except the design map, which stays in the chat in plan mode. It ends with the
   decisions and a proposal draft and offers `/spec-propose <slug>`, telling you to switch to agent mode first when you
   are in plan mode; `/spec-propose` picks the exploration up from the chat.
+- **Run summary.** Once a run has finished, the Timeline tab of a change (and of an archived change) opens with one
+  card: how long the run took, the tasks completed, the checks at finish and the task checks with their fix rounds, the
+  visual scenarios, the review findings fixed, the code files changed since the run's base commit with their added and
+  removed lines, and the open items (checks not run at finish, untested scenarios, skipped visual checks, review fixes
+  without a test, a check that failed after finish). Each line scrolls to its timeline entry. The `finish` timeline
+  event now records each check's verdict and that diff (`details.checks`, `details.diff`), taken when finish runs.
 - **Faster stale-anchor check.** The `git blame` runs behind the stale-anchor rule (`problems`, `drift`, and the
   extension's Problems refresh after opening) run up to 8 at a time instead of one after another. Without a blame cache,
   a project with 13,000 anchored files and 3,000 commits takes 41 s instead of 273 s, and one with 3,000 files takes

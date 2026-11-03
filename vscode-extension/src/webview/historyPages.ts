@@ -117,7 +117,7 @@ ${text ? `<div class="md" style="margin-top:10px">${renderMarkdown(parseFrontMat
     ['design', 'Design', doc('design.md', 'No design was archived.')],
     ['adrs', 'ADRs', adrs],
     ['tasks', 'Tasks', readOnlyTasks(d.texts[join(c.dir, 'tasks.md')])],
-    ['timeline', 'Timeline', timelineTab(d.texts[join(c.dir, 'timeline.jsonl')], d.texts[join(c.dir, 'archived.json')])],
+    ['timeline', 'Timeline', timelineTab(d.texts[join(c.dir, 'timeline.jsonl')], d.texts[join(c.dir, 'archived.json')], c.taskTotal || undefined)],
   ];
   const sub = `<span title="${esc(whenTitle(c.archived, 'Archived'))}">${esc(whenText(c.date, c.archived))}</span>`;
   const aside = `${ring(c.taskDone, c.taskTotal, 56)}<button class="icon-btn" ${openAttr(c.dir)} title="Reveal folder">${icon('file')}</button>`;

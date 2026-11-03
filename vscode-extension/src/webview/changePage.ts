@@ -217,7 +217,7 @@ export function changePage(d: ViewData): string {
   if (change.progressPath) {
     panes.push(['progress', 'Progress', docTab(d, change.progressPath, 'No progress notes yet', 'The implementer writes them while it works.')]);
   }
-  if (change.isWingmanSpec) panes.push(['timeline', 'Timeline', timelineTab(d.texts[timelinePath(project.root, change.name)])]);
+  if (change.isWingmanSpec) panes.push(['timeline', 'Timeline', timelineTab(d.texts[timelinePath(project.root, change.name)], undefined, change.taskTotal)]);
 
 
   return `${pageHeader(change.name, sub.join(' '), aside)}
