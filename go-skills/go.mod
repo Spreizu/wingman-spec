@@ -2,3 +2,5 @@
 module github.com/Spreizu/wingman-spec/go-skills
 
 go 1.27
+
+toolchain go1.27.3
