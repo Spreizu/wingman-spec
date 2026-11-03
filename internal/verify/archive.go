@@ -16,6 +16,7 @@ import (
 	"github.com/Spreizu/wingman-spec/internal/trace"
 )
 
+// SyncReport is the read-only sync check: specs merged, ADRs promoted, anchors and drift, plus unified diffs of a pending merge.
 func (e *Env) SyncReport() (*Obj, bool, error) {
 	changeDir, err := e.changeDir()
 	if err != nil {

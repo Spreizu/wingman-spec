@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -39,13 +40,7 @@ func Fix(changeDir string) (int, error) {
 func fixSpec(text string) (string, int) {
 	ls := strings.Split(text, "\n")
 	n := 0
-	hasPurpose := false
-	for _, l := range ls {
-		if purposeFix.MatchString(l) {
-			hasPurpose = true
-			break
-		}
-	}
+	hasPurpose := slices.ContainsFunc(ls, purposeFix.MatchString)
 	if !hasPurpose {
 		insert := 0
 		for i, l := range ls {
@@ -87,9 +82,6 @@ func fixSpec(text string) (string, int) {
 		for k < len(ls) && strings.TrimSpace(ls[k]) == "" {
 			out = append(out, ls[k])
 			k++
-		}
-		if k < len(ls) && k > i+1 {
-			// SHALL (or statement) already copied? we only copied blanks.
 		}
 		if k < len(ls) && !strings.HasPrefix(ls[k], "#") && !why.MatchString(ls[k]) {
 			out = append(out, ls[k])

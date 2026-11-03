@@ -37,7 +37,7 @@ jobs:
         run: test -z "$(gofmt -l cmd internal)"
       - name: golangci-lint
         if: runner.os == 'Linux'
-        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.1 run ./...
+        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./...
       - name: Cross builds (the platforms of the vsix files)
         if: runner.os == 'Linux'
         run: |

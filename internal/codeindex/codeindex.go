@@ -53,9 +53,7 @@ func Scan(root string, scannable func(string) bool) *Index {
 	ch := make(chan int)
 	var wg sync.WaitGroup
 	for range workers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := range ch {
 				rel := jobs[i]
 				p := filepath.Join(root, rel)
@@ -83,7 +81,7 @@ func Scan(root string, scannable func(string) bool) *Index {
 				}
 				out[i] = result{ok: true, f: File{Rel: rel, Text: s}, rel: rel}
 			}
-		}()
+		})
 	}
 	for i := range jobs {
 		ch <- i

@@ -113,7 +113,7 @@ func TestBlock(t *testing.T) {
 
 func TestInstall(t *testing.T) {
 	d := t.TempDir()
-	skills := fsSub(src, "skills")
+	skills := fsSub(src)
 	exe, _ := os.Executable()
 	for range 2 {
 		if _, err := Install(d, src, skills, Options{Harnesses: Names, Exe: exe}); err != nil {
@@ -171,7 +171,7 @@ func TestInstall(t *testing.T) {
 // Stale names a generated file and AGENTS.md once they differ from what update writes, and nothing after update.
 func TestStale(t *testing.T) {
 	d := t.TempDir()
-	if _, err := Install(d, src, fsSub(src, "skills"), Options{Harnesses: []string{"cursor"}}); err != nil {
+	if _, err := Install(d, src, fsSub(src), Options{Harnesses: []string{"cursor"}}); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := Stale(d, src, []string{"cursor"}); err != nil || len(got) != 0 {
@@ -199,10 +199,10 @@ func TestParseList(t *testing.T) {
 	}
 }
 
-func fsSub(f fstest.MapFS, dir string) fstest.MapFS {
+func fsSub(f fstest.MapFS) fstest.MapFS {
 	out := fstest.MapFS{}
 	for k, v := range f {
-		if rest, ok := strings.CutPrefix(k, dir+"/"); ok {
+		if rest, ok := strings.CutPrefix(k, "skills/"); ok {
 			out[rest] = v
 		}
 	}
@@ -212,7 +212,7 @@ func fsSub(f fstest.MapFS, dir string) fstest.MapFS {
 // Hook files are the user's: init neither registers a hook nor removes the 0.11 spec-guard.cjs entry or script.
 func TestInstallLeavesHookFilesAlone(t *testing.T) {
 	d := t.TempDir()
-	skills := fsSub(src, "skills")
+	skills := fsSub(src)
 	files := map[string]string{
 		".cursor/hooks.json":           `{"version":1,"hooks":{"beforeSubmitPrompt":[{"command":"node .cursor/hooks/spec-guard.cjs"}]}}` + "\n",
 		".claude/settings.json":        "{\n  \"hooks\": {\n    \"Stop\": [ { \"hooks\": [ { \"type\": \"command\", \"command\": \"echo mine\" } ] } ]\n  }\n}\n",
@@ -246,7 +246,7 @@ func TestInstallRemovesOldUnprefixedSkills(t *testing.T) {
 	if err := writeFile(theirs, []byte("Use TDD. Write a failing test first.\n")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Install(d, src, fsSub(src, "skills"), Options{Harnesses: []string{"cursor"}}); err != nil {
+	if _, err := Install(d, src, fsSub(src), Options{Harnesses: []string{"cursor"}}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Dir(ours)); err == nil {

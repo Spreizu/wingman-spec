@@ -416,7 +416,3 @@ func cut(s string, n int) string {
 	}
 	return s
 }
-
-// EdgeLint checks proposal.md `## Edge cases`: one bullet per edge case ending with `-> <capability>/<scenario-slug>`.
-// livingDir is used for a slice change, whose edge cases are scenarios of the living specs.
-// ui marks a change with UI files in tasks.md, so a UI case needs a visual state even when no block is left.

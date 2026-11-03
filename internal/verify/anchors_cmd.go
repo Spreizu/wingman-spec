@@ -11,6 +11,7 @@ import (
 	"github.com/Spreizu/wingman-spec/internal/trace"
 )
 
+// Anchors reports @spec markers that do not match a requirement, and the requirement index when --json is set.
 func (e *Env) Anchors() error {
 	md := trace.Mode(e.Cfg)
 	dir := filepath.Join(e.R.Specs, ".none")

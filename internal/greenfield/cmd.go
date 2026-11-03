@@ -2,6 +2,7 @@ package greenfield
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -76,7 +77,7 @@ func Main(p *Project, e *Env, cmd string, args []string) int {
 	if err == nil {
 		return 0
 	}
-	if x, ok := err.(cmdErr); ok {
+	if x, ok := errors.AsType[cmdErr](err); ok {
 		return x.code
 	}
 	fmt.Fprintln(e.Err, err)

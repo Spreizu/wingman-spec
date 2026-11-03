@@ -13,6 +13,9 @@ import (
 	"github.com/Spreizu/wingman-spec/internal/testpaths"
 )
 
+// EdgeLint checks proposal.md `## Edge cases`: one bullet per edge case ending with `-> <capability>/<scenario-slug>`.
+// livingDir is used for a slice change, whose edge cases are scenarios of the living specs.
+// ui marks a change with UI files in tasks.md, so a UI case needs a visual state even when no block is left.
 func EdgeLint(changeDir, livingDir string, visual map[string]VisualScenario, ui bool) ([]EdgeItem, []Finding) {
 	var out []Finding
 	items := []EdgeItem{}
