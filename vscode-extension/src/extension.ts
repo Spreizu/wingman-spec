@@ -56,7 +56,14 @@ export function activate(context: vscode.ExtensionContext): void {
     if (!force && signature === watched) return;
     watched = signature;
     watcher?.dispose();
-    watcher = watchRoots(codeRoots, specsRoots, () => void refresh());
+    watcher = watchRoots(codeRoots, specsRoots, (kind, paths) => {
+      if (kind === 'code') {
+        traceCache.invalidatePaths(paths);
+        problems.service.schedule(400);
+        return;
+      }
+      void refresh();
+    });
   };
   rewatch(true);
 

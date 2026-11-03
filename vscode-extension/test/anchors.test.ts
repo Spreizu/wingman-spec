@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { isScannable, isTestPath, itemAt, markersIn, nearest, scanCode, slug, tagsIn } from '../src/model/anchors.ts';
+import { forgetScan, isScannable, isTestPath, itemAt, markersIn, nearest, scanCode, slug, tagsIn } from '../src/model/anchors.ts';
 
 test('slug matches the verifier rule', () => {
   assert.equal(slug('Add an Item!'), 'add-an-item');
@@ -84,4 +84,19 @@ test('scanCode walks the tree with the verifier skip rules', () => {
   assert.equal(files[1]?.markers.length, 2);
   assert.ok(files[2]?.test);
   assert.equal(files[2]?.tags[0]?.tag, 'billing/add-item');
+});
+
+test('scanCode patches listed paths into the cache', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wsx-scan-inc-'));
+  const put = (f: string, text: string): void => {
+    mkdirSync(dirname(join(dir, f)), { recursive: true });
+    writeFileSync(join(dir, f), text);
+  };
+  forgetScan(dir);
+  put('src/a.ts', '// @spec billing/add-item\n');
+  assert.deepEqual(scanCode(dir).map((f) => f.file), ['src/a.ts']);
+  put('src/b.ts', '// @spec billing/list\n');
+  const patched = scanCode(dir, 20000, ['src/b.ts']).map((f) => f.file).sort();
+  assert.deepEqual(patched, ['src/a.ts', 'src/b.ts']);
+  forgetScan(dir);
 });

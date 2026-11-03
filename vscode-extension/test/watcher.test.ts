@@ -15,7 +15,9 @@ const tick = (ms: number) => new Promise((r) => setTimeout(r, ms));
 function setup(): { fired: () => number; fire: (rel: string) => void; patterns: string[]; dispose: () => void } {
   host.reset();
   let n = 0;
-  const d = watchRoots([root], [specs], () => void n++);
+  const d = watchRoots([root], [specs], () => {
+    n++;
+  });
   const patterns = host.watchers.map((w: { pattern: { pattern: string } }) => w.pattern.pattern);
   // an event from every watcher whose pattern could match: the code watcher gets every file, so the filter is what is tested
   const fire = (rel: string) => host.watchers.forEach((w: { fire: (p: string) => void; pattern: { pattern: string } }) => w.fire(join(root, rel)));

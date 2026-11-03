@@ -96,6 +96,12 @@ export class VerifierClient {
     return { ok: true, value: r };
   }
 
+  async trace(p: ProjectModel): Promise<Outcome<{ stdout: string }>> {
+    const r = await this.call(p, ['trace', '--json']);
+    if (!r.ok) return r;
+    return { ok: true, value: { stdout: r.value.stdout } };
+  }
+
   async problems(p: ProjectModel, change?: string): Promise<Outcome<ProblemsReport>> {
     const r = await this.call(p, ['problems', ...(change ? [change] : []), '--json']);
     if (!r.ok) return r;

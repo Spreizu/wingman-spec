@@ -90,15 +90,21 @@ export class ProblemsService implements vscode.CodeActionProvider, vscode.Dispos
     const all: VerifierFinding[] = [];
     const reasons: string[] = [];
     this.roots.clear();
-    for (const p of this.store.projects) {
-      if (p.error) continue;
-      const r = await this.client.problems(p);
-      if (!r.ok) {
-        reasons.push(r.reason);
-        continue;
-      }
-      this.roots.set(p.root, p);
-      all.push(...r.value.findings);
+    const projects = this.store.projects.filter((p) => !p.error);
+    const limit = 3;
+    for (let i = 0; i < projects.length; i += limit) {
+      const chunk = projects.slice(i, i + limit);
+      const rs = await Promise.all(chunk.map((p) => this.client.problems(p)));
+      chunk.forEach((p, j) => {
+        const r = rs[j];
+        if (!r) return;
+        if (!r.ok) {
+          reasons.push(r.reason);
+          return;
+        }
+        this.roots.set(p.root, p);
+        all.push(...r.value.findings);
+      });
     }
     const live = codeViewOn();
     const shown = all.filter((f) => !coveredByLive(f, live));

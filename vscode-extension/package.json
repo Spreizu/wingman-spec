@@ -299,6 +299,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
     "build": "node esbuild.mjs",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"test/*.test.ts\"",
     "package": "pnpm run typecheck && pnpm test && node esbuild.mjs --production && vsce package --no-dependencies"

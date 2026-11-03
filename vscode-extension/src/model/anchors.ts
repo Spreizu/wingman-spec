@@ -100,48 +100,102 @@ export interface ScannedFile {
   tags: Tag[];
 }
 
-/** Scans the code root for markers (every scannable file) and tags (test files). Bounded, no git needed. */
-export function scanCode(codeRoot: string, maxFiles = 20000): ScannedFile[] {
+type CacheEnt = { mtimeMs: number; size: number; hit?: ScannedFile };
+const scanCaches = new Map<string, Map<string, CacheEnt>>();
+
+function readOne(codeRoot: string, rel: string): CacheEnt | undefined {
+  const full = join(codeRoot, rel);
+  let st;
+  try {
+    st = statSync(full);
+  } catch {
+    return undefined;
+  }
+  if (!st.isFile() || st.size > MAX_BYTES) return { mtimeMs: st.mtimeMs, size: st.size };
+  let text: string;
+  try {
+    text = readFileSync(full, 'utf8');
+  } catch {
+    return { mtimeMs: st.mtimeMs, size: st.size };
+  }
+  if (text.includes('\0')) return { mtimeMs: st.mtimeMs, size: st.size };
+  const test = isTestPath(rel);
+  const markers = text.includes('@spec') ? markersIn(text) : [];
+  const tags = isTestFile(rel) ? tagsIn(text) : [];
+  const hit = markers.length || tags.length ? { file: rel, test, markers, tags } : undefined;
+  return { mtimeMs: st.mtimeMs, size: st.size, ...(hit ? { hit } : {}) };
+}
+
+/** Drop cached scan data (tests, or a deleted file). */
+export function forgetScan(codeRoot?: string, rel?: string): void {
+  if (!codeRoot) {
+    scanCaches.clear();
+    return;
+  }
+  if (!rel) {
+    scanCaches.delete(codeRoot);
+    return;
+  }
+  scanCaches.get(codeRoot)?.delete(rel.split('\\').join('/'));
+}
+
+/** Scans the code root for markers (every scannable file) and tags (test files). Bounded, no git needed. `only` patches those relative paths into the cache. */
+export function scanCode(codeRoot: string, maxFiles = 20000, only?: Iterable<string>): ScannedFile[] {
+  let cache = scanCaches.get(codeRoot);
+  if (!cache) {
+    cache = new Map();
+    scanCaches.set(codeRoot, cache);
+  }
+  if (only) {
+    for (const raw of only) {
+      const rel = raw.split('\\').join('/');
+      if (!isScannable(rel)) {
+        cache.delete(rel);
+        continue;
+      }
+      const ent = readOne(codeRoot, rel);
+      if (!ent) cache.delete(rel);
+      else cache.set(rel, ent);
+    }
+  } else {
+    const seenRel = new Set<string>();
+    let seen = 0;
+    const walk = (dir: string, rel: string): void => {
+      let entries: import('node:fs').Dirent[];
+      try {
+        entries = readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const e of entries) {
+        if (seen > maxFiles) return;
+        const r = rel ? `${rel}/${e.name}` : e.name;
+        if (e.isDirectory()) {
+          if (isScannable(`${r}/.`)) walk(join(dir, e.name), r);
+          continue;
+        }
+        if (!e.isFile() || !isScannable(r)) continue;
+        seen++;
+        seenRel.add(r);
+        const full = join(dir, e.name);
+        let st;
+        try {
+          st = statSync(full);
+        } catch {
+          continue;
+        }
+        const prev = cache.get(r);
+        if (prev && prev.mtimeMs === st.mtimeMs && prev.size === st.size) continue;
+        const ent = readOne(codeRoot, r);
+        if (ent) cache.set(r, ent);
+        else cache.delete(r);
+      }
+    };
+    walk(codeRoot, '');
+    for (const k of [...cache.keys()]) if (!seenRel.has(k)) cache.delete(k);
+  }
   const out: ScannedFile[] = [];
-  let seen = 0;
-  const walk = (dir: string, rel: string): void => {
-    let entries: import('node:fs').Dirent[];
-    try {
-      entries = readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const e of entries) {
-      if (seen > maxFiles) return;
-      const r = rel ? `${rel}/${e.name}` : e.name;
-      if (e.isDirectory()) {
-        if (isScannable(`${r}/.`)) walk(join(dir, e.name), r);
-        continue;
-      }
-      if (!e.isFile() || !isScannable(r)) continue;
-      seen++;
-      const full = join(dir, e.name);
-      let st;
-      try {
-        st = statSync(full);
-      } catch {
-        continue;
-      }
-      if (st.size > MAX_BYTES) continue;
-      let text: string;
-      try {
-        text = readFileSync(full, 'utf8');
-      } catch {
-        continue;
-      }
-      if (text.includes('\0')) continue;
-      const test = isTestPath(r);
-      const markers = text.includes('@spec') ? markersIn(text) : [];
-      const tags = isTestFile(r) ? tagsIn(text) : [];
-      if (markers.length || tags.length) out.push({ file: r, test, markers, tags });
-    }
-  };
-  walk(codeRoot, '');
+  for (const ent of cache.values()) if (ent.hit) out.push(ent.hit);
   return out;
 }
 

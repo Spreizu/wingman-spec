@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve as resolvePath, sep } from 'node:path';
 import * as vscode from 'vscode';
 import { anchorProblems, resolve, reverseTitle } from '../model/anchorView.ts';
-import { isScannable, isTestFile, isTestPath, itemAt, markersIn } from '../model/anchors.ts';
+import { isScannable, isTestFile, isTestPath, itemAt, markersIn, scanCode } from '../model/anchors.ts';
 import { HOVER_COMMANDS, hoverInsight, hoverUnresolved } from '../model/hoverText.ts';
 import { insightOf, lensText, lensTooltip, readTestCommand, unresolvedInfo, unresolvedLensText } from '../model/reqInsight.ts';
 import type { ReqInsight } from '../model/reqInsight.ts';
@@ -93,6 +93,28 @@ export class TraceCache implements vscode.Disposable {
     };
     if (delay === 0) run();
     else this.timer = setTimeout(run, delay);
+  }
+
+  /** Patch the code scan for these files, then rebuild models that use those code roots. */
+  invalidatePaths(paths: string[]): void {
+    const roots = new Set<string>();
+    for (const p of this.store.projects) {
+      if (p.error) continue;
+      const rels: string[] = [];
+      for (const f of paths) {
+        if (!inside(p.workspaceFolder, f)) continue;
+        rels.push(relative(p.workspaceFolder, f).split(sep).join('/'));
+      }
+      if (rels.length) {
+        scanCode(p.workspaceFolder, 20000, rels);
+        roots.add(`${p.root}\n${p.workspaceFolder}`);
+      }
+    }
+    if (!roots.size) return;
+    for (const k of roots) this.models.delete(k);
+    this.insights.clear();
+    this.testCommands.clear();
+    this.emitter.fire();
   }
 
   /** Models of all projects (one per specs root). */

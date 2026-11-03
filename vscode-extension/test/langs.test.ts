@@ -42,14 +42,14 @@ const dir = project();
 const model = buildTrace(dir, dir);
 
 test('every language: source and test file are scanned, the tags and the anchor are found', () => {
-  const scanned = new Map(scanCode(dir).map((s) => [s.file, s]));
+  const scanned = new Map(scanCode(dir).map((s) => [s.file.toLowerCase(), s]));
   for (const l of fx.LANGS) {
     assert.ok(isScannable(l.src) && isScannable(l.test), l.id);
     assert.ok(isTestFile(l.test) && !isTestPath(l.src), l.id);
     assert.deepEqual(tagsIn(l.testText).map((t) => t.tag).sort(), [`${l.cap}/fails`, `${l.cap}/works`], l.id);
     assert.deepEqual(markersIn(l.srcText).map((m) => m.key), [`${l.cap}/${l.req}`], l.id);
-    assert.deepEqual(scanned.get(l.test)?.tags.map((t) => t.tag).sort(), [`${l.cap}/fails`, `${l.cap}/works`], `${l.id} tags in ${l.test}`);
-    assert.deepEqual(scanned.get(l.src)?.markers.map((m) => m.key), [`${l.cap}/${l.req}`], `${l.id} anchor in ${l.src}`);
+    assert.deepEqual(scanned.get(l.test.toLowerCase())?.tags.map((t) => t.tag).sort(), [`${l.cap}/fails`, `${l.cap}/works`], `${l.id} tags in ${l.test}`);
+    assert.deepEqual(scanned.get(l.src.toLowerCase())?.markers.map((m) => m.key), [`${l.cap}/${l.req}`], `${l.id} anchor in ${l.src}`);
   }
 });
 
