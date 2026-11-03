@@ -14,6 +14,7 @@
     "advisory": { "type": "array" },
     "accepted": { "type": "array" },
     "notes": { "type": "array" },
+    "coverage": { "type": "object", "description": "the last test results finish recorded: results (the cache file) and counts (requirements per state)" },
     "skipped": { "type": "array" }
   }
 }

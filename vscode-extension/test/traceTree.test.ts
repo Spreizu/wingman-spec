@@ -93,3 +93,18 @@ test('drift gaps about a requirement reveal it; other gaps keep opening their fi
   assert.ok(withRoute.length > 0);
   for (const g of withRoute) assert.equal((g.route as { focus: string }).focus.startsWith('req:'), true);
 });
+
+test('the recorded test results (from `problems --json`) show calmly: a word after the test count, the detail in the tooltip', () => {
+  const withCov = buildTraceNodes(buildTrace(dir, dir), {
+    'billing/add-an-item': { state: 'failed', at: '2026-11-03T10:00:00Z', commit: '1a2b3c4d5e6f', scenarios: { 'billing/added': 'failed', 'billing/totals': 'passed' } },
+    'billing/remove-an-item': { state: 'stale', reason: 'code changed', last: 'passed', scenarios: {} },
+  });
+  const failed = find(withCov, 'req/billing/add-an-item');
+  assert.equal(failed?.description, 'Users see what they owe, so they trust the app. · billing · 1 code anchor · 2 tests failed');
+  assert.equal(failed?.icon, 'close');
+  assert.match(failed?.tooltip ?? '', /Last test run: failed \[billing\/added\] \(2026-11-03, 1a2b3c4d\)/);
+  const stale = find(withCov, 'req/billing/remove-an-item');
+  assert.match(stale?.description ?? '', /tests? stale$/);
+  assert.match(stale?.tooltip ?? '', /Last test run: stale: code changed since it passed/);
+  assert.doesNotMatch(find(nodes, 'req/billing/add-an-item')?.tooltip ?? '', /Last test run/);
+});

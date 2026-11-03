@@ -29,6 +29,7 @@ func (e *Env) Anchors() error {
 	}
 	problems := list(trace.BySeverity(r.Problems, m))
 	bad := slices.ContainsFunc(problems, func(p trace.Problem) bool { return p.Severity == "error" })
+	cov := e.tr().CoverageOf(r.Eff)
 	reqs := O()
 	keys := make([]string, 0, len(r.Facts.Requirements))
 	for k := range r.Facts.Requirements {
@@ -40,17 +41,23 @@ func (e *Env) Anchors() error {
 			continue
 		}
 		x := r.Facts.Requirements[k]
-		reqs.Set(k, O("code", sortedKeys(x.Code), "tests", sortedKeys(x.Tests)))
+		reqs.Set(k, O("code", sortedKeys(x.Code), "tests", sortedKeys(x.Tests), "coverage", cov[k]))
 	}
 	var index any = Skip
 	if e.O.JSON {
 		index = trace.AnchorIndex(r.Eff, r.Facts)
 	}
-	e.print(O("ok", !bad, "mode", md, "summary", r.Summary, "problems", problems, "index", index, "requirements", reqs, "skipped", e.skippedObj(), "markers", If(e.O.JSON, r.Facts.Markers)))
+	e.print(O("ok", !bad, "mode", md, "summary", r.Summary, "problems", problems, "index", index, "requirements", reqs, "coverage", e.coverageObj(cov), "skipped", e.skippedObj(), "markers", If(e.O.JSON, r.Facts.Markers)))
 	if bad {
 		return quit(Fail)
 	}
 	return nil
+}
+
+// coverageObj summarizes the recorded test results: where they live and the requirement count per state.
+func (e *Env) coverageObj(cov map[string]trace.Coverage) *Obj {
+	p := e.tr().ResultsPath()
+	return O("results", If(exists(p), rel(e.code, p)), "counts", trace.CoverageCounts(cov))
 }
 
 func sortedKeys(m map[string]bool) []string {

@@ -46,7 +46,25 @@ func driftText(r trace.DriftReport) string {
 	for _, g := range r.Accepted {
 		l = append(l, fmt.Sprintf("  accepted %s  (%s)", g.Key, g.Accepted))
 	}
+	if c := coverageLine(r.Coverage); c != "" {
+		l = append(l, "  tests: "+c)
+	}
 	return strings.Join(l, "\n")
+}
+
+// coverageLine counts the requirements per recorded test state ("" when no result was recorded).
+func coverageLine(cov map[string]trace.Coverage) string {
+	n := trace.CoverageCounts(cov)
+	if len(n) == 0 || n["not run"] == len(cov) {
+		return ""
+	}
+	var parts []string
+	for _, k := range []string{"passed", "failed", "skipped", "stale: spec changed", "stale: code changed", "not run"} {
+		if n[k] > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", n[k], k))
+		}
+	}
+	return strings.Join(parts, ", ") + " (the last test results finish recorded)"
 }
 
 func gapObj(g trace.Gap) *Obj {
@@ -87,7 +105,7 @@ func (e *Env) Drift() error {
 		obs = r.Observed
 	}
 	x := O("ok", len(errs) == 0, "mode", md, "requirements", r.Requirements, "counts", r.Counts, "observed", obs, "open", list(errs), "advisory", NonEmpty(adv),
-		"notes", NonEmpty(r.Notes), "accepted", acc, "skipped", e.skippedObj(), "next", next)
+		"notes", NonEmpty(r.Notes), "accepted", acc, "coverage", e.coverageObj(r.Coverage), "skipped", e.skippedObj(), "next", next)
 	var fs []report.Finding
 	for _, g := range r.Open {
 		sev := "warning"

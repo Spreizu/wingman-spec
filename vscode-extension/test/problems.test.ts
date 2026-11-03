@@ -102,3 +102,9 @@ test('over-anchored: the CLI finding with fix remove-marker is accepted, shown o
   const multi = '// @spec auth/user-login, checkout/order-summary\nconst a = 1;\n';
   assert.ok(fixesFor({ ...f, line: 1 }, { text: multi, rel: 'a.js' })[0]?.edits, 'a marker line with several keys still offers an edit');
 });
+
+test('parse: the recorded test states; a malformed entry is dropped', () => {
+  const r = parseProblems(JSON.stringify({ ok: true, findings: [], coverage: { 'a/x': { state: 'stale', reason: 'spec changed', last: 'passed', scenarios: { 'a/s': 'passed', bad: 3 } }, 'a/y': { state: 'nope' }, 'a/z': 4 } }));
+  assert.deepEqual(r?.coverage, { 'a/x': { state: 'stale', reason: 'spec changed', last: 'passed', scenarios: { 'a/s': 'passed' } } });
+  assert.deepEqual(parseProblems('{"ok":true,"findings":[]}')?.coverage, {});
+});

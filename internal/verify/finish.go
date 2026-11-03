@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Spreizu/wingman-spec/internal/anchors"
+	"github.com/Spreizu/wingman-spec/internal/checkparse"
 	"github.com/Spreizu/wingman-spec/internal/gitx"
 	"github.com/Spreizu/wingman-spec/internal/quality"
 	"github.com/Spreizu/wingman-spec/internal/runstate"
@@ -163,7 +164,7 @@ func (e *Env) Finish() error {
 	for i, j := range jobs {
 		r := results[i]
 		if j.name == "tests" {
-			testOut, ranTests = r.Full, true
+			testOut, ranTests = r.Full+"\n"+checkparse.JUnitLines(e.junitOf(r)), true
 		}
 		x := O("check", j.name, "ok", r.RC == 0, "rc", r.RC, "timed_out", r.TimedOut, "seconds", r.Seconds)
 		if r.Cached {
@@ -183,6 +184,11 @@ func (e *Env) Finish() error {
 		o.fail(fmt.Sprintf("validate failed (exit 1): wingman-spec validate %s\n%s", e.O.Change, strings.Join(vrep, "\n")))
 	default:
 		o.check(O("check", "validate", "ok", true, "rc", 0, "seconds", vsecs))
+	}
+	if ranTests {
+		if _, err := e.tr().RecordResults(trace.Effective(e.R.LivingSpecs(), changeDir), testOut); err != nil {
+			o.warn("the test results were not recorded: " + err.Error())
+		}
 	}
 	e.finishVisual(changeDir, run, &o)
 	// trace: every scenario of the change has a tagged test (visual ones are covered by the visual check)
@@ -415,7 +421,7 @@ func (e *Env) testEvidence(o *outcome, ran bool, out string, scens []*quality.Sc
 	var failed, unlisted, passed []string
 	for _, s := range sc {
 		switch ev.ByScenario[s.ID] {
-		case "failed":
+		case "failed", "skipped":
 			failed = append(failed, s.ID)
 		case "unlisted":
 			unlisted = append(unlisted, s.ID)
@@ -431,6 +437,8 @@ func (e *Env) testEvidence(o *outcome, ran bool, out string, scens []*quality.Sc
 		switch {
 		case len(v.Failed) > 0:
 			st = "failed"
+		case len(v.Skipped) > 0:
+			st = "skipped"
 		case len(v.Passed) > 0 && len(v.Unlisted) == 0:
 			st = "passed"
 		case len(v.Passed) > 0:

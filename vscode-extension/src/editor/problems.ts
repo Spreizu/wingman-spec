@@ -5,7 +5,7 @@ import { isTestFile } from '../model/anchors.ts';
 import { PROBLEMS_SOURCE, coveredByLive, diagnosticOf, fixesFor, findingId, groupByFile, tagTitleEdit, testCases } from '../model/problems.ts';
 import type { FixAction } from '../model/problems.ts';
 import type { ProjectModel } from '../model/types.ts';
-import type { VerifierFinding } from '../model/verifier.ts';
+import type { RequirementCoverage, VerifierFinding } from '../model/verifier.ts';
 import { toWorkspaceEdit } from './markerFixes.ts';
 import type { TraceCache } from './anchorCode.ts';
 import type { VerifierClient } from './verifier.ts';
@@ -38,6 +38,8 @@ export class ProblemsService implements vscode.CodeActionProvider, vscode.Dispos
   private readonly diag = vscode.languages.createDiagnosticCollection('wingman-spec-problems');
   private readonly found = new Map<string, VerifierFinding>();
   private readonly roots = new Map<string, ProjectModel>();
+  /** Per project root: the recorded test state of each requirement (from the same `problems` run). */
+  readonly coverage = new Map<string, Record<string, RequirementCoverage>>();
   private timer: NodeJS.Timeout | undefined;
   private running: Promise<void> | undefined;
   private again = false;
@@ -98,6 +100,7 @@ export class ProblemsService implements vscode.CodeActionProvider, vscode.Dispos
           return;
         }
         this.roots.set(p.root, p);
+        this.coverage.set(p.root, r.value.coverage);
         all.push(...r.value.findings);
       });
     }
@@ -129,6 +132,7 @@ export class ProblemsService implements vscode.CodeActionProvider, vscode.Dispos
   }
 
   clear(): void {
+    this.coverage.clear();
     this.diag.clear();
     this.found.clear();
     this.summary = { error: 0, warning: 0, info: 0, problem: '' };

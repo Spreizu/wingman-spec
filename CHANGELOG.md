@@ -4,6 +4,14 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
 ## Unreleased
 
+- **Test results per requirement.** `finish` now records what its test run showed for each scenario (passed, failed,
+  skipped; from the runner output and, when `commands.junit` is set, the JUnit report) in
+  `.wingman-spec/cache/test-results.json` (derived data, git-ignored), with the commit and tree and fingerprints of the
+  requirement text and of the code under its `@spec` markers. `anchors --json`, `drift` and `problems --json` read it
+  back as passed, failed, skipped, not run, or stale (spec changed / code changed); `drift` adds advisory
+  `failing-test` and `stale-test-result` gaps (they never fail drift) and a `tests:` count line, and the extension's
+  Requirements view says "2 tests passed" / "failed" / "stale" with the details in the tooltip. A skipped test is now
+  reported as skipped (it still fails `finish`).
 - **`Verify:` line.** A requirement that no test can prove (a manual, a legal text, a performance budget checked by
   hand) may say `Verify: inspection`, `Verify: analysis` or `Verify: demonstration` under its SHALL sentence, with an
   optional note. Its scenarios count as verified in `trace` (`N verified without a test`), and `drift`, the anchor lint

@@ -103,3 +103,17 @@ func TestParseANSI(t *testing.T) {
 		t.Fatalf("%+v", s)
 	}
 }
+
+// A JUnit report reads as TAP lines: a failure or error is `not ok`, a skipped case `ok ... # SKIP`, nested suites too.
+func TestJUnitLines(t *testing.T) {
+	x := `<testsuites><testsuite name="a"><testcase classname="todo" name="[todo/added] adds"/>` +
+		`<testcase name="[todo/removed]"><failure message="m"/></testcase><testcase name="[todo/x]"><error/></testcase>` +
+		`<testsuite name="b"><testcase name="[todo/cleared]"><skipped/></testcase></testsuite></testsuite></testsuites>`
+	want := "ok - todo [todo/added] adds\nnot ok - [todo/removed]\nnot ok - [todo/x]\nok - [todo/cleared] # SKIP\n"
+	if got := JUnitLines([]byte(x)); got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if JUnitLines([]byte("not xml")) != "" || JUnitLines(nil) != "" {
+		t.Error("not a JUnit report: want empty")
+	}
+}

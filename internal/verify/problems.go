@@ -3,6 +3,7 @@ package verify
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -83,7 +84,7 @@ var (
 	mdPrefixRE   = regexp.MustCompile(`^[^\s:]+\.md:\d+: `)
 )
 
-var advisoryGap = map[string]bool{"misplaced-marker": true, "over-anchored": true, "stale-anchor": true, "unconfirmed-requirement": true, "observed-incomplete": true}
+var advisoryGap = map[string]bool{"failing-test": true, "stale-test-result": true, "misplaced-marker": true, "over-anchored": true, "stale-anchor": true, "unconfirmed-requirement": true, "observed-incomplete": true}
 
 func markerSpan(f string, line int) (col, length int) {
 	t, _ := lineOf(f, line)
@@ -119,7 +120,7 @@ func (e *Env) driftFindings(gaps []trace.Gap, reqs *trace.Reqs) []Finding {
 			if len(g.Files) > 0 {
 				push(Finding{File: filepath.Join(e.R.Specs, g.Files[0]), Line: max(1, g.Line), Col: 1, Length: 1})
 			}
-		case "unconfirmed-requirement", "unanchored-requirement", "untested-requirement":
+		case "unconfirmed-requirement", "unanchored-requirement", "untested-requirement", "failing-test", "stale-test-result":
 			r, ok := reqAt()
 			if !ok {
 				continue
@@ -296,9 +297,11 @@ func (e *Env) Problems() error {
 		}
 	}
 	e.O.Change = saved
+	var cov map[string]trace.Coverage
 	if md != "off" {
 		tr := e.tr()
 		r := tr.Drift("", false)
+		cov = r.Coverage
 		pendReq, pendScn := map[string]bool{}, map[string]bool{}
 		for _, name := range e.activeChanges() {
 			for _, d := range trace.Deltas(e.R.Change(name)) {
@@ -326,13 +329,17 @@ func (e *Env) Problems() error {
 		fs = append(fs, e.driftFindings(open, trace.Living(e.R.LivingSpecs()))...)
 		notes = append(notes, r.Notes...)
 	}
+	if cov == nil {
+		cov = e.tr().CoverageOf(trace.Living(e.R.LivingSpecs()))
+	}
+	maps.DeleteFunc(cov, func(_ string, c trace.Coverage) bool { return c.State == "not run" })
 	fs = finishFindings(fs)
 	counts := map[string]int{"error": 0, "warning": 0, "info": 0}
 	for _, f := range fs {
 		counts[f.Severity]++
 	}
 	e.saySkipped()
-	x := O("ok", counts["error"] == 0, "mode", md, "counts", O("error", counts["error"], "warning", counts["warning"], "info", counts["info"]), "findings", list(fs), "notes", NonEmpty(notes), "skipped", e.skippedObj())
+	x := O("ok", counts["error"] == 0, "mode", md, "counts", O("error", counts["error"], "warning", counts["warning"], "info", counts["info"]), "findings", list(fs), "notes", NonEmpty(notes), "coverage", If(len(cov) > 0, cov), "skipped", e.skippedObj())
 	return e.writeReport("Problems", findingsOfProblems(fs), x, false)
 }
 

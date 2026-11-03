@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { TraceCache } from '../editor/anchorCode.ts';
+import type { ProblemsService } from '../editor/problems.ts';
 import { buildTraceNodes } from '../model/traceTree.ts';
 import type { TraceNode } from '../model/traceTree.ts';
 import type { ProjectStore } from '../store.ts';
@@ -26,9 +27,11 @@ class TraceProvider implements vscode.TreeDataProvider<TraceNode> {
   readonly onDidChangeTreeData = this.emitter.event;
   private readonly cache: TraceCache;
   private readonly store: ProjectStore;
-  constructor(store: ProjectStore, cache: TraceCache) {
+  private readonly problems: ProblemsService;
+  constructor(store: ProjectStore, cache: TraceCache, problems: ProblemsService) {
     this.store = store;
     this.cache = cache;
+    this.problems = problems;
   }
   fire(): void {
     this.emitter.fire();
@@ -42,23 +45,25 @@ class TraceProvider implements vscode.TreeDataProvider<TraceNode> {
   }
   private roots(): TraceNode[] {
     const models = this.cache.all();
-    if (models.length === 1 && models[0]) return buildTraceNodes(models[0]);
+    const cov = this.problems.coverage;
+    if (models.length === 1 && models[0]) return buildTraceNodes(models[0], cov.get(models[0].root));
     return models.map((m) => ({
       id: `project/${m.root}`,
       label: this.store.projects.find((p) => p.root === m.root)?.workspaceFolder.split(/[\\/]/).pop() ?? m.root,
       icon: 'root-folder',
-      children: buildTraceNodes(m),
+      children: buildTraceNodes(m, cov.get(m.root)),
     }));
   }
 }
 
-export function registerTraceView(store: ProjectStore, cache: TraceCache): vscode.Disposable {
-  const provider = new TraceProvider(store, cache);
+export function registerTraceView(store: ProjectStore, cache: TraceCache, problems: ProblemsService): vscode.Disposable {
+  const provider = new TraceProvider(store, cache, problems);
   const setContext = (): void => void vscode.commands.executeCommand('setContext', 'wingmanSpec.hasProject', store.projects.some((p) => !p.error));
   setContext();
   return vscode.Disposable.from(
     vscode.window.registerTreeDataProvider('wingmanSpec.traceability', provider),
     cache.onDidChange(() => provider.fire()),
+    problems.onDidChange(() => provider.fire()),
     vscode.commands.registerCommand('wingmanSpec.openNodeFile', (node?: TraceNode) => {
       if (node?.file) return vscode.commands.executeCommand('wingmanSpec.openFile', node.file, node.line);
       return undefined;

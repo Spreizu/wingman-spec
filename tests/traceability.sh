@@ -315,6 +315,79 @@ $V drift --text | cat > "$T/pipe.drift.txt"; $V drift --text > "$T/file.drift.tx
 expect "drift --text through a pipe is complete (same bytes as the file output)" '[ "$(wc -c < "$T/pipe.drift.txt")" -gt 70000 ] && cmp -s "$T/pipe.drift.txt" "$T/file.drift.txt"'
 rm -rf .wingman-spec/specs/bulk
 
+echo "== recorded test results: passed, failed, skipped, not run, stale (spec or code changed)"
+mkdir -p "$T/cov" && cd "$T/cov" && ws_project . && V="$WS"
+mkdir -p .wingman-spec/specs src test .wingman-spec/changes/clear/specs
+cat > .wingman-spec/specs/todo.md <<'SPEC'
+## Purpose
+Keeps a list of things to do.
+
+## Requirements
+
+### Requirement: Add a todo
+The system SHALL append a todo with the given text to the list.
+Why: A person wants to keep a list of things to do, so that nothing is forgotten.
+
+#### Scenario: Added
+- **WHEN** the user adds "buy milk"
+- **THEN** the list is ["buy milk"]
+
+### Requirement: Remove a todo
+The system SHALL remove the todo with the given index.
+Why: A person wants to drop what is done, so that the list stays short.
+
+#### Scenario: Removed
+- **WHEN** the user removes index 0
+- **THEN** the list is empty
+
+### Requirement: Count the todos
+The system SHALL return the number of todos.
+Why: A person wants to see how much is left, so that they can plan the day.
+
+#### Scenario: Counted
+- **WHEN** the list has two todos
+- **THEN** the count is 2
+SPEC
+printf '## ADDED\n\n### Requirement: Clear the list\nThe system SHALL remove every todo.\nWhy: A person wants a fresh start, so that old todos do not pile up.\n\n#### Scenario: Cleared\n- **WHEN** the user clears the list\n- **THEN** the list is empty\n' > .wingman-spec/changes/clear/specs/todo.md
+printf 'Size: S\nRisk: none\n\n## Why\nA fresh start.\n\n## What Changes\n- Clears the list.\n' > .wingman-spec/changes/clear/proposal.md
+printf '## 1. Clear\n- [x] 1.1 clear\n  - Spec: todo/clear-the-list\n  - Files: src/todo.js\n  - Done when: `true` exits 0\n' > .wingman-spec/changes/clear/tasks.md
+printf '/**\n * @spec todo/add-a-todo\n */\nexport function add(l, t) {\n  return [...l, t];\n}\n\n/**\n * @spec todo/remove-a-todo\n */\nexport function remove(l, i) {\n  return l.filter((_, j) => j !== i);\n}\n\n/**\n * @spec todo/count-the-todos\n */\nexport function count(l) {\n  return l.length;\n}\n\n/**\n * @spec todo/clear-the-list\n */\nexport function clear() {\n  return [];\n}\n' > src/todo.js
+printf "// [todo/added] [todo/removed] [todo/counted] [todo/cleared]\n" > test/todo.test.js
+printf 'cat test/out.tap 2>/dev/null; exit 0\n' > run-tests.sh
+printf 'ok 1 - [todo/added] adds\nnot ok 2 - [todo/removed] removes\nok 3 - [todo/cleared] clears # SKIP later\n' > test/out.tap
+ws_cmd test "sh run-tests.sh"
+git add -A && git commit -qm init
+R=.wingman-spec/cache/test-results.json
+rc=0; $V finish clear > "$T/f.json" 2>/dev/null || rc=$?
+expect "finish fails on the failing and the skipped test, and records every result it saw" '[ $rc = 1 ] && [ -f "$R" ] && [ "$(J "$R" requirements.todo/add-a-todo.scenarios.todo/added)" = passed ] && [ "$(J "$R" requirements.todo/remove-a-todo.scenarios.todo/removed)" = failed ] && [ "$(J "$R" requirements.todo/clear-the-list.scenarios.todo/cleared)" = skipped ]'
+expect "the record carries the commit and the tree, and a scenario the output does not name is not recorded" '[ -n "$(J "$R" requirements.todo/add-a-todo.commit)" ] && [ -n "$(J "$R" requirements.todo/add-a-todo.tree)" ] && [ "$(J "$R" requirements.todo/count-the-todos)" = undefined ]'
+expect "the results are derived data: git ignores them" 'git check-ignore -q "$R"'
+rc=0; $V anchors clear --json > "$T/a.json" || true
+expect "anchors --json shows each requirement's state (the change's own requirement: skipped)" '[ "$(J "$T/a.json" requirements.todo/clear-the-list.coverage.state)" = skipped ] && [ "$(J "$T/a.json" coverage.results)" = "$R" ]'
+$V anchors --json > "$T/a.json" 2>/dev/null || true
+expect "...living ones: passed, failed, not run" '[ "$(J "$T/a.json" requirements.todo/add-a-todo.coverage.state)" = passed ] && [ "$(J "$T/a.json" requirements.todo/remove-a-todo.coverage.state)" = failed ] && [ "$(J "$T/a.json" "requirements.todo/count-the-todos.coverage.state")" = "not run" ]'
+rc=0; $V drift > "$T/d.json" 2>/dev/null || rc=$?
+expect "drift lists the failing test as an advisory failing-test gap (drift does not fail on it)" '[ "$(J "$T/d.json" advisory.0.key)" = failing-test:todo/remove-a-todo ] && ! J "$T/d.json" open | grep -q failing-test && grep -q "\[todo/removed\]" "$T/d.json" && [ "$(J "$T/d.json" coverage.counts.failed)" = 1 ]'
+$V drift --text > "$T/d.txt" 2>/dev/null || true
+expect "drift --text counts the states" 'grep -q "tests: 1 passed, 1 failed, 1 not run" "$T/d.txt"'
+sed -i 's#  return \[...l, t\];#  // keep the order\n  return [...l, t];#' src/todo.js; $V drift > "$T/d.json" 2>/dev/null || true
+expect "a comment added to the anchored code: the result stays current" '! grep -q "stale-test-result" "$T/d.json"'
+sed -i 's#  return \[...l, t\];#  return l.concat([t]);#' src/todo.js; $V drift > "$T/d.json" 2>/dev/null || true
+expect "the anchored code changed: stale (code changed), advisory info" 'grep -q "stale-test-result:todo/add-a-todo" "$T/d.json" && grep -q "the code changed since" "$T/d.json" && [ "$(J "$T/d.json" "coverage.counts.stale: code changed")" = 1 ]'
+sed -i 's/SHALL remove the todo with the given index./SHALL remove the todo at the given index./' .wingman-spec/specs/todo.md; $V drift > "$T/d.json" 2>/dev/null || true
+expect "the requirement text changed: stale (spec changed)" 'grep -q "stale-test-result:todo/remove-a-todo" "$T/d.json" && grep -q "the spec changed since" "$T/d.json"'
+$V problems --json > "$T/p.json" 2>/dev/null || true
+expect "problems --json carries the recorded states for the editor, and the failing-test finding sits on the requirement" '[ "$(J "$T/p.json" coverage.todo/add-a-todo.reason)" = "code changed" ] && [ "$(J "$T/p.json" "coverage.todo/count-the-todos")" = undefined ]'
+printf 'ok 1 - [todo/added] adds\nok 2 - [todo/removed] removes\nok 3 - [todo/cleared] clears\nok 4 - [todo/counted] counts\n' > test/out.tap
+rm -rf .wingman-spec/runs; rc=0; WINGMAN_SPEC_TRACEABILITY=off $V finish clear > "$T/f.json" 2>/dev/null || rc=$?
+expect "with traceability off finish still records the results: all passed now, nothing stale" '[ "$(J "$R" requirements.todo/count-the-todos.scenarios.todo/counted)" = passed ] && { $V drift > "$T/d.json" 2>/dev/null; true; } && ! grep -q "stale-test-result\|failing-test" "$T/d.json" && [ "$(J "$T/d.json" coverage.counts.passed)" = 3 ]'
+: > test/out.tap
+printf '<testsuites><testsuite name="todo"><testcase classname="todo" name="[todo/counted] counts"><failure message="x"/></testcase></testsuite></testsuites>\n' > report.xml
+ws_cmd junit report.xml; printf 'touch report.xml; exit 0\n' >> run-tests.sh
+rm -rf .wingman-spec/runs; WINGMAN_SPEC_TRACEABILITY=off $V finish clear > "$T/f.json" 2>/dev/null || true
+expect "a JUnit report (commands.junit) is read too: a failing testcase is recorded as failed" '[ "$(J "$R" requirements.todo/count-the-todos.scenarios.todo/counted)" = failed ] && [ "$(J "$R" requirements.todo/add-a-todo.scenarios.todo/added)" = passed ]'
+cd "$T/p" || exit 1
+
 echo
 echo "traceability: passed=$PASS failed=$FAIL"
 [ "$FAIL" = 0 ]

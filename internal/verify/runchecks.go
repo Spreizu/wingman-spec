@@ -45,17 +45,27 @@ func (e *Env) writeLog(dir, name string, r Result) string {
 	return f
 }
 
+// junitOf is the configured JUnit report when the test run r wrote it (nil: none, or older than the run).
+func (e *Env) junitOf(r Result) []byte {
+	p := e.Cfg.Commands.JUnit
+	if p == "" {
+		return nil
+	}
+	if !filepath.IsAbs(p) {
+		p = filepath.Join(e.code, p)
+	}
+	if st, err := os.Stat(p); err == nil && !st.ModTime().Before(time.Now().Add(-time.Duration(r.Seconds*float64(time.Second))-2*time.Second)) {
+		b, _ := os.ReadFile(p)
+		return b
+	}
+	return nil
+}
+
 // parsed reads a command's output (and the configured JUnit report when the run wrote it).
 func (e *Env) parsed(name string, r Result) checkparse.Summary {
 	var junit []byte
-	if j := e.Cfg.Commands.JUnit; j != "" && (name == "test" || name == "tests") {
-		p := j
-		if !filepath.IsAbs(p) {
-			p = filepath.Join(e.code, j)
-		}
-		if st, err := os.Stat(p); err == nil && !st.ModTime().Before(time.Now().Add(-time.Duration(r.Seconds*float64(time.Second))-2*time.Second)) {
-			junit, _ = os.ReadFile(p)
-		}
+	if name == "test" || name == "tests" {
+		junit = e.junitOf(r)
 	}
 	out := r.Full
 	if out == "" {

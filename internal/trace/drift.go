@@ -236,15 +236,16 @@ type Gap struct {
 
 // DriftReport is the drift of the living specs against the code.
 type DriftReport struct {
-	Gaps         []Gap          `json:"gaps"`
-	Open         []Gap          `json:"open"`
-	Accepted     []Gap          `json:"accepted"`
-	Counts       map[string]int `json:"counts"`
-	Requirements int            `json:"requirements"`
-	Facts        Facts          `json:"-"`
-	Reqs         *Reqs          `json:"-"`
-	Notes        []string       `json:"notes"`
-	Observed     map[string]int `json:"observed"`
+	Gaps         []Gap               `json:"gaps"`
+	Open         []Gap               `json:"open"`
+	Accepted     []Gap               `json:"accepted"`
+	Counts       map[string]int      `json:"counts"`
+	Requirements int                 `json:"requirements"`
+	Facts        Facts               `json:"-"`
+	Reqs         *Reqs               `json:"-"`
+	Notes        []string            `json:"notes"`
+	Observed     map[string]int      `json:"observed"`
+	Coverage     map[string]Coverage `json:"-"`
 }
 
 // Acceptable gap types: they belong to a requirement, so accepting one is an `Accepted:` line on it.
@@ -388,7 +389,16 @@ func (c Ctx) Drift(pendingDir string, light bool) DriftReport {
 				Hint: fmt.Sprintf("read the diff (git show %s -- %s); if the requirement still holds, `wingman-spec drift decide stale-anchor:%s@%s --accept --note \"...\"` (an `Accepted:` line on the requirement; commit it; a later code change reopens the gap); otherwise update the requirement or the code", x.Commit[:8], x.File, x.Key, x.File)})
 		}
 	}
-	rep := DriftReport{Gaps: []Gap{}, Open: []Gap{}, Accepted: []Gap{}, Counts: map[string]int{}, Requirements: reqs.Len(), Facts: facts, Reqs: reqs, Notes: notes,
+	var cov map[string]Coverage
+	if !light {
+		cov = c.CoverageOf(reqs)
+		for _, k := range reqs.keys {
+			if g, ok := coverageGap(k, reqs.m[k], cov[k]); ok {
+				add(g)
+			}
+		}
+	}
+	rep := DriftReport{Coverage: cov, Gaps: []Gap{}, Open: []Gap{}, Accepted: []Gap{}, Counts: map[string]int{}, Requirements: reqs.Len(), Facts: facts, Reqs: reqs, Notes: notes,
 		Observed: map[string]int{"entries": len(observed), "files": len(obsCaps)}}
 	if rep.Notes == nil {
 		rep.Notes = []string{}
@@ -408,6 +418,30 @@ func (c Ctx) Drift(pendingDir string, light bool) DriftReport {
 		rep.Gaps = append(rep.Gaps, g)
 	}
 	return rep
+}
+
+// coverageGap is the advisory gap of a requirement whose recorded test result failed, was skipped, or is stale.
+func coverageGap(k string, r *Requirement, cv Coverage) (Gap, bool) {
+	when := cut(cv.At, 10)
+	if cv.Commit != "" {
+		when += ", " + cut(cv.Commit, 8)
+	}
+	var bad []string
+	for id, st := range cv.Scenarios {
+		if st == "failed" || st == "skipped" {
+			bad = append(bad, "["+id+"]")
+		}
+	}
+	slices.Sort(bad)
+	switch cv.State {
+	case "failed", "skipped":
+		return Gap{Type: "failing-test", Subject: k, Severity: "warn", Text: fmt.Sprintf("requirement %q: the last recorded test run (%s) %s %s", r.Name, when, cv.State, strings.Join(bad, ", ")),
+			Hint: "fix the code or the test (do not skip it), then run the tests through `wingman-spec finish <change>` to record the result"}, true
+	case "stale":
+		return Gap{Type: "stale-test-result", Subject: k, Severity: "info", Text: fmt.Sprintf("requirement %q: the last recorded test result (%s, %s) is stale: the %s since", r.Name, cv.Last, when, cv.Reason),
+			Hint: "run the tests through `wingman-spec finish <change>` again to record a current result"}, true
+	}
+	return Gap{}, false
 }
 
 // specPathOf reports a code-repo path that is a spec file of capability cap (living, delta or archived).

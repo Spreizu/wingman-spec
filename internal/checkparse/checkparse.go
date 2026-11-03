@@ -213,6 +213,38 @@ func parseJUnit(s *Summary, b []byte) {
 	walk(root.junitSuite, "")
 }
 
+// JUnitLines turns a JUnit XML report into one TAP line per test case (`ok`, `not ok`, `ok ... # SKIP`), so the tags in
+// the test names read the same as in a runner's own output ("" when b is not a JUnit report).
+func JUnitLines(b []byte) string {
+	var root struct {
+		XMLName xml.Name
+		junitSuite
+	}
+	if len(b) == 0 || xml.Unmarshal(b, &root) != nil || (root.XMLName.Local != "testsuites" && root.XMLName.Local != "testsuite") {
+		return ""
+	}
+	var out strings.Builder
+	var walk func(js junitSuite)
+	walk = func(js junitSuite) {
+		for _, c := range js.Cases {
+			name := strings.Join(strings.Fields(strings.TrimSpace(c.Classname+" "+c.Name)), " ")
+			switch {
+			case c.Failure != nil || c.Error != nil:
+				out.WriteString("not ok - " + name + "\n")
+			case c.Skipped != nil:
+				out.WriteString("ok - " + name + " # SKIP\n")
+			default:
+				out.WriteString("ok - " + name + "\n")
+			}
+		}
+		for _, x := range js.Suites {
+			walk(x)
+		}
+	}
+	walk(root.junitSuite)
+	return out.String()
+}
+
 func bodyOf(c junitCase) string {
 	if c.Failure != nil {
 		return c.Failure.Body

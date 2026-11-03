@@ -78,7 +78,7 @@ export function activate(context: vscode.ExtensionContext): void {
     registerDiagnostics(store),
     traceCache,
     registerAnchorCode(traceCache, panel),
-    registerTraceView(store, traceCache),
+    registerTraceView(store, traceCache, problems.service),
     registerScaffoldCommands(store, panel, verifier),
     problems.disposable,
     vscode.languages.registerCodeLensProvider(markdownFiles, codeLens),

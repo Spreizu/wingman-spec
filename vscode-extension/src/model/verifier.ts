@@ -32,10 +32,44 @@ export interface VerifierFinding {
   fix?: FindingFix;
 }
 
+/** The last recorded test result of one requirement (`finish` records them; stale: the spec or the code changed since). */
+export interface RequirementCoverage {
+  state: 'passed' | 'failed' | 'skipped' | 'stale';
+  reason?: string;
+  last?: string;
+  at?: string;
+  commit?: string;
+  scenarios: Record<string, string>;
+}
+
 export interface ProblemsReport {
   ok: boolean;
   findings: VerifierFinding[];
   notes: string[];
+  /** Requirement key -> its recorded test state; requirements without a recorded result are absent. */
+  coverage: Record<string, RequirementCoverage>;
+}
+
+const COVERAGE_STATES = new Set(['passed', 'failed', 'skipped', 'stale']);
+
+function coverageOf(v: unknown): Record<string, RequirementCoverage> {
+  const out: Record<string, RequirementCoverage> = {};
+  if (typeof v !== 'object' || v === null) return out;
+  for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof x !== 'object' || x === null) continue;
+    const o = x as Record<string, unknown>;
+    if (!isStr(o['state']) || !COVERAGE_STATES.has(o['state'])) continue;
+    const sc = typeof o['scenarios'] === 'object' && o['scenarios'] !== null ? Object.fromEntries(Object.entries(o['scenarios'] as Record<string, unknown>).filter((e): e is [string, string] => isStr(e[1]))) : {};
+    out[k] = {
+      state: o['state'] as RequirementCoverage['state'],
+      ...(isStr(o['reason']) ? { reason: o['reason'] } : {}),
+      ...(isStr(o['last']) ? { last: o['last'] } : {}),
+      ...(isStr(o['at']) ? { at: o['at'] } : {}),
+      ...(isStr(o['commit']) ? { commit: o['commit'] } : {}),
+      scenarios: sc,
+    };
+  }
+  return out;
 }
 
 const SEVERITIES = new Set(['error', 'warning', 'info']);
@@ -88,7 +122,7 @@ export function parseProblems(stdout: string): ProblemsReport | undefined {
   const o = j as Record<string, unknown>;
   const findings = (o['findings'] as unknown[]).map(findingOf).filter((f): f is VerifierFinding => f !== undefined);
   const notes = Array.isArray(o['notes']) ? (o['notes'] as unknown[]).filter(isStr) : [];
-  return { ok: o['ok'] === true, findings, notes };
+  return { ok: o['ok'] === true, findings, notes, coverage: coverageOf(o['coverage']) };
 }
 
 export interface SyncCheckReport {

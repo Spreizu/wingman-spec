@@ -4,6 +4,7 @@ import type { Route } from '../webview/types.ts';
 import { plain } from './markdown.ts';
 import { revealRoute } from './reveal.ts';
 import type { AnchorRef, GapType, RequirementFlag, TraceModel, TraceRequirement } from './traceability.ts';
+import type { RequirementCoverage } from './verifier.ts';
 
 export interface TraceNode {
   id: string;
@@ -50,10 +51,19 @@ function anchorNode(codeRoot: string, kind: 'code' | 'test', a: AnchorRef, id: s
   };
 }
 
-export function requirementNode(model: TraceModel, r: TraceRequirement, prefix: string): TraceNode {
+/** One line about the last recorded test result: "failed [cap/x] (2026-11-03, 1a2b3c4d)", or "stale: code changed (passed …)". */
+export function coverageText(c: RequirementCoverage): string {
+  const when = [c.at?.slice(0, 10), c.commit?.slice(0, 8)].filter(Boolean).join(', ');
+  const bad = Object.entries(c.scenarios).filter(([, s]) => s === 'failed' || s === 'skipped').map(([id]) => `[${id}]`);
+  const what = c.state === 'stale' ? `stale: ${c.reason ?? 'changed'} since it ${c.last ?? 'ran'}` : `${c.state}${bad.length ? ` ${bad.join(', ')}` : ''}`;
+  return `${what}${when ? ` (${when})` : ''}`;
+}
+
+export function requirementNode(model: TraceModel, r: TraceRequirement, prefix: string, cov?: RequirementCoverage): TraceNode {
   // A requirement that only exists in a pending change's delta has no anchors yet.
   const pending = model.requirements.get(r.key) !== r;
-  const tests = r.verify && !r.tests.length ? `verified by ${r.verify}` : plural(r.tests.length, 'test');
+  const ran = cov ? ` ${cov.state}` : '';
+  const tests = r.verify && !r.tests.length ? `verified by ${r.verify}` : `${plural(r.tests.length, 'test')}${ran}`;
   const bits = pending ? [r.cap, 'in this change'] : [r.cap, plural(r.code.length, 'code anchor'), tests];
   const flags = r.flags.filter((f) => !pending || f === 'no-why').map((f) => REQUIREMENT_FLAG_TEXT[f]);
   const children: TraceNode[] = [
@@ -64,8 +74,8 @@ export function requirementNode(model: TraceModel, r: TraceRequirement, prefix: 
     id: prefix,
     label: plain(r.name),
     description: [r.why ? clip(plain(r.why), 60) : '', ...bits].filter(Boolean).join(' · '),
-    tooltip: plain([r.why ? `Why: ${r.why}` : '', r.statement, ...flags.map((f) => `Warning: ${f}`)].filter(Boolean).join('\n')),
-    icon: r.flags.includes('no-why') ? 'warning' : !pending && r.flags.length ? 'circle-outline' : 'pass',
+    tooltip: plain([r.why ? `Why: ${r.why}` : '', r.statement, ...flags.map((f) => `Warning: ${f}`), !pending && cov ? `Last test run: ${coverageText(cov)}` : ''].filter(Boolean).join('\n')),
+    icon: r.flags.includes('no-why') ? 'warning' : !pending && (cov?.state === 'failed' || cov?.state === 'skipped') ? 'close' : !pending && r.flags.length ? 'circle-outline' : !pending && cov?.state === 'stale' ? 'history' : 'pass',
     file: r.file,
     line: r.line,
     route: revealRoute(model, { type: 'requirement', key: r.key }),
@@ -74,7 +84,7 @@ export function requirementNode(model: TraceModel, r: TraceRequirement, prefix: 
 }
 
 /** The whole tree for one project. */
-export function buildTraceNodes(model: TraceModel): TraceNode[] {
+export function buildTraceNodes(model: TraceModel, coverage: Record<string, RequirementCoverage> = {}): TraceNode[] {
   const out: TraceNode[] = [];
   if (model.mode === 'off' && !model.hasLayer) {
     return [{ id: 'off', label: 'Traceability is off', description: 'set `traceability: on` in wingman-spec.yaml', icon: 'info', children: [] }];
@@ -95,7 +105,7 @@ export function buildTraceNodes(model: TraceModel): TraceNode[] {
       label: cap,
       description: plural(rs.length, 'requirement'),
       icon: 'symbol-ruler',
-      children: rs.map((r) => requirementNode(model, r, `req/${r.key}`)),
+      children: rs.map((r) => requirementNode(model, r, `req/${r.key}`, coverage[r.key])),
     })),
   });
 

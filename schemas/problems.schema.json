@@ -18,6 +18,7 @@
     },
     "findings": { "type": "array" },
     "notes": { "type": "array" },
+    "coverage": { "type": "object", "description": "requirement key -> the recorded test state (passed, failed, skipped or stale with a reason); a requirement without a recorded result is not listed" },
     "skipped": { "type": "array" }
   }
 }
