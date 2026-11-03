@@ -8,6 +8,8 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
   and sibling repos whose `specs:` link points at it) and lists them as `code repos`, so a specs repository with linked
   code is brownfield instead of greenfield. A linked code repo may run `/spec-adopt` (and `mode --for adopt`) instead of
   being refused as an unsupported layout; the greenfield commands still run in the specs repository.
+- **Extension package.** The README screenshots load from GitHub instead of being packed into the vsix (about 1.1 MB
+  smaller per platform), which also fixes the broken images on the Marketplace and Open VSX pages.
 
 ## 0.12.1
 
