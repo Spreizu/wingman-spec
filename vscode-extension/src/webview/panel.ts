@@ -17,9 +17,9 @@ import type { ActionResult, CliAction } from '../model/cliActions.ts';
 import { timelinePath } from '../model/timeline.ts';
 import type { AgentFiles } from '../editor/agentFiles.ts';
 import { actionKey } from './types.ts';
-import type { BranchState, RoadmapState, Route, ViewData } from './types.ts';
+import type { RoadmapState, Route, ViewData } from './types.ts';
 
-const PAGES = new Set(['overview', 'change', 'adrs', 'adr', 'specs', 'spec', 'history', 'archived', 'branch', 'roadmap']);
+const PAGES = new Set(['overview', 'change', 'adrs', 'adr', 'specs', 'spec', 'history', 'archived', 'roadmap']);
 
 /** Scaffold commands a webview may trigger. Everything else is ignored. */
 const WEBVIEW_COMMANDS = new Set(['newChange', 'newAdr', 'promoteAdr', 'promoteChange', 'supersedeAdr', 'refreshView']);
@@ -29,7 +29,6 @@ export const TERMINAL_COMMAND = /^\.wingman-spec\/bin\/wingman-spec [A-Za-z0-9 .
 
 /** Data read from git and the verifier in the background (see editor/panelData.ts). */
 export interface PanelExtras {
-  branch(root: string | undefined): BranchState;
   roadmap(root: string | undefined): RoadmapState;
   dashboard(root: string, change: string): DashboardInputs | undefined;
   settled?(ms: number): Promise<void>;
@@ -153,7 +152,6 @@ export class SpecPanel implements vscode.Disposable {
         if (text !== undefined) texts[p] = text;
       }),
     );
-    const branch = route.page === 'branch' ? this.extras?.branch(route.root) : undefined;
     const roadmap = route.page === 'roadmap' ? this.extras?.roadmap(route.root) : undefined;
     const greenfield = projects.some((p) => existsSync(greenfieldFile(p.root)));
     const dash = (): DashboardInputs | undefined => (route.page === 'change' && this.extras ? this.extras.dashboard(route.root, route.name) : undefined);
@@ -163,7 +161,7 @@ export class SpecPanel implements vscode.Disposable {
       dashboard = dash();
     }
     const agentUpdates = vscode.workspace.isTrusted ? (this.agentFiles?.list() ?? []) : [];
-    return { projects, route, texts, baseSpecs, setup: setupStatus(workspaceRoots(this.store)), trace: this.traces(), revealTick: this.revealTick, ...(agentUpdates.length ? { agentUpdates } : {}), ...(branch ? { branch } : {}), ...(roadmap ? { roadmap } : {}), ...(greenfield ? { greenfield } : {}), ...(dashboard ? { dashboard } : {}), ...(this.extras?.runAction ? { actions: { trusted: vscode.workspace.isTrusted, results: this.results, ...(this.running ? { running: this.running } : {}) } } : {}) };
+    return { projects, route, texts, baseSpecs, setup: setupStatus(workspaceRoots(this.store)), trace: this.traces(), revealTick: this.revealTick, ...(agentUpdates.length ? { agentUpdates } : {}), ...(roadmap ? { roadmap } : {}), ...(greenfield ? { greenfield } : {}), ...(dashboard ? { dashboard } : {}), ...(this.extras?.runAction ? { actions: { trusted: vscode.workspace.isTrusted, results: this.results, ...(this.running ? { running: this.running } : {}) } } : {}) };
   }
 
   async render(): Promise<void> {

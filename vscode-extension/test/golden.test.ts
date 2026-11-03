@@ -3,7 +3,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { analyze } from '../src/core/anchorDiff.ts';
 import { placementFindings } from '../src/core/placement.ts';
 import { isTestFile, isTestPath, isUiFile } from '../src/core/testpaths.ts';
 
@@ -14,18 +13,11 @@ interface AnchorCase {
   text: string;
   is_test: boolean;
   placement: { line: number; kind: string; keys: string[]; text: string }[];
-  units: { key: string; line: number; start: number; end: number; whole: boolean; header: string; body: string }[];
 }
 
 test('marker placement matches the CLI on every golden case', () => {
   for (const c of golden<AnchorCase[]>('anchors.json')) {
     assert.deepEqual(placementFindings(c.text, c.is_test).map(({ line, kind, keys, text }) => ({ line, kind, keys, text })), c.placement, c.name);
-  }
-});
-
-test('anchored units match the CLI on every golden case', () => {
-  for (const c of golden<AnchorCase[]>('anchors.json')) {
-    assert.deepEqual(analyze(c.text).map(({ key, line, start, end, whole, header, body }) => ({ key, line, start, end, whole, header, body })), c.units, c.name);
   }
 });
 

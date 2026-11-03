@@ -13,6 +13,9 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
   unused code again: the darwin-arm64 binary is 6.8 MB instead of 8.4 MB (Linux 7.4 instead of 9.0, Windows 7.7 instead
   of 9.3) and each vsix about 0.5 MB smaller. Commands, flags, defaults, help text, error messages and exit codes are
   unchanged; flags still go before or after the arguments.
+- **Branch Review removed.** The extension's Branch Review page, its `Open Branch Review` command, its node in the
+  traceability tree and the settings `wingmanSpec.branchReviewBase` and `wingmanSpec.branchReviewGit` are gone, and the
+  extension no longer runs git for it. `wingman-spec guard --base` and the other CLI commands are unchanged.
 - **Extension package.** The README screenshots load from GitHub instead of being packed into the vsix (about 1.1 MB
   smaller per platform), which also fixes the broken images on the Marketplace and Open VSX pages.
 

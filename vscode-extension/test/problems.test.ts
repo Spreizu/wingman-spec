@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { applyEdits } from '../src/model/markerFix.ts';
 import { addWhyEdit, coveredByLive, diagnosticOf, findingId, fixesFor, groupByFile, tagTitleEdit, testCases } from '../src/model/problems.ts';
-import { findingOf, parseGuard, parseProblems, parseSyncCheck } from '../src/model/verifier.ts';
+import { findingOf, parseProblems, parseSyncCheck } from '../src/model/verifier.ts';
 import type { VerifierFinding } from '../src/model/verifier.ts';
 
 const real = parseProblems(readFileSync(new URL('./fixtures/problems.json', import.meta.url), 'utf8'));
@@ -27,8 +27,6 @@ test('parse: malformed JSON, wrong shape and broken entries never throw', () => 
   const r = parseProblems(JSON.stringify({ ok: false, findings: [null, 3, { source: 'lint' }, { source: 'lint', code: 'x', severity: 'fatal', message: 'm', file: '/a', line: 1 }, { source: 'lint', code: 'x', severity: 'error', message: 'm', file: '/a', line: 0 }, { source: 'lint', code: 'ok', severity: 'info', message: 'm', file: '/a', line: 2, fix: { kind: 'nope' } }], notes: ['n', 4] }));
   assert.deepEqual(r?.findings.map((f) => [f.code, f.line, f.col, f.length, f.fix]), [['ok', 2, 1, 1, undefined]]);
   assert.deepEqual(r?.notes, ['n']);
-  assert.deepEqual(parseGuard('x', '/r', 'c'), []);
-  assert.deepEqual(parseGuard(JSON.stringify({ level: 'warn', findings: [{ kind: 'changed-anchor', key: 'a/b', file: 'src/x.ts', line: 4, text: 't' }, { kind: 1 }] }), '/r', 'c').map((f) => [f.source, f.code, f.severity, f.file, f.line, f.change]), [['guard', 'changed-anchor', 'warning', '/r/src/x.ts', 4, 'c']]);
   assert.equal(parseSyncCheck(JSON.stringify({ synced: false, problems: ['p'], warnings: [] }))?.ok, false);
   assert.equal(parseSyncCheck('nope'), undefined);
 });

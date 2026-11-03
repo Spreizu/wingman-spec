@@ -5,8 +5,8 @@ import { cli } from '../core/paths.ts';
 import * as vscode from 'vscode';
 import { parseRoadmap } from '../model/roadmap.ts';
 import type { RoadmapReport } from '../model/roadmap.ts';
-import { parseGuard, parseProblems, parseSyncCheck } from '../model/verifier.ts';
-import type { ProblemsReport, SyncCheckReport, VerifierFinding } from '../model/verifier.ts';
+import { parseProblems, parseSyncCheck } from '../model/verifier.ts';
+import type { ProblemsReport, SyncCheckReport } from '../model/verifier.ts';
 import { actionArgs, readAction } from '../model/cliActions.ts';
 import type { ActionResult, CliAction } from '../model/cliActions.ts';
 import type { ProjectModel } from '../model/types.ts';
@@ -119,11 +119,6 @@ export class VerifierClient {
     if (r.value.code === 6) return { ok: false, reason: (r.value.stdout || r.value.stderr).trim().split('\n')[0] ?? 'this project is not a new product' };
     const report = parseRoadmap(r.value.stdout);
     return report ? { ok: true, value: report } : { ok: false, reason: `the verifier's \`roadmap\` output was not understood${r.value.stderr ? `: ${r.value.stderr.trim().split('\n')[0]}` : ''} (is the CLI older than this extension? run wingman-spec update)` };
-  }
-
-  async guard(p: ProjectModel, change: string, base: string): Promise<Outcome<VerifierFinding[]>> {
-    const r = await this.call(p, ['guard', change, '--base', base, '--json']);
-    return r.ok ? { ok: true, value: parseGuard(r.value.stdout, p.workspaceFolder, change) } : r;
   }
 
   async syncCheck(p: ProjectModel, change: string): Promise<Outcome<SyncCheckReport>> {

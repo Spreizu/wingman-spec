@@ -34,7 +34,6 @@ const ICONS = {
   chevron: '<path d="M6 3.5L10.5 8 6 12.5"/>',
   plus: '<path d="M8 3v10M3 8h10"/>',
   archive: '<path d="M2.5 3.5h11v3h-11zM3.5 6.5v6.5h9V6.5M6.5 9h3"/>',
-  branch: '<circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="6" r="1.6"/><path d="M4 5.1v5.8M12 7.6c0 2.6-3.6 2.2-8 3.6"/>',
   graph: '<circle cx="3.5" cy="8" r="1.8"/><circle cx="12.5" cy="4" r="1.8"/><circle cx="12.5" cy="12" r="1.8"/><path d="M5.3 7.4l5.4-2.8M5.3 8.6l5.4 2.8"/>',
 } as const;
 

@@ -158,15 +158,5 @@ export function buildTraceNodes(model: TraceModel): TraceNode[] {
       })),
     })),
   });
-  out.push({
-    id: 'branch-review',
-    label: 'Branch review',
-    description: 'this branch against its base',
-    tooltip: 'Requirements and anchors touched by the current git branch, what is untested, and the verifier findings in the diff.',
-    icon: 'git-compare',
-    route: { page: 'branch', root: model.root },
-    children: [],
-  });
-
   return out;
 }

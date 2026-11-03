@@ -91,37 +91,6 @@ export function parseProblems(stdout: string): ProblemsReport | undefined {
   return { ok: o['ok'] === true, findings, notes };
 }
 
-/** Maps the findings of `guard <change>` (kind, key, file, line, text) to the common shape. */
-export function parseGuard(stdout: string, root: string, change: string): VerifierFinding[] {
-  let j: unknown;
-  try {
-    j = JSON.parse(stdout);
-  } catch {
-    return [];
-  }
-  const o = (typeof j === 'object' && j !== null ? j : {}) as Record<string, unknown>;
-  const level = o['level'] === 'error' ? 'error' : 'warning';
-  if (!Array.isArray(o['findings'])) return [];
-  const out: VerifierFinding[] = [];
-  for (const x of o['findings']) {
-    const f = (typeof x === 'object' && x !== null ? x : {}) as Record<string, unknown>;
-    if (!isStr(f['kind']) || !isStr(f['text']) || !isStr(f['file'])) continue;
-    out.push({
-      source: 'guard',
-      code: f['kind'],
-      severity: level,
-      message: f['text'],
-      file: f['file'].startsWith('/') ? f['file'] : `${root}/${f['file']}`,
-      line: isPosInt(f['line']) ? f['line'] : 1,
-      col: 1,
-      length: 1,
-      ...(isStr(f['key']) ? { key: f['key'] } : {}),
-      change,
-    });
-  }
-  return out;
-}
-
 export interface SyncCheckReport {
   ok: boolean;
   problems: string[];

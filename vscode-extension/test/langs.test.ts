@@ -6,8 +6,6 @@ import { test } from 'node:test';
 import { createRequire } from 'node:module';
 import { isScannable, isTestFile, isTestPath, markersIn, scanCode, tagsIn } from '../src/model/anchors.ts';
 import { anchorProblems } from '../src/model/anchorView.ts';
-import { reviewBranch } from '../src/model/branchReview.ts';
-import type { ChangedFile } from '../src/model/branchReview.ts';
 import { insightOf, lensText, warningsOf } from '../src/model/reqInsight.ts';
 import { buildTrace } from '../src/model/traceability.ts';
 
@@ -63,22 +61,6 @@ test('every language: the requirement shows 2/2 scenarios tested, no warning', (
     assert.ok(lensText(i).startsWith('2/2 scenarios tested'), `${l.id}: ${lensText(i)}`);
     assert.deepEqual(warningsOf(i).filter((w) => w.code === 'none-tested'), [], l.id);
     assert.deepEqual(anchorProblems(model, l.test, l.testText).filter((p) => p.code === 'unresolved-tag'), [], l.id);
-  }
-});
-
-test('branch review: a branch that adds the source and the test of every language counts 2/2 per requirement', () => {
-  const files: ChangedFile[] = fx.LANGS.flatMap((l) =>
-    [[l.src, l.srcText], [l.test, l.testText]].map(([path = '', text = '']) => ({ path, from: path, status: 'A' as const, added: 3, removed: 0, oldText: undefined, newText: text })),
-  );
-  const r = reviewBranch({ root: dir, codeRoot: dir, branch: 'feature/x', base: 'origin/main', mergeBase: 'abc', model, findings: [], files });
-  assert.equal(r.requirements.length, fx.LANGS.length);
-  for (const l of fx.LANGS) {
-    const q = r.requirements.find((x) => x.key === `${l.cap}/${l.req}`);
-    assert.ok(q, l.id);
-    assert.equal(q.scenarios, 2, l.id);
-    assert.equal(q.tested, 2, l.id);
-    assert.ok(!q.untested, l.id);
-    assert.ok(q.via.includes('code') && q.via.includes('test'), `${l.id}: ${q.via.join(',')}`);
   }
 });
 

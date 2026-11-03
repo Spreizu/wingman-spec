@@ -19,7 +19,6 @@ The pages below are that same project: `add-invoice-export` in progress, `fix-ta
 
 - A workspace set up with **Wingman Spec: Set Up This Folder** (`wingman-spec init`): `.wingman-spec/wingman-spec.yaml` next to the code, a specs repository with `wingman-spec.yaml` at its root, or a code repository linked to one.
 - Nothing else to install for the CLI: each platform build (Linux, macOS and Windows, x64 and arm64) bundles `wingman-spec` and always runs it. The extension keeps each project's shim `.wingman-spec/bin/wingman-spec` pointing at it and logs that in the **Wingman Spec** output channel.
-- git for the branch review.
 
 The extension reads local files only. It sends nothing over the network and collects no telemetry.
 
@@ -35,7 +34,6 @@ Open the dashboard from the **Wingman Spec** status bar item or with **Wingman S
 | ADRs | Promoted decisions as a list and as a supersede graph, with change ADRs waiting to be promoted. |
 | Specs | Each capability's requirements and scenarios, with pending changes. |
 | History | Archived changes by month, each with its tasks, specs, ADRs and timeline. |
-| Branch review | Requirements the current branch touches, their Why, changed code anchors and findings in the diff. |
 | Roadmap | For a new product: slices in build order and the one that is next. |
 | Requirements & Traceability (Explorer) | Requirements with their Why and code and test anchors, pending changes, drift gaps. |
 | In the editor | Problems, CodeLens, hover and go-to-definition for spec files, tasks, ADRs and `@spec` markers in code. |
@@ -50,7 +48,7 @@ workspace the CLI is not run.
 | Command | Does |
 |---|---|
 | Open Dashboard, Open ADR Hub, Browse Specs, Open History | Open a page. |
-| Open Branch Review, Open Roadmap (new product) | Open those pages. |
+| Open Roadmap (new product) | Open the roadmap page. |
 | New Change, New ADR, Supersede ADR | Create a change or an ADR from the templates. |
 | Promote Change ADRs, Promote ADR | Copy change ADRs into the project ADR folder. |
 | Refresh, Refresh Problems | Read the files and CLI findings again. |
@@ -68,9 +66,7 @@ All commands start with **Wingman Spec:** in the Command Palette.
 | wingmanSpec.runTestsLens | on | A Run tests action on markers |
 | wingmanSpec.problemsPanel | on | CLI findings (`wingman-spec problems`) in the Problems panel, with quick fixes |
 | wingmanSpec.dashboardChecks | on | The change page asks the CLI what blocks the archive |
-| wingmanSpec.branchReviewBase | empty | Base branch of the branch review (empty: main or master) |
-| wingmanSpec.branchReviewGit | on | The branch review may run read-only git |
-| wingmanSpec.verifierTimeoutSeconds | 30 | Time limit of CLI and git calls |
+| wingmanSpec.verifierTimeoutSeconds | 30 | Time limit of CLI calls |
 
 ## Troubleshooting
 

@@ -1,5 +1,4 @@
 import { adrPage, adrsPage } from './adrPages.ts';
-import { branchPage } from './branchPage.ts';
 import { changePage } from './changePage.ts';
 import { layout } from './layout.ts';
 import { roadmapPage } from './roadmapPage.ts';
@@ -31,8 +30,6 @@ function content(d: ViewData): string {
       return specsPage(d);
     case 'spec':
       return specPage(d);
-    case 'branch':
-      return branchPage(d);
     case 'roadmap':
       return roadmapPage(d);
     case 'history':

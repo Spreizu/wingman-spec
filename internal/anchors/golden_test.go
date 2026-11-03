@@ -34,7 +34,6 @@ type goldenCase struct {
 	Text      string             `json:"text"`
 	IsTest    bool               `json:"is_test"`
 	Placement []PlacementFinding `json:"placement"`
-	Units     []Unit             `json:"units"`
 }
 
 func TestGoldenForEditor(t *testing.T) {
@@ -44,11 +43,7 @@ func TestGoldenForEditor(t *testing.T) {
 		if p == nil {
 			p = []PlacementFinding{}
 		}
-		u := Analyze(in.Text)
-		if u == nil {
-			u = []Unit{}
-		}
-		cases = append(cases, goldenCase{in.Name, in.Text, in.IsTest, p, u})
+		cases = append(cases, goldenCase{in.Name, in.Text, in.IsTest, p})
 	}
 	got, err := json.MarshalIndent(cases, "", "  ")
 	if err != nil {

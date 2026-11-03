@@ -34,7 +34,6 @@ const routes: Route[] = [
   { page: 'specs', root },
   { page: 'history', root },
   { page: 'roadmap', root },
-  { page: 'branch', root },
 ];
 const withoutAssets = (html: string): string => html.replace(/<(style|script)[\s\S]*?<\/\1>/g, '');
 

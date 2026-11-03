@@ -72,7 +72,6 @@ ${navItem({ page: 'overview' }, is({ page: 'overview' }), icon('home'), 'Overvie
 ${navItem({ page: 'adrs' }, d.route.page === 'adrs' || d.route.page === 'adr', icon('adr'), 'ADRs', String(adrTotal))}
 ${navItem({ page: 'specs' }, d.route.page === 'specs' || d.route.page === 'spec', icon('file'), 'Specs', String(specCount))}
 ${d.greenfield ? navItem({ page: 'roadmap' }, d.route.page === 'roadmap', icon('graph'), 'Roadmap') : ''}
-${navItem({ page: 'branch' }, d.route.page === 'branch', icon('branch'), 'Branch review')}
 ${navItem({ page: 'history' }, d.route.page === 'history' || d.route.page === 'archived', icon('archive'), 'History', String(archiveCount))}
 <div class="nav-label">${multi ? 'Changes' : 'Active changes'}</div>
 ${sections || '<div class="muted" style="padding:6px 8px">No active changes</div>'}

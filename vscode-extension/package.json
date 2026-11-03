@@ -137,10 +137,6 @@
         "title": "Wingman Spec: Open spec.md"
       },
       {
-        "command": "wingmanSpec.openBranchReview",
-        "title": "Wingman Spec: Open Branch Review"
-      },
-      {
         "command": "wingmanSpec.openRoadmap",
         "title": "Wingman Spec: Open Roadmap (new product)"
       },
@@ -268,22 +264,12 @@
           "type": "number",
           "default": 30,
           "minimum": 1,
-          "description": "How long the extension waits for the wingman-spec CLI or git before it gives up (Problems panel, change dashboard, branch review)."
+          "description": "How long the extension waits for the wingman-spec CLI before it gives up (Problems panel, change dashboard)."
         },
         "wingmanSpec.dashboardChecks": {
           "type": "boolean",
           "default": true,
           "description": "The change dashboard asks the verifier (read-only `problems` and `sync --check`) what blocks the archive. Off: it shows only what the files say."
-        },
-        "wingmanSpec.branchReviewBase": {
-          "type": "string",
-          "default": "",
-          "description": "Base ref of the Branch Review page. Empty: origin/main, origin/master, main, master, origin/develop or develop, the first that exists; the review compares against the merge base with it."
-        },
-        "wingmanSpec.branchReviewGit": {
-          "type": "boolean",
-          "default": true,
-          "description": "The Branch Review page runs read-only git commands (rev-parse, merge-base, diff, show, ls-files) in the workspace folder. Off: the page stays empty."
         }
       }
     },

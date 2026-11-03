@@ -37,7 +37,7 @@ export function keysOf(l: string): string[] {
 }
 
 /** Docstring lines (python-style triple quotes): a marker inside one is the doc comment of the unit above it. */
-export function docLines(lines: string[]): boolean[] {
+function docLines(lines: string[]): boolean[] {
   const out: boolean[] = [];
   let inDoc = false;
   for (const l of lines) {

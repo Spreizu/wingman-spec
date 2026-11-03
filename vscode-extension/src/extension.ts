@@ -35,7 +35,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const store = new ProjectStore();
   const traceCache = new TraceCache(store);
   const verifier = new VerifierClient(execRunner, join(context.extensionPath, 'bin'));
-  const data = new PanelData(store, traceCache, verifier);
+  const data = new PanelData(store, verifier);
   const panel = new SpecPanel(store, () => traceCache.all(), data, vscode.Uri.joinPath(context.extensionUri, 'images', 'icon.png'));
   data.onReady = () => panel.refresh();
   const cliSetup = registerCliSetup(verifier, () => panel.refresh());
@@ -95,7 +95,6 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('wingmanSpec.openAdrHub', show({ page: 'adrs' })),
     vscode.commands.registerCommand('wingmanSpec.openSpecs', show({ page: 'specs' })),
     vscode.commands.registerCommand('wingmanSpec.openHistory', show({ page: 'history' })),
-    vscode.commands.registerCommand('wingmanSpec.openBranchReview', show({ page: 'branch' })),
     vscode.commands.registerCommand('wingmanSpec.openRoadmap', show({ page: 'roadmap' })),
     vscode.commands.registerCommand('wingmanSpec.refreshView', () => {
       data.invalidate();

@@ -16,8 +16,8 @@ const find = (list: TraceNode[], id: string): TraceNode | undefined => {
   return undefined;
 };
 
-test('top level: requirements, changes, drift, branch review', () => {
-  assert.deepEqual(nodes.map((n) => n.id), ['requirements', 'changes', 'drift', 'branch-review']);
+test('top level: requirements, changes, drift', () => {
+  assert.deepEqual(nodes.map((n) => n.id), ['requirements', 'changes', 'drift']);
   assert.equal(nodes[0]?.description, '4 · 1 without a Why');
 });
 

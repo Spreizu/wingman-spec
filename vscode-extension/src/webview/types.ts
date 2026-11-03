@@ -1,5 +1,4 @@
 import type { AgentUpdate } from '../editor/agentFiles.ts';
-import type { BranchReview } from '../model/branchReview.ts';
 import type { RoadmapReport } from '../model/roadmap.ts';
 import type { DashboardInputs } from '../model/changeDashboard.ts';
 import type { ActionResult } from '../model/cliActions.ts';
@@ -14,13 +13,9 @@ export type Route =
   | { page: 'adr'; root: string; number: string }
   | { page: 'specs'; root?: string }
   | { page: 'spec'; root: string; name: string; focus?: string }
-  | { page: 'branch'; root?: string }
   | { page: 'roadmap'; root?: string }
   | { page: 'history'; root?: string }
   | { page: 'archived'; root: string; name: string };
-
-/** The pull request view's data: it comes from git and the verifier, so it is loaded after the page first shows. */
-export type BranchState = { status: 'loading' } | { status: 'unavailable'; reason: string } | { status: 'ready'; review: BranchReview };
 
 /** The roadmap view's data (a new product's slices): it comes from the verifier, so it is loaded after the page first shows. */
 export type RoadmapState = { status: 'loading' } | { status: 'unavailable'; reason: string } | { status: 'ready'; roadmap: RoadmapReport };
@@ -36,8 +31,6 @@ export interface ViewData {
   setup: SetupStatus;
   /** Traceability models (one per project): the spec pages show the Why, anchors, tested scenarios and pending changes from them. */
   trace?: TraceModel[];
-  /** The pull request view (route `branch`). */
-  branch?: BranchState;
   /** The roadmap view (route `roadmap`). */
   roadmap?: RoadmapState;
   /** The project is a new product in the specification or build phase (`greenfield.yaml` exists in the specs root): the roadmap link shows. */

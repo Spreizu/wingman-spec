@@ -55,11 +55,6 @@ export class ProblemsService implements vscode.CodeActionProvider, vscode.Dispos
     this.client = client;
   }
 
-  /** Every finding currently shown (the branch review filters these to its diff). */
-  findings(): VerifierFinding[] {
-    return [...this.found.values()];
-  }
-
   schedule(delay = 800): void {
     clearTimeout(this.timer);
     this.timer = setTimeout(() => void this.refresh(), delay);

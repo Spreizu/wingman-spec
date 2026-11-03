@@ -50,7 +50,7 @@ The extension dashboard on a small billing project. `add-invoice-export` is in p
 - Traceability: each requirement's Why, code and test anchors, and drift reports.
 - A timeline of every build step and every plan change made during the build, with its reason.
 - Starts from any point: `/spec-green-start` for a new product, `/spec-adopt` for an existing codebase. Specs can live next to the code or in their own repository shared by 2 or more code repositories.
-- VS Code and Cursor extension: dashboard, tasks, specs, ADRs, history, timeline, branch review and requirement traceability in the editor. It bundles the CLI.
+- VS Code and Cursor extension: dashboard, tasks, specs, ADRs, history, timeline and requirement traceability in the editor. It bundles the CLI.
 
 ## Install
 

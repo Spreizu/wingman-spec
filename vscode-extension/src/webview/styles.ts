@@ -252,12 +252,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .po-card { padding: 12px 14px; }
 @media (max-width: 1100px) { .board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .shell { grid-template-columns: 1fr; } .nav { position: static; height: auto; } .main { padding: 20px 16px; } .board { grid-template-columns: 1fr; } }
-/* pull request view, change dashboard */
+/* change dashboard, roadmap */
 .item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--card); margin-bottom: 8px; }
 .item .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .item .pills { margin-top: 0; justify-content: flex-end; }
-.item.click { cursor: pointer; }
-.item.click:hover { border-color: var(--vscode-focusBorder, var(--accent)); }
 .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .tile { padding: 10px 12px; border-radius: 9px; border: 1px solid var(--line); border-left: 3px solid var(--c, var(--line)); }
 .tile.empty { border-left-color: var(--line); }

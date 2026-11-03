@@ -7,7 +7,6 @@ import { fakeBundle } from './support/bundle.ts';
 import { makeData, makeFixture } from './fixture.ts';
 
 const stub = await import('./support/vscodeStub.mjs');
-const { TraceCache } = await import('../src/editor/anchorCode.ts');
 const { PanelData } = await import('../src/editor/panelData.ts');
 const { VerifierClient } = await import('../src/editor/verifier.ts');
 const { parseRoadmap, orderedSlices, blockers } = await import('../src/model/roadmap.ts');
@@ -102,7 +101,7 @@ test('page: loading, unavailable and empty states; no roadmap link outside a new
 
 test('PanelData.roadmap loads in the background and re-renders when the verifier answered', async () => {
   const store = { projects: [proj()], onDidChange: () => new stub.Disposable() };
-  const data = new PanelData(store as never, new TraceCache(store as never), new VerifierClient(ok(JSON_OUT), fakeBundle()));
+  const data = new PanelData(store as never, new VerifierClient(ok(JSON_OUT), fakeBundle()));
   const ready = new Promise<void>((r) => (data.onReady = r));
   assert.deepEqual(data.roadmap(fx), { status: 'loading' });
   await ready;
