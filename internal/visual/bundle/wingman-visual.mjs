@@ -955,10 +955,10 @@ var require_visual_check = __commonJS({
           resolve(null);
           return;
         }
-        let settled = false;
+        let settled2 = false;
         const finish = (v) => {
-          if (!settled) {
-            settled = true;
+          if (!settled2) {
+            settled2 = true;
             clearTimeout(timer);
             resolve(v);
           }
@@ -978,6 +978,15 @@ var require_visual_check = __commonJS({
         });
       });
     }
+    var LIVE = /* @__PURE__ */ new Set();
+    process.on("exit", () => {
+      for (const pid of LIVE) {
+        try {
+          process.kill(-pid, "SIGKILL");
+        } catch (e) {
+        }
+      }
+    });
     function startServer(c, codeRoot, logFile) {
       const env = { ...process.env, PORT: String(c.port || ""), BROWSER: "none", CI: "1", FORCE_COLOR: "0" };
       const child = spawn("sh", ["-c", c.command], { cwd: codeRoot, detached: process.platform !== "win32", env, stdio: ["ignore", "pipe", "pipe"] });
@@ -992,6 +1001,7 @@ var require_visual_check = __commonJS({
       child.on("exit", (code, sig) => {
         exited = { code, sig };
       });
+      if (child.pid && process.platform !== "win32") LIVE.add(child.pid);
       return {
         child,
         get exited() {
@@ -1015,10 +1025,11 @@ var require_visual_check = __commonJS({
             }
           };
           if (!exited) kill("SIGTERM");
-          for (let i = 0; i < 30 && !exited; i++) await sleep(100);
+          for (let i = 0; i < 150 && !exited; i++) await sleep(20);
           kill("SIGKILL");
-          for (let i = 0; i < 20 && !exited; i++) await sleep(100);
-          for (let i = 0; i < 20 && await probe(c.url, 300, c.ignore_https_errors) !== null; i++) await sleep(100);
+          for (let i = 0; i < 100 && !exited; i++) await sleep(20);
+          LIVE.delete(child.pid);
+          for (let i = 0; i < 100 && await probe(c.url, 300, c.ignore_https_errors) !== null; i++) await sleep(20);
         }
       };
     }
@@ -1144,7 +1155,7 @@ var require_visual_check = __commonJS({
           while (Date.now() < until && !server.exited) {
             up = await probe(c.url, 1e3, c.ignore_https_errors);
             if (up !== null) break;
-            await sleep(250);
+            await sleep(50);
           }
           if (up === null) {
             const why = server.exited ? `the command exited (code ${server.exited.code})` : `nothing answered within ${c.ready_timeout}s`;
@@ -1510,28 +1521,18 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
       }
     }
     async function ariaOf(page, keys) {
-      const out = [];
-      for (const sel of keys) {
+      const parts = await Promise.all(keys.map(async (sel) => {
         const loc = page.locator(sel);
         let n = 0;
         try {
           n = await loc.count();
         } catch (e) {
-          out.push(`# ${sel}: invalid selector`);
-          continue;
+          return [`# ${sel}: invalid selector`];
         }
-        out.push(`# ${sel} (${n} match${n === 1 ? "" : "es"})`);
-        for (let i = 0; i < Math.min(n, 10); i++) {
-          let t;
-          try {
-            t = await loc.nth(i).ariaSnapshot({ timeout: 2e3 });
-          } catch (e) {
-            t = "(not in the accessibility tree)";
-          }
-          out.push(String(t || "(empty)").trimEnd());
-        }
-      }
-      return out.join("\n");
+        const snaps = await Promise.all(Array.from({ length: Math.min(n, 10) }, (_, i) => loc.nth(i).ariaSnapshot({ timeout: 2e3 }).catch(() => "(not in the accessibility tree)")));
+        return [`# ${sel} (${n} match${n === 1 ? "" : "es"})`, ...snaps.map((t) => String(t || "(empty)").trimEnd())];
+      }));
+      return parts.flat().join("\n");
     }
     async function pointerStep(page, step, note, vw) {
       try {
@@ -1583,12 +1584,27 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
         else if (!quietSince) quietSince = Date.now();
         else if (Date.now() - quietSince >= QUIET_MS) break;
       }
+      if (await page.evaluate(settled, MOTION_OFF).then(() => true, () => false)) return;
       await page.evaluate(() => document.fonts ? document.fonts.ready : null).catch(() => {
       });
-      await page.addStyleTag({ content: "*,*::before,*::after{transition:none!important;animation:none!important;caret-color:transparent!important}" }).catch(() => {
+      await page.addStyleTag({ content: MOTION_OFF }).catch(() => {
       });
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))).catch(() => {
       });
+    }
+    var MOTION_OFF = "*,*::before,*::after{transition:none!important;animation:none!important;caret-color:transparent!important}";
+    async function settled(css) {
+      try {
+        if (document.fonts) await document.fonts.ready;
+      } catch (e) {
+      }
+      try {
+        const s = document.createElement("style");
+        s.textContent = css;
+        (document.head || document.documentElement).appendChild(s);
+      } catch (e) {
+      }
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     }
     function lineDiff(a, b, max = 40) {
       if (a === b) return [];

@@ -129,12 +129,15 @@ function probe(url, timeoutMs = 1500, ignoreHttps = true) {
   });
 }
 
+const LIVE = new Set();  // app server groups still running: killed when this process exits (a stopped warm helper included)
+process.on('exit', () => { for (const pid of LIVE) { try { process.kill(-pid, 'SIGKILL'); } catch (e) { /* gone */ } } });
 function startServer(c, codeRoot, logFile) {
   const env = { ...process.env, PORT: String(c.port || ''), BROWSER: 'none', CI: '1', FORCE_COLOR: '0' };
   const child = spawn('sh', ['-c', c.command], { cwd: codeRoot, detached: process.platform !== 'win32', env, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = ''; const add = (b) => { log += b; if (log.length > 40000) log = log.slice(-20000); };
   child.stdout.on('data', add); child.stderr.on('data', add);
   let exited = null; child.on('exit', (code, sig) => { exited = { code, sig }; });
+  if (child.pid && process.platform !== 'win32') LIVE.add(child.pid);
   return {
     child, get exited() { return exited; }, tail: () => log.slice(-3000),
     /** SIGTERM the whole process group, wait for it (SIGKILL after 3 s) so the port is free for the next run. */
@@ -142,10 +145,11 @@ function startServer(c, codeRoot, logFile) {
       try { fs.writeFileSync(logFile, log); } catch (e) { /* best effort */ }
       const kill = (sig) => { try { process.kill(-child.pid, sig); } catch (e) { try { child.kill(sig); } catch (e2) { /* gone */ } } };
       if (!exited) kill('SIGTERM');
-      for (let i = 0; i < 30 && !exited; i++) await sleep(100);
+      for (let i = 0; i < 150 && !exited; i++) await sleep(20);
       kill('SIGKILL'); // stragglers in the group (e.g. a preview server forked by npm) even after the shell exited
-      for (let i = 0; i < 20 && !exited; i++) await sleep(100);
-      for (let i = 0; i < 20 && (await probe(c.url, 300, c.ignore_https_errors)) !== null; i++) await sleep(100);
+      for (let i = 0; i < 100 && !exited; i++) await sleep(20);
+      LIVE.delete(child.pid);
+      for (let i = 0; i < 100 && (await probe(c.url, 300, c.ignore_https_errors)) !== null; i++) await sleep(20);
     },
   };
 }
@@ -242,7 +246,7 @@ async function run(o) {
     if (pre === null) {
       server = startServer(c, o.codeRoot, path.join(o.outDir, 'server.log'));
       const until = Date.now() + c.ready_timeout * 1000; let up = null;
-      while (Date.now() < until && !server.exited) { up = await probe(c.url, 1000, c.ignore_https_errors); if (up !== null) break; await sleep(250); }
+      while (Date.now() < until && !server.exited) { up = await probe(c.url, 1000, c.ignore_https_errors); if (up !== null) break; await sleep(50); }
       if (up === null) {
         const why = server.exited ? `the command exited (code ${server.exited.code})` : `nothing answered within ${c.ready_timeout}s`;
         rep.defects.push(defect('server:not-ready', null, null, null, `the app did not start: \`${c.command}\` -> ${c.url}: ${why}. Last output:\n${server.tail()}`));
@@ -514,17 +518,14 @@ async function runScenario(it, o, browser, axe, rep) {
 
 /** ARIA snapshot (YAML text) of every match of every key selector (first 10 per selector), in declared order. */
 async function ariaOf(page, keys) {
-  const out = [];
-  for (const sel of keys) {
+  // the selectors and their matches are read side by side (the page is settled); the text keeps the declared order
+  const parts = await Promise.all(keys.map(async (sel) => {
     const loc = page.locator(sel); let n = 0;
-    try { n = await loc.count(); } catch (e) { out.push(`# ${sel}: invalid selector`); continue; }
-    out.push(`# ${sel} (${n} match${n === 1 ? '' : 'es'})`);
-    for (let i = 0; i < Math.min(n, 10); i++) {
-      let t; try { t = await loc.nth(i).ariaSnapshot({ timeout: 2000 }); } catch (e) { t = '(not in the accessibility tree)'; }
-      out.push(String(t || '(empty)').trimEnd());
-    }
-  }
-  return out.join('\n');
+    try { n = await loc.count(); } catch (e) { return [`# ${sel}: invalid selector`]; }
+    const snaps = await Promise.all(Array.from({ length: Math.min(n, 10) }, (_, i) => loc.nth(i).ariaSnapshot({ timeout: 2000 }).catch(() => '(not in the accessibility tree)')));
+    return [`# ${sel} (${n} match${n === 1 ? '' : 'es'})`, ...snaps.map((t) => String(t || '(empty)').trimEnd())];
+  }));
+  return parts.flat().join('\n');
 }
 
 /**
@@ -565,9 +566,18 @@ async function settle(page, ms, pending) {
     await sleep(20);
     if (pending.size) quietSince = 0; else if (!quietSince) quietSince = Date.now(); else if (Date.now() - quietSince >= QUIET_MS) break;
   }
+  // one round trip; if the page navigates under it, the three steps again one by one, each on its own
+  if (await page.evaluate(settled, MOTION_OFF).then(() => true, () => false)) return;
   await page.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
-  await page.addStyleTag({ content: '*,*::before,*::after{transition:none!important;animation:none!important;caret-color:transparent!important}' }).catch(() => {});
+  await page.addStyleTag({ content: MOTION_OFF }).catch(() => {});
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))).catch(() => {});
+}
+const MOTION_OFF = '*,*::before,*::after{transition:none!important;animation:none!important;caret-color:transparent!important}';
+/** In the page: fonts ready, motion off (a style element, as addStyleTag adds), two animation frames. */
+async function settled(css) {
+  try { if (document.fonts) await document.fonts.ready; } catch (e) { /* as the separate call: ignored */ }
+  try { const s = document.createElement('style'); s.textContent = css; (document.head || document.documentElement).appendChild(s); } catch (e) { /* ignored */ }
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 }
 
 /** Line diff (LCS) of two texts: ['- old', '+ new', ...]; [] when equal. */
