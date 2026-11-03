@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -122,6 +123,29 @@ func blameOf(cwd, file string, copies bool) *blame {
 	return r
 }
 
+// blameAll runs the blames of files (key -> repository path) a few git processes at a time; each result is what
+// blameOf gives for that file alone.
+func blameAll(cwd string, files map[string]string, copies bool) map[string]*blame {
+	out := make(map[string]*blame, len(files))
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, min(8, max(2, runtime.NumCPU())))
+	for k, f := range files {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer wg.Done()
+			b := blameOf(cwd, f, copies)
+			mu.Lock()
+			out[k] = b
+			mu.Unlock()
+			<-sem
+		}()
+	}
+	wg.Wait()
+	return out
+}
+
 // specRange is the 1-based line range of the requirement that starts at line: until the next ##/### heading.
 func specRange(text string, line int) (int, int) {
 	lines := strings.Split(text, "\n")
@@ -191,8 +215,26 @@ func Stale(o StaleOpts) ([]StaleAnchor, []string) {
 	rs, _ := filepath.EvalSymlinks(specTop)
 	rc, _ := filepath.EvalSymlinks(codeTop)
 	same := rs == rc
-	specBlame := map[string]*blame{}
-	fileBlame := map[string]*blame{}
+	specRel := func(file string) string {
+		real, err := filepath.EvalSymlinks(file)
+		if err != nil {
+			real = file
+		}
+		rel, _ := filepath.Rel(rs, real)
+		return filepath.ToSlash(rel)
+	}
+	// The markers the loop below looks at, so their spec and code blames can run in parallel first.
+	var use []Marker
+	for _, m := range o.Markers {
+		if _, ok := o.Reqs[m.Key]; ok && !m.Test && !IsGenerated(m.File, "") {
+			use = append(use, m)
+		}
+	}
+	specFiles := map[string]string{}
+	for _, m := range use {
+		specFiles[o.Reqs[m.Key].File] = specRel(o.Reqs[m.Key].File)
+	}
+	specBlame := blameAll(specTop, specFiles, false)
 	touched := map[string]bool{}
 	filesOf := map[string][]string{}
 	anc := map[string]bool{}
@@ -218,12 +260,7 @@ func Stale(o StaleOpts) ([]StaleAnchor, []string) {
 	specCommit := func(r StaleReq) specC {
 		b, ok := specBlame[r.File]
 		if !ok {
-			real, err := filepath.EvalSymlinks(r.File)
-			if err != nil {
-				real = r.File
-			}
-			rel, _ := filepath.Rel(rs, real)
-			b = blameOf(specTop, filepath.ToSlash(rel), false)
+			b = blameOf(specTop, specRel(r.File), false)
 			specBlame[r.File] = b
 		}
 		if b == nil {
@@ -270,16 +307,17 @@ func Stale(o StaleOpts) ([]StaleAnchor, []string) {
 		touched[k] = hit
 		return hit
 	}
+	codeFiles := map[string]string{}
+	for _, m := range use {
+		if sc := specCommit(o.Reqs[m.Key]); sc.c != nil && !sc.uncommitted {
+			codeFiles[m.File] = m.File
+		}
+	}
+	fileBlame := blameAll(o.CodeRoot, codeFiles, true)
 	seen := map[string]bool{}
 	texts := map[string]string{}
-	for _, m := range o.Markers {
-		if m.Test || IsGenerated(m.File, "") {
-			continue
-		}
-		req, ok := o.Reqs[m.Key]
-		if !ok {
-			continue
-		}
+	for _, m := range use {
+		req := o.Reqs[m.Key]
 		key := m.Key + "@" + m.File
 		if seen[key] {
 			continue

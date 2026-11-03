@@ -26,6 +26,10 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
   timeout options, fallbacks for values the CLI always sends, its own url/port derivation the CLI already does) and shares
   one in-page visibility test between expects and `absent:` checks; the embedded bundle is a little smaller. What it
   checks, reports and prints is unchanged.
+- **Faster stale-anchor check.** The `git blame` runs behind the stale-anchor rule (`problems`, `drift`, and the
+  extension's Problems refresh after opening) run up to 8 at a time instead of one after another. Without a blame cache,
+  a project with 13,000 anchored files and 3,000 commits takes 41 s instead of 273 s, and one with 3,000 files takes
+  3.6 s instead of 10.2 s. The findings are the same.
 - **Extension package.** The README screenshots load from GitHub instead of being packed into the vsix (about 1.1 MB
   smaller per platform), which also fixes the broken images on the Marketplace and Open VSX pages.
 
