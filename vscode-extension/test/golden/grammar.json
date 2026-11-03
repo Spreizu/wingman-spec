@@ -9,6 +9,7 @@
           "op": "ADDED",
           "why": "The owner wants x, because y.",
           "verify": null,
+          "id": null,
           "scenarios": [
             "One"
           ]
@@ -25,6 +26,7 @@
           "op": "LIVING",
           "why": null,
           "verify": null,
+          "id": null,
           "scenarios": [
             "S"
           ]
@@ -34,6 +36,7 @@
           "op": "LIVING",
           "why": null,
           "verify": null,
+          "id": null,
           "scenarios": [
             "T"
           ]
@@ -50,6 +53,7 @@
           "op": "REMOVED",
           "why": null,
           "verify": null,
+          "id": null,
           "scenarios": []
         }
       ],
@@ -69,6 +73,7 @@
           "op": "MODIFIED",
           "why": null,
           "verify": null,
+          "id": null,
           "scenarios": [
             "One",
             "Two"
@@ -86,6 +91,7 @@
           "op": "ADDED",
           "why": null,
           "verify": "inspection",
+          "id": null,
           "scenarios": [
             "Read"
           ]
@@ -95,8 +101,36 @@
           "op": "ADDED",
           "why": null,
           "verify": null,
+          "id": null,
           "scenarios": [
             "S"
+          ]
+        }
+      ],
+      "renames": []
+    },
+    {
+      "name": "ids",
+      "text": "## ADDED\n\n### Requirement: I\nI SHALL x.\nID: cap-a-7kq3\n\n#### Scenario: S\n\n### Requirement: J\nJ SHALL y.\n- **ID**: `CAP-A-AB2C`\n#### Scenario: T\nID: NOT-ONE\n",
+      "reqs": [
+        {
+          "name": "I",
+          "op": "ADDED",
+          "why": null,
+          "verify": null,
+          "id": "CAP-A-7KQ3",
+          "scenarios": [
+            "S"
+          ]
+        },
+        {
+          "name": "J",
+          "op": "ADDED",
+          "why": null,
+          "verify": null,
+          "id": "CAP-A-AB2C",
+          "scenarios": [
+            "T"
           ]
         }
       ],
@@ -111,6 +145,7 @@
           "op": "ADDED",
           "why": null,
           "verify": null,
+          "id": null,
           "scenarios": [
             "Real"
           ]
@@ -171,6 +206,32 @@
         {
           "key": "cap-e/five",
           "line": 1
+        }
+      ]
+    },
+    {
+      "file": "src/f.ts",
+      "text": "// @spec CAP-A-7KQ3, Cap-A/One\n// @spec cap-b-ab2c\n/**\n * @spec CAP-C-WXYZ\n */\n// @spec cap-a-7kq3/not-an-id\n",
+      "markers": [
+        {
+          "key": "CAP-A-7KQ3",
+          "line": 1
+        },
+        {
+          "key": "cap-a/one",
+          "line": 1
+        },
+        {
+          "key": "CAP-B-AB2C",
+          "line": 2
+        },
+        {
+          "key": "CAP-C-WXYZ",
+          "line": 4
+        },
+        {
+          "key": "cap-a-7kq3/not-an-id",
+          "line": 6
         }
       ]
     }

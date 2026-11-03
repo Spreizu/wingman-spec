@@ -426,6 +426,41 @@ expect "lint of one change warns (not fails) on the requirement the other active
 $V lint rename > "$T/l.json" 2>/dev/null || true
 expect "...and the other one, at its RENAMED line" 'grep -q "specs/todo.md:3: RENAMED todo/remove-a-todo" "$T/l.json"'
 rm -rf .wingman-spec/changes/tidy
+
+echo "== stable requirement IDs: assigned by lint --fix, kept, never reused; markers may name them"
+mkdir -p "$T/ids" && cd "$T/ids" && ws_project . && V="$WS"
+mkdir -p src .wingman-spec/changes/more/specs .wingman-spec/archive/2026-01-01-0000-old/specs && cp -r "$T/cov/.wingman-spec/specs" .wingman-spec/
+sed -i 's/^The system SHALL remove the todo at the given index.$/&\nID: TODO-AB2C/' .wingman-spec/specs/todo.md
+printf '## REMOVED\n\n### Requirement: Old thing\nID: TODO-ZZZ9\n**Reason**: gone\n' > .wingman-spec/archive/2026-01-01-0000-old/specs/todo.md
+printf '## ADDED\n\n### Requirement: Clear the list\nThe system SHALL remove every todo.\nWhy: A person wants a fresh start, so that old todos do not pile up.\n\n#### Scenario: Cleared\n- **WHEN** the user clears the list\n- **THEN** the list is empty\n\n## MODIFIED\n\n### Requirement: Remove a todo\nThe system SHALL remove the todo at the given index and keep the order.\nWhy: A person wants to drop what is done, so that the list stays short.\n\n#### Scenario: Removed\n- **WHEN** the user removes index 0\n- **THEN** the list is empty\n' > .wingman-spec/changes/more/specs/todo.md
+printf 'Size: S\nRisk: none\n\n## Why\nMore.\n\n## What Changes\n- More.\n\n## Edge cases\n- none named\n' > .wingman-spec/changes/more/proposal.md
+printf '## 1. More\n- [ ] 1.1 more\n  - Spec: todo/clear-the-list\n  - Files: src/todo.js\n  - Done when: `true` exits 0\n' > .wingman-spec/changes/more/tasks.md
+D=.wingman-spec/changes/more/specs/todo.md
+$V lint more --text > "$T/l.txt" 2>&1 || true
+expect "a MODIFIED requirement must keep its living ID" 'grep -q "its living ID is TODO-AB2C and an ID never changes: keep the line .ID: TODO-AB2C." "$T/l.txt"'
+$V lint more --fix --text > "$T/l.txt" 2>&1 || true
+expect "lint --fix gives the ADDED requirement a new random ID (capability prefix, no 0/O/1/I) and the MODIFIED one its living ID" 'grep -Eq "^ID: TODO-[A-HJ-NP-Z2-9]{4}$" "$D" && [ "$(grep -c "^ID: " "$D")" = 2 ] && grep -q "^ID: TODO-AB2C$" "$D" && ! grep -q "requirement-id\|living ID" "$T/l.txt"'
+NEW=$(grep -Eo "TODO-[A-Z2-9]{4}" "$D" | grep -v AB2C)
+expect "...placed under the Why line, before the first scenario, outside the requirement text" 'grep -A1 "^Why: A person wants a fresh start" "$D" | grep -q "^ID: $NEW" && $V lint more --fix > /dev/null 2>&1; [ "$(grep -c "^ID: " "$D")" = 2 ]'
+sed -i "s/^ID: $NEW$/ID: todo-zzz9/" "$D"; $V lint more --text > "$T/l.txt" 2>&1 || true
+expect "lint prints the canonical form of a lower-case ID" 'grep -q "write the ID as TODO-ZZZ9" "$T/l.txt"'
+sed -i "s/^ID: todo-zzz9$/ID: TODO-ZZZ9/" "$D"; $V lint more --text > "$T/l.txt" 2>&1 || true
+expect "a retired ID (an archived REMOVED entry recorded it) is never reused" 'grep -q "ID TODO-ZZZ9 is retired" "$T/l.txt"'
+sed -i "s/^ID: TODO-ZZZ9$/ID: TODO-AB2C/" "$D"; $V lint more --text > "$T/l.txt" 2>&1 || true
+expect "...nor one a living requirement holds" 'grep -q "ID TODO-AB2C is already todo/remove-a-todo.s" "$T/l.txt"'
+sed -i "0,/^ID: TODO-AB2C$/s//ID: LIST-ABCD/" "$D"; $V lint more --text > "$T/l.txt" 2>&1 || true
+expect "a new ID starts with the capability folder name" 'grep -q "a new ID starts with TODO-" "$T/l.txt"'
+sed -i "s/^ID: LIST-ABCD$/ID: $NEW/" "$D"
+printf '// @spec todo-ab2c\nexport function remove() {}\n// @spec TODO-WXYZ\nexport function gone() {}\n' > src/ids.js
+$V anchors --json > "$T/a.json" 2>/dev/null || true
+expect "a marker may name the requirement by its ID, in any case; an unknown ID is an orphan marker" 'J "$T/a.json" requirements.todo/remove-a-todo | grep -q "src/ids.js" && grep -q "TODO-WXYZ" "$T/a.json" && ! J "$T/a.json" requirements.todo/remove-a-todo | grep -q "TODO-WXYZ"'
+printf '## RENAMED\n\n- Remove a todo -> Delete a todo\n' > .wingman-spec/changes/more/specs/todo.md
+$V anchors more --json > "$T/a.json" 2>/dev/null || true
+expect "...and follows a rename: no rewrite needed" 'J "$T/a.json" index.requirements.todo/delete-a-todo | grep -q "src/ids.js"'
+rm -rf .wingman-spec/changes/more
+sed -i 's/^The system SHALL return the number of todos.$/&\nID: TODO-AB2C/' .wingman-spec/specs/todo.md
+$V drift > "$T/d.json" 2>/dev/null || true
+expect "two living requirements with one ID: a duplicate-id drift gap" 'grep -q "duplicate-id:TODO-AB2C" "$T/d.json" && grep -q "todo/count-the-todos, todo/remove-a-todo\|todo/remove-a-todo, todo/count-the-todos" "$T/d.json"'
 cd "$T/p" || exit 1
 
 echo

@@ -213,7 +213,7 @@ func (a *app) verifyCmds() []*command {
 		a.vcmd("lint <change>", "Validate the plan: proposal, delta specs, tasks, design (no command runs)", one, run, (*verify.Env).Lint,
 			func(f *flagSet, o *verify.Options) {
 				f.BoolVar(&o.Text, "text", false, "one file:line finding per line instead of JSON")
-				f.BoolVar(&o.Fix, "fix", false, "apply mechanical fixes (missing Why, ## Purpose heading)")
+				f.BoolVar(&o.Fix, "fix", false, "apply mechanical fixes (missing Why, ## Purpose heading, requirement IDs)")
 				f.StringVar(&o.Report, "format", "json", "json|sarif|markdown")
 			}),
 		a.vcmd("size <change>", "Declared size against what the change needs", one, 0, (*verify.Env).Size),

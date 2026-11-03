@@ -439,7 +439,13 @@ func (e *Env) Lint() error {
 		return err
 	}
 	if e.O.Fix {
-		if n, err := quality.Fix(changeDir); err != nil {
+		n, err := quality.Fix(changeDir, e.R.LivingSpecs())
+		if err == nil {
+			var k int
+			k, err = e.tr().AssignIDs(changeDir)
+			n += k
+		}
+		if err != nil {
 			return die(Fail, "%v", err)
 		} else if n > 0 {
 			e.say("applied %d mechanical fix(es)", n)

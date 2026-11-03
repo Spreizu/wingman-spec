@@ -48,3 +48,13 @@ export function verifyOf(raw: string): string | null {
   }
   return null;
 }
+
+/** The `ID:` line of one requirement block (before its first scenario), upper-cased, or null. Same reading as the CLI. */
+export function idOf(raw: string): string | null {
+  for (const l of raw.split('\n')) {
+    if (/^####\s+Scenario:/.test(l)) break;
+    const m = /^\s*(?:[-*]\s*)?\**ID\**:\s*(.*?)\s*$/i.exec(l);
+    if (m) return (m[1] ?? '').replace(/^[*`\s]+|[*`\s]+$/g, '').toUpperCase();
+  }
+  return null;
+}

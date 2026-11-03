@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -281,6 +282,22 @@ func (c Ctx) Drift(pendingDir string, light bool) DriftReport {
 		case len(x.Tests) == 0 && r.Verified() == "":
 			cp, _, _ := strings.Cut(k, "/")
 			add(Gap{Type: "untested-requirement", Subject: k, Files: sortedKeys(x.Code), Text: fmt.Sprintf("requirement %q has code anchors but no test anchor (no test tagged for its scenarios, no @spec marker in a test)", r.Name), Hint: "tag a test `[" + cp + "/<scenario-slug>]` or put `@spec " + k + "` in it; if a test cannot prove it, say how it is verified with a `Verify: inspection|analysis|demonstration` line in a change; if it is knowingly untested: `wingman-spec drift decide untested-requirement:" + k + " --accept --note \"<why>\"`"})
+		}
+	}
+	byID := map[string][]string{}
+	for _, k := range reqs.keys {
+		if id := idOf(reqs.m[k]); id != "" {
+			byID[id] = append(byID[id], k)
+		}
+	}
+	for _, id := range slices.Sorted(maps.Keys(byID)) {
+		if ks := byID[id]; len(ks) > 1 {
+			var files []string
+			for _, k := range ks {
+				files = append(files, c.R.Rel(reqs.m[k].File))
+			}
+			add(Gap{Type: "duplicate-id", Subject: id, Files: slices.Compact(slices.Sorted(slices.Values(files))), Text: fmt.Sprintf("ID %s is on %d requirements: %s", id, len(ks), strings.Join(ks, ", ")),
+				Hint: "an ID names one requirement for good: keep it on the one that had it first; in a change, drop the other's `ID:` line and run `lint --fix` for a new one"})
 		}
 	}
 	seenOrphan := map[string]bool{}

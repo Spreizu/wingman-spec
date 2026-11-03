@@ -11,10 +11,11 @@ import (
 	"github.com/Spreizu/wingman-spec/internal/quality"
 )
 
-// LineLint checks the requirement lines of a change's deltas that are not prose: a `Verify:` line names a method; and
+// LineLint checks the requirement lines of a change's deltas that are not prose: a `Verify:` line names a method, the
+// `ID:` lines (IDLint); and
 // warns when another active change changes the same requirement (the later merge would overwrite the earlier one).
 func (c Ctx) LineLint(changeDir string) []Problem {
-	out := c.overlaps(changeDir)
+	out := append(c.overlaps(changeDir), c.IDLint(changeDir)...)
 	for _, d := range Deltas(changeDir) {
 		rel := filepath.ToSlash(relTo(changeDir, d.File))
 		for _, r := range d.Reqs {

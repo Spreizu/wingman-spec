@@ -4,12 +4,42 @@
  */
 
 /** Comment leaders in front of `@spec` (any comment syntax), or a bare `@spec <key>` line (docstring, Javadoc-like text). */
-export const MARKER_LEADER = /(?:(?:\/\/+|#+|\/\*+|\*+|--+|;+|<!--|%+|\{#|"""|''')\s*@spec\b|^\s*@spec\b(?=\s+[a-z0-9][a-z0-9-]*\/[a-z0-9]))/;
+export const MARKER_LEADER = /(?:(?:\/\/+|#+|\/\*+|\*+|--+|;+|<!--|%+|\{#|"""|''')\s*@spec\b|^\s*@spec\b(?=\s+(?:[a-zA-Z0-9][a-zA-Z0-9-]*\/[a-zA-Z0-9]|[a-zA-Z0-9][\w-]*-[a-hj-np-zA-HJ-NP-Z2-9]{4}\b)))/;
 export const COMMENT_LINE = /^\s*(?:\/\/|#(?!\[)|\/\*|\*|--|;|<!--|%|\{#|"""|''')/;
 /** `@Test`, `@pytest.fixture`, `#[test]`, `[Fact]`. */
 export const ANNOTATION = /^\s*(?:@[\w.]+(?:\(.*\))?\s*$|#\[.*\]\s*$|\[[A-Z]\w*.*\]\s*$)/;
 export const CLOSING = /^\s*(?:[}\])]+[;,]?|end|<\/\w+>)\s*$/;
-export const KEY = /^\s*[,;]?\s*([a-z0-9][a-z0-9-]*)\/([a-z0-9][a-z0-9-]*)/;
+/** One `cap/slug` key after the leader (or after another key), any case: the key is lower-cased. */
+export const KEY = /^\s*[,;]?\s*([a-z0-9][a-z0-9-]*)\/([a-z0-9][a-z0-9-]*)/i;
+/** A requirement ID instead of a key: `<CAPABILITY>-XXXX`, any case (upper-cased, then resolved to its key). */
+export const ID_KEY = /^\s*[,;]?\s*([a-z0-9][a-z0-9_-]*-[a-hj-np-z2-9]{4})\b(?!\/)/i;
+
+let idAliases = new Map<string, string>();
+/** The requirement IDs (upper case) markers may name, with their keys; the trace model sets them from the specs. */
+export function setIdAliases(m: Map<string, string>): void {
+  idAliases = m;
+}
+/** The key a marker's ID names: its requirement's key when known, else the ID in upper case. */
+export const keyOfId = (id: string): string => idAliases.get(id.toUpperCase()) ?? id.toUpperCase();
+
+/** The keys of the markers on one line with the column range each is written at. */
+export function keyHits(l: string): { key: string; col: number; length: number }[] {
+  const m = MARKER_LEADER.exec(l);
+  if (!m) return [];
+  const out: { key: string; col: number; length: number }[] = [];
+  let pos = m.index + m[0].length;
+  for (;;) {
+    const rest = l.slice(pos);
+    const k = KEY.exec(rest);
+    const d = k ? null : ID_KEY.exec(rest);
+    const hit = k ?? d;
+    if (!hit) break;
+    const raw = k ? `${k[1]}/${k[2]}` : (d?.[1] ?? '');
+    out.push({ key: k ? raw.toLowerCase() : keyOfId(raw), col: pos + hit[0].length - raw.length, length: raw.length });
+    pos += hit[0].length;
+  }
+  return out;
+}
 
 const CONTROL = /^\s*(?:if|else|for|foreach|while|switch|catch|try|do|return|elif|except|with|match|case|using|lock|synchronized)\b/;
 const MODS = '(?:(?:export|default|public|private|protected|internal|static|final|abstract|async|override|virtual|sealed|pub|unsafe|extern|readonly|open|suspend|inline)\\s+)*';
@@ -23,17 +53,9 @@ const UNIT_TAG = /^\s*<(?:script|template|style)\b/;
 export const isUnitStart = (l: string): boolean =>
   !CONTROL.test(l) && (UNIT_KW.test(l) || UNIT_ARROW.test(l) || UNIT_TEST.test(l) || UNIT_METHOD.test(l) || UNIT_TAG.test(l));
 
-/** Keys of the markers on one line (a comment may list several: `@spec a/b, c/d`). */
+/** Keys of the markers on one line (a comment may list several: `@spec a/b, c/d`; an ID resolves to its key). */
 export function keysOf(l: string): string[] {
-  const m = MARKER_LEADER.exec(l);
-  if (!m) return [];
-  const keys: string[] = [];
-  let rest = l.slice(m.index + m[0].length);
-  for (let k = KEY.exec(rest); k; k = KEY.exec(rest)) {
-    keys.push(`${k[1]}/${k[2]}`);
-    rest = rest.slice(k[0].length);
-  }
-  return keys;
+  return keyHits(l).map((h) => h.key);
 }
 
 /** Docstring lines (python-style triple quotes): a marker inside one is the doc comment of the unit above it. */
@@ -106,5 +128,5 @@ export function placementFindings(text: string, isTest: boolean): PlacementFindi
   return out;
 }
 
-const placement = { MARKER_LEADER, COMMENT_LINE, ANNOTATION, CLOSING, KEY, isUnitStart, keysOf, placementFindings, PLACEMENT_FIX };
+const placement = { MARKER_LEADER, COMMENT_LINE, ANNOTATION, CLOSING, KEY, ID_KEY, isUnitStart, keysOf, keyHits, setIdAliases, keyOfId, placementFindings, PLACEMENT_FIX };
 export default placement;

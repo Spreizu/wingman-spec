@@ -4,6 +4,15 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
 ## Unreleased
 
+- **Stable requirement IDs.** A requirement may carry an `ID: <CAPABILITY>-XXXX` line (upper case, 4 random characters
+  without 0, O, 1 or I). `lint --fix` gives each ADDED requirement a new one, restores the living ID on MODIFIED and
+  REMOVED entries, and upper-cases a lower-case one; an ID never changes on a rename or move and is never reused (an
+  archived REMOVED entry records it as retired). `lint` fails a changed, malformed, reused, retired or misprefixed ID and
+  prints the canonical form; `drift` reports a `duplicate-id` gap. `@spec` accepts the ID or the slug, in any case, and a
+  marker by ID survives a rename. The extension adds "Wingman Spec: Go to Requirement ID".
+- **`lint --fix` adds `## Purpose` only for a new capability.** It used to add it to every delta without one, also of a
+  living capability (which merge then refused), and after a leading `## ADDED` heading; now it goes before the first
+  section.
 - **Overlap warning.** `lint` (and so `problems` and the editor) warns, at the delta line, when another active change
   also adds, modifies, removes or renames the same requirement: the change archived later overwrites the other.
 - **RENAMED rewrites the markers.** `next` rewrites the `@spec` markers (code and tests) of each requirement a

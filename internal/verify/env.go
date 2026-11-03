@@ -18,6 +18,7 @@ import (
 
 	"github.com/Spreizu/wingman-spec/internal/quality"
 
+	"github.com/Spreizu/wingman-spec/internal/anchors"
 	"github.com/Spreizu/wingman-spec/internal/change"
 	"github.com/Spreizu/wingman-spec/internal/codeindex"
 	"github.com/Spreizu/wingman-spec/internal/config"
@@ -159,6 +160,7 @@ func (e *Env) say(format string, a ...any) { fmt.Fprintf(e.Err, "wingman-spec: "
 func (e *Env) index() *codeindex.Index {
 	if e.idx == nil {
 		c := trace.Ctx{R: e.R, Cfg: e.Cfg}
+		anchors.SetAliases(c.IDAliases())
 		e.idx = codeindex.Scan(e.code, c.IsScannable)
 	}
 	return e.idx

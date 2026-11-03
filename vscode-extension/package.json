@@ -109,6 +109,10 @@
         "title": "Wingman Spec: Reveal Requirement"
       },
       {
+        "command": "wingmanSpec.goToRequirementId",
+        "title": "Wingman Spec: Go to Requirement ID"
+      },
+      {
         "command": "wingmanSpec.revealScenario",
         "title": "Wingman Spec: Reveal Scenario"
       },

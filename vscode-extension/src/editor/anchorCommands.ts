@@ -5,6 +5,7 @@ import { moveMarkerPlan, replaceKeyEdit } from '../model/markerFix.ts';
 import { filteredTestCommand, planTest, scenarioMenu, testStub } from '../model/reqInsight.ts';
 import type { MenuItem, ReqInsight } from '../model/reqInsight.ts';
 import { revealRoute } from '../model/reveal.ts';
+import { requirementIds } from '../model/traceability.ts';
 import type { TraceModel } from '../model/traceability.ts';
 import type { Route } from '../webview/types.ts';
 import type { TraceCache } from './anchorCode.ts';
@@ -66,6 +67,17 @@ export function registerAnchorCommands(cache: TraceCache, panel: RevealPanel): v
     scenarioMenu(ins, model.codeRoot, planTest(ins, (rel) => existsSync(join(model.codeRoot, rel))), join);
 
   return vscode.Disposable.from(
+    vscode.commands.registerCommand('wingmanSpec.goToRequirementId', async () => {
+      const picks = cache.all().flatMap((m) =>
+        requirementIds(m).map((x) => ({ label: x.id, description: x.req.key, detail: x.change ? `${x.req.name} (change ${x.change})` : x.req.name, file: x.req.file, line: x.req.line })),
+      );
+      if (!picks.length) {
+        void vscode.window.showInformationMessage('No requirement has an ID yet: `wingman-spec lint <change> --fix` gives each new one an `ID:` line.');
+        return;
+      }
+      const chosen = await vscode.window.showQuickPick<Pick>(picks, { title: 'Go to requirement ID', placeHolder: 'ID, key or name', matchOnDescription: true, matchOnDetail: true });
+      if (chosen?.file) await open(chosen.file, chosen.line);
+    }),
     vscode.commands.registerCommand('wingmanSpec.revealRequirement', (root: unknown, key: unknown) => {
       if (isStr(root) && isStr(key)) panel.show(revealRoute({ root }, { type: 'requirement', key }));
     }),

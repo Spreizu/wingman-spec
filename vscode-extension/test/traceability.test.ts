@@ -113,3 +113,19 @@ test('a Verify: line verifies a requirement without a test: no test flag, no unt
   assert.deepEqual(r?.flags, ['no-code-anchor']);
   assert.ok(!r?.statement.includes('Verify'));
 });
+
+test('an ID: line names a requirement: a marker may use it (any case), and the go-to-ID list has it', async () => {
+  const { readFileSync, writeFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { requirementIds } = await import('../src/model/traceability.ts');
+  const dir = traceProject();
+  const p = join(dir, 'specs/billing.md');
+  writeFileSync(p, readFileSync(p, 'utf8').replace('### Requirement: Remove an item\n', '### Requirement: Remove an item\nID: billing-7kq3\n'));
+  writeFileSync(join(dir, 'src/remove.ts'), '// @spec billing-7KQ3\nexport function remove() {}\n');
+  const m = buildTrace(dir, dir);
+  const r = m.requirements.get('billing/remove-an-item');
+  assert.equal(r?.id, 'BILLING-7KQ3');
+  assert.deepEqual(r?.code.map((a) => a.file), ['src/remove.ts']);
+  assert.ok(!r?.statement.includes('ID'));
+  assert.deepEqual(requirementIds(m).map((x) => [x.id, x.req.key]), [['BILLING-7KQ3', 'billing/remove-an-item']]);
+});

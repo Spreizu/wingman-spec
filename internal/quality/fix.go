@@ -15,9 +15,14 @@ var (
 	purposeFix = regexp.MustCompile(`(?i)^##\s+Purpose\s*$`)
 )
 
-// Fix applies mechanical repairs to the change's specs: a missing Why: line and a missing ## Purpose heading.
-func Fix(changeDir string) (int, error) {
+// Fix applies mechanical repairs to the change's specs: a missing Why: line, and a missing ## Purpose heading for a new
+// capability (one with no spec in livingDir: a delta of a living capability takes no Purpose).
+func Fix(changeDir, livingDir string) (int, error) {
 	n := 0
+	living := map[string]bool{}
+	for _, sf := range SpecFiles(livingDir) {
+		living[sf.Cap] = true
+	}
 	specs := filepath.Join(changeDir, "specs")
 	for _, sf := range SpecFiles(specs) {
 		b, err := os.ReadFile(sf.File)
@@ -25,7 +30,7 @@ func Fix(changeDir string) (int, error) {
 			return n, err
 		}
 		text := strings.ReplaceAll(string(b), "\r\n", "\n")
-		next, k := fixSpec(text)
+		next, k := fixSpec(text, !living[sf.Cap])
 		if k == 0 {
 			continue
 		}
@@ -37,14 +42,16 @@ func Fix(changeDir string) (int, error) {
 	return n, nil
 }
 
-func fixSpec(text string) (string, int) {
+func fixSpec(text string, purpose bool) (string, int) {
 	ls := strings.Split(text, "\n")
 	n := 0
-	hasPurpose := slices.ContainsFunc(ls, purposeFix.MatchString)
-	if !hasPurpose {
-		insert := 0
+	if purpose && !slices.ContainsFunc(ls, purposeFix.MatchString) {
+		insert := 0 // after a "# Title" line, else before the first section
 		for i, l := range ls {
-			if strings.HasPrefix(l, "# ") || h2Fix.MatchString(l) {
+			if h2Fix.MatchString(l) {
+				break
+			}
+			if strings.HasPrefix(l, "# ") {
 				insert = i + 1
 				for insert < len(ls) && strings.TrimSpace(ls[insert]) == "" {
 					insert++

@@ -15,7 +15,7 @@ import testPaths from '../core/testpaths.ts';
 export const slug = (s: string): string => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'scenario';
 
 // The marker syntax lives in core/placement.ts (the same rules as the CLI for the editor and the scripts).
-const { MARKER_LEADER, KEY } = placement;
+const { keyHits } = placement;
 const { TAG_RE } = quality;
 const MAX_BYTES = 1024 * 1024;
 
@@ -26,7 +26,7 @@ export const { isTestPath, isTestFile } = testPaths;
 export const { isScannable } = traceability;
 
 export interface Marker {
-  /** `capability/requirement-slug`. */
+  /** `capability/requirement-slug` (a marker written with the requirement's ID: its key). */
   key: string;
   /** Zero-based line and the column range of the key itself. */
   line: number;
@@ -34,20 +34,11 @@ export interface Marker {
   length: number;
 }
 
-/** Markers of one text. A comment may list several keys: `@spec a/b, c/d`. */
+/** Markers of one text. A comment may list several keys: `@spec a/b, c/d`; a requirement ID resolves to its key. */
 export function markersIn(text: string): Marker[] {
   const out: Marker[] = [];
   text.split('\n').forEach((l, i) => {
-    const m = MARKER_LEADER.exec(l);
-    if (!m) return;
-    let pos = m.index + m[0].length;
-    for (;;) {
-      const k = KEY.exec(l.slice(pos));
-      if (!k) break;
-      const key = `${k[1]}/${k[2]}`;
-      out.push({ key, line: i, col: pos + k[0].length - key.length, length: key.length });
-      pos += k[0].length;
-    }
+    for (const h of keyHits(l)) out.push({ key: h.key, line: i, col: h.col, length: h.length });
   });
   return out;
 }

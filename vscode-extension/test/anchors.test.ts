@@ -31,7 +31,18 @@ test('a marker reports the column range of its key, and a comment may list sever
 test('text that only mentions @spec without a comment leader or a key is ignored', () => {
   assert.deepEqual(markersIn('const s = "@spec billing/x"'), []);
   assert.deepEqual(markersIn('// @spec'), []);
-  assert.deepEqual(markersIn('// @spec Billing/Add'), []);
+});
+
+test('a marker key is read in any case, and a requirement ID resolves to its key', async () => {
+  const { default: placement } = await import('../src/core/placement.ts');
+  assert.deepEqual(markersIn('// @spec Billing/Add').map((m) => m.key), ['billing/add']);
+  placement.setIdAliases(new Map([['BILLING-7KQ3', 'billing/add-an-item']]));
+  try {
+    const [m, n] = markersIn('// @spec billing-7kq3, BILLING-WXYZ');
+    assert.deepEqual([m?.key, m?.col, m?.length, n?.key], ['billing/add-an-item', 9, 12, 'BILLING-WXYZ']);
+  } finally {
+    placement.setIdAliases(new Map());
+  }
 });
 
 test('test tags are found inside titles', () => {

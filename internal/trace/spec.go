@@ -25,7 +25,9 @@ type Requirement struct {
 	Confirmed  *string    `json:"confirmed,omitempty"`
 	Accepted   *string    `json:"accepted,omitempty"`
 	Verify     *string    `json:"verify,omitempty"` // the `Verify:` line's value
+	ID         *string    `json:"id,omitempty"`     // the `ID:` line's value, as written
 	acceptedAt int        // 0-based line of the Accepted: line, -1 when none
+	idAt       int        // 0-based line of the ID: line, -1 when none
 	Scenarios  []Scenario `json:"scenarios"`
 	Block      string     `json:"-"`
 	Baseline   bool       `json:"baseline,omitempty"`
@@ -110,7 +112,7 @@ func ParseSpec(text string) Parsed {
 		}
 		var keep []string
 		for j := req.Line - 1; j < end; j++ {
-			if j != req.acceptedAt {
+			if j != req.acceptedAt && j != req.idAt {
 				keep = append(keep, lines[j])
 			}
 		}
@@ -140,7 +142,7 @@ func ParseSpec(text string) Parsed {
 		}
 		if m := reqRE.FindStringSubmatch(l); m != nil {
 			closeReq(i)
-			req = &Requirement{Name: m[1], Slug: spec.Slug(m[1]), Op: op, Line: i + 1, acceptedAt: -1, Scenarios: []Scenario{}}
+			req = &Requirement{Name: m[1], Slug: spec.Slug(m[1]), Op: op, Line: i + 1, acceptedAt: -1, idAt: -1, Scenarios: []Scenario{}}
 			out.Reqs = append(out.Reqs, req)
 			inPurpose = false
 			continue
@@ -175,6 +177,12 @@ func ParseSpec(text string) Parsed {
 			if m := acceptedRE.FindStringSubmatch(l); m != nil {
 				req.Accepted = new(strings.ReplaceAll(m[1], "*", ""))
 				req.acceptedAt = i
+				continue
+			}
+		}
+		if req.ID == nil {
+			if m := IDLineRE.FindStringSubmatch(l); m != nil {
+				req.ID, req.idAt = new(strings.Trim(m[1], "*` ")), i
 				continue
 			}
 		}

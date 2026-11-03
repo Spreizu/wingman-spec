@@ -14,14 +14,19 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 )
 
 var (
 	leaderComment = regexp.MustCompile(`(?://+|#+|/\*+|\*+|-{2,}|;+|<!--|%+|\{#|"""|''')\s*@spec\b`)
 	leaderBare    = regexp.MustCompile(`^\s*@spec\b`)
-	bareKeyAhead  = regexp.MustCompile(`^\s+[a-z0-9][a-z0-9-]*/[a-z0-9]`)
-	// KeyRE is one key after a marker leader (or after another key, separated by a comma or semicolon).
-	KeyRE = regexp.MustCompile(`^\s*[,;]?\s*([a-z0-9][a-z0-9-]*)/([a-z0-9][a-z0-9-]*)`)
+	bareKeyAhead  = regexp.MustCompile(`^\s+(?:(?i:[a-z0-9][a-z0-9-]*/[a-z0-9])|(?i:[a-z0-9][a-z0-9_-]*-[a-hj-np-z2-9]{4})\b)`)
+	// KeyRE is one key after a marker leader (or after another key, separated by a comma or semicolon), any case.
+	KeyRE = regexp.MustCompile(`(?i)^\s*[,;]?\s*([a-z0-9][a-z0-9-]*)/([a-z0-9][a-z0-9-]*)`)
+	// idKeyRE is a requirement ID in a marker: <CAPABILITY>-XXXX, any case.
+	idKeyRE = regexp.MustCompile(`(?i)^\s*[,;]?\s*([a-z0-9][a-z0-9_-]*-[a-hj-np-z2-9]{4})\b`)
+
+	aliases atomic.Pointer[map[string]string]
 
 	commentLine = regexp.MustCompile(`^\s*(?://|#(?:[^\[]|$)|/\*|\*|--|;|<!--|%|\{#|"""|''')`)
 	annotation  = regexp.MustCompile(`^\s*(?:@[\w.]+(?:\(.*\))?\s*$|#\[.*\]\s*$|\[[A-Z]\w*.*\]\s*$)`)
@@ -52,7 +57,22 @@ func Leader(l string) (int, int, bool) {
 	return a[0], a[1], true
 }
 
-// KeysOf returns the keys of the markers on one line.
+// SetAliases sets the requirement IDs (upper case) that markers may name instead of a key, with their keys.
+func SetAliases(m map[string]string) { aliases.Store(&m) }
+
+// keyOfID is the key a marker's ID names (any case): its requirement's key when the ID is known, else the ID in upper
+// case (a marker naming no requirement).
+func keyOfID(id string) string {
+	up := strings.ToUpper(id)
+	if m := aliases.Load(); m != nil {
+		if k, ok := (*m)[up]; ok {
+			return k
+		}
+	}
+	return up
+}
+
+// KeysOf returns the keys of the markers on one line: `cap/slug` in lower case, a requirement ID resolved to its key.
 func KeysOf(l string) []string {
 	_, end, ok := Leader(l)
 	if !ok {
@@ -61,11 +81,16 @@ func KeysOf(l string) []string {
 	var keys []string
 	rest := l[end:]
 	for {
-		m := KeyRE.FindStringSubmatchIndex(rest)
-		if m == nil {
+		if m := KeyRE.FindStringSubmatchIndex(rest); m != nil {
+			keys = append(keys, strings.ToLower(rest[m[2]:m[3]]+"/"+rest[m[4]:m[5]]))
+			rest = rest[m[1]:]
+			continue
+		}
+		m := idKeyRE.FindStringSubmatchIndex(rest)
+		if m == nil || strings.HasPrefix(rest[m[1]:], "/") {
 			break
 		}
-		keys = append(keys, rest[m[2]:m[3]]+"/"+rest[m[4]:m[5]])
+		keys = append(keys, keyOfID(rest[m[2]:m[3]]))
 		rest = rest[m[1]:]
 	}
 	return keys

@@ -72,6 +72,7 @@ func (c Ctx) files() *codeindex.Index {
 	if c.Idx != nil {
 		return c.Idx
 	}
+	anchors.SetAliases(c.IDAliases())
 	return codeindex.Scan(c.R.Code, c.IsScannable)
 }
 

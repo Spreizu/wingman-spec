@@ -7,10 +7,11 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import chrono from '../core/chronology.ts';
+import placementCore from '../core/placement.ts';
 import { archiveDir, changesDir as changesOf, configFiles, livingSpecsDir } from '../core/paths.ts';
 import { nearest, scanCode, slug } from './anchors.ts';
 import type { ScannedFile } from './anchors.ts';
-import { acceptedOf, proposalApproval, verifyOf, whyOf } from './requirementLines.ts';
+import { acceptedOf, idOf, proposalApproval, verifyOf, whyOf } from './requirementLines.ts';
 import { parseSpec } from './specParser.ts';
 import { parseTasks } from './tasksParser.ts';
 
@@ -48,6 +49,8 @@ export interface TraceRequirement {
   accepted: string | null;
   /** The method of its `Verify:` line (inspection, analysis, demonstration): verified without a test. */
   verify: string | null;
+  /** Its `ID:` line (`<CAPABILITY>-XXXX`, upper case): stable across renames and moves; null when it has none. */
+  id: string | null;
   scenarios: TraceScenario[];
   /** Comment-free source of the whole requirement block (the words `anchor_fit` compares a unit with). */
   block: string;
@@ -213,6 +216,7 @@ function reqsOfSpec(cap: string, file: string, text: string, sections: string[])
       why: whyOf(r.raw),
       accepted: acceptedOf(r.raw),
       verify: verifyOf(r.raw),
+      id: idOf(r.raw),
       block: r.raw,
       scenarios: r.scenarios.map((s) => ({ name: s.name, slug: slug(s.name), line: s.line, steps: s.steps.map((st) => ({ keyword: st.keyword, text: st.text })) })),
       file,
@@ -254,6 +258,28 @@ function deltasOf(changeDir: string): { cap: string; file: string; reqs: DeltaRe
   return out;
 }
 
+/** The requirements that carry an `ID:` line, living ones first, then those an active change adds (`change` names it). */
+export function requirementIds(model: TraceModel): { id: string; req: TraceRequirement; change?: string }[] {
+  const out = new Map<string, { id: string; req: TraceRequirement; change?: string }>();
+  for (const r of model.requirements.values()) if (r.id) out.set(r.id, { id: r.id, req: r });
+  for (const c of model.changes) for (const r of c.requirements.values()) if (r.id && !out.has(r.id)) out.set(r.id, { id: r.id, req: r, change: c.name });
+  return [...out.values()].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/** Each requirement ID with its key, as the CLI resolves `@spec <ID>`: the living ones (moved by the active changes'
+ * RENAMED entries) and the IDs the active changes add. */
+function idAliases(root: string, living: Map<string, TraceRequirement>): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const r of living.values()) if (r.id) m.set(r.id, r.key);
+  for (const name of dirs(changesOf(root))) {
+    for (const d of deltasOf(join(changesOf(root), name))) {
+      for (const rn of d.renames) for (const [id, k] of m) if (k === `${d.cap}/${slug(rn.from)}`) m.set(id, `${d.cap}/${slug(rn.to)}`);
+      for (const r of d.reqs) if (r.id && r.op !== 'REMOVED') m.set(r.id, r.key);
+    }
+  }
+  return m;
+}
+
 /** Requirement keys the archived changes say should be in the living specs. */
 function archivedExpectation(root: string): Map<string, string> {
   const dir = archiveDir(root);
@@ -288,6 +314,8 @@ export function buildTrace(root: string, codeRoot: string, opts: { scan?: Scanne
   const mode = readMode(configs);
   const placement = readPlacement(configs);
   const reqs = livingRequirements(root);
+  const ids = idAliases(root, reqs);
+  placementCore.setIdAliases(ids);
   const scan = opts.scan ?? scanCode(codeRoot);
 
   // anchors
@@ -299,10 +327,11 @@ export function buildTrace(root: string, codeRoot: string, opts: { scan?: Scanne
   const stale: { tag: string; file: string; line: number; why: string }[] = [];
   for (const f of scan) {
     for (const m of f.markers) {
-      const r = reqs.get(m.key);
+      const key = ids.get(m.key) ?? m.key; // a scan cached before the IDs were known
+      const r = reqs.get(key);
       if (!r) {
-        const hint = nearest(m.key, reqs.keys());
-        unresolved.push({ key: m.key, file: f.file, line: m.line, ...(hint ? { hint } : {}) });
+        const hint = nearest(key, reqs.keys());
+        unresolved.push({ key, file: f.file, line: m.line, ...(hint ? { hint } : {}) });
       } else (f.test ? r.tests : r.code).push({ file: f.file, line: m.line, kind: 'marker' });
     }
     for (const t of f.tags) {

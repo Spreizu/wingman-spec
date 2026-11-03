@@ -20,6 +20,7 @@ var specInputs = []struct{ Name, Text string }{
 	{"removed and renamed", "## REMOVED\n\n### Requirement: Gone\n**Reason**: x\n\n## RENAMED\n\n- Old -> New\n"},
 	{"modified", "## MODIFIED\n\n### Requirement: M\nM SHALL z.\n\n#### Scenario: One\n#### Scenario: Two\n"},
 	{"verify", "## ADDED\n\n### Requirement: V\nThe manual SHALL list every flag.\nVerify: **Inspection** of the manual\n\n#### Scenario: Read\n\n### Requirement: W\nW SHALL x.\nVerify: test\n#### Scenario: S\n"},
+	{"ids", "## ADDED\n\n### Requirement: I\nI SHALL x.\nID: cap-a-7kq3\n\n#### Scenario: S\n\n### Requirement: J\nJ SHALL y.\n- **ID**: `CAP-A-AB2C`\n#### Scenario: T\nID: NOT-ONE\n"},
 	{"fenced headings", "## ADDED\n\n### Requirement: F\nF SHALL a.\n\n```md\n### Requirement: Not one\n#### Scenario: Not one\n```\n\n#### Scenario: Real\n"},
 }
 
@@ -29,6 +30,7 @@ var markerInputs = []struct{ File, Text string }{
 	{"src/c.go", "/* @spec cap-a/three */\npackage c\n// not a marker: @spec nothing\n"},
 	{"src/d.sql", "-- @spec cap-d/four\nselect 1;\n"},
 	{"src/e.rb", "x = 1 # @spec cap-e/five\n"},
+	{"src/f.ts", "// @spec CAP-A-7KQ3, Cap-A/One\n// @spec cap-b-ab2c\n/**\n * @spec CAP-C-WXYZ\n */\n// @spec cap-a-7kq3/not-an-id\n"},
 }
 
 var approvalInputs = []string{
@@ -49,6 +51,7 @@ type goldenReq struct {
 	Op        string   `json:"op"`
 	Why       *string  `json:"why"`
 	Verify    *string  `json:"verify"`
+	ID        *string  `json:"id"`
 	Scenarios []string `json:"scenarios"`
 }
 
@@ -89,7 +92,11 @@ func TestGrammarGoldenForEditor(t *testing.T) {
 			if m := r.Verified(); m != "" {
 				v = &m
 			}
-			reqs = append(reqs, goldenReq{r.Name, r.Op, r.Why, v, sc})
+			var id *string
+			if r.ID != nil {
+				id = new(trace.CanonID(*r.ID))
+			}
+			reqs = append(reqs, goldenReq{r.Name, r.Op, r.Why, v, id, sc})
 		}
 		ren := [][2]string{}
 		for _, r := range p.Renames {
