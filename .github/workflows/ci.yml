@@ -26,12 +26,18 @@ jobs:
           go-version-file: go.mod
       - run: go vet ./...
       - run: go test ./...
+      - name: Race detector
+        if: runner.os != 'Windows'
+        run: go test -race ./...
+      - name: Coverage
+        if: runner.os == 'Linux'
+        run: go test -coverprofile=coverage.out ./...
       - name: gofmt
         if: runner.os == 'Linux'
         run: test -z "$(gofmt -l cmd internal)"
       - name: golangci-lint
         if: runner.os == 'Linux'
-        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run ./...
+        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.1 run ./...
       - name: Cross builds (the platforms of the vsix files)
         if: runner.os == 'Linux'
         run: |
@@ -57,6 +63,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
       - run: pnpm test
+      - name: Bundle size
+        run: |
+          pnpm run build
+          node -e "const fs=require('fs'); const n=fs.statSync('out/extension.js').size; if (n>2_000_000) { console.error('extension bundle too large:', n); process.exit(1); } console.log('extension bundle', n, 'bytes');"
       - name: The committed visual helper bundle matches its sources
         run: node ../scripts/build-visual.mjs --check
 
