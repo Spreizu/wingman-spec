@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.1
+
+- Code-file watches are filtered by file extension and debounce a path list into an incremental `@spec` scan. The Problems panel refreshes up to three projects at once.
+- The bundled CLI checks `specs/` as it reads after archive, so finish no longer runs a scenario the change drops or removes, and `lint` flags a surviving scenario that contradicts the change. It also asks for a visual state per data state of a list view, and a committed file your `.gitignore` matches no longer makes finish stale. Details in the repository changelog.
+- The README shows the dashboard, change page, spec page and Timeline on a sample billing project.
+
 ## 0.12.0
 
 - Each platform build bundles the `wingman-spec` CLI and always runs it; there is no universal build and no CLI to install. The extension keeps each project's shim `.wingman-spec/bin/wingman-spec` on the bundled CLI. **Set Up This Folder** runs `init`; when the generated agent files are older than the CLI, an **Update** button in the panel header runs `update` and hides once they are current. Removed settings: `wingmanSpec.verifierNode`, `wingmanSpec.openspecPath`, `wingmanSpec.adrDirectory`. Details in the repository changelog.

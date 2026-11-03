@@ -2,15 +2,15 @@
 
 Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
-## Unreleased
+## 0.12.1
 
 - **CLI performance.** `check`, `drift` and `anchors` share one code-file index per command (git `ls-files -z`, parallel reads). Unreadable files are listed as `skipped` instead of silently dropped.
 - **Windows.** Project commands run through `cmd /C` and are killed with `taskkill /T`. `init --no-detect` probe uses the same shell helper.
 - **JSON schema.** Trace, drift, problems, check and finish JSON include `schema_version: 1` (`schemas/*.json`). `--format sarif|markdown|junit` on drift, problems, lint, trace and finish. `lint --fix` inserts a missing `Why:` and `## Purpose`. Archive writes `trace.json`. `sync --check` includes unified diffs of a pending merge.
 - **Skills.** The seven formerly vendored skills are first-party rewrites (`skills/NOTICE.md`). Vendoring scripts and lock files are gone. They install as `wingman-*` so they do not collide with a user's own superpowers or ponytail. `init`/`update` remove an old unprefixed copy only when its `SKILL.md` still looks like the bundled one. The four rewritten superpowers skills no longer carry an upstream copyright line.
-- **Extension.** Code-file watches are extension-filtered and debounce a path list into an incremental `@spec` scan. Problems panel refreshes up to three projects at once.
-- **CI.** `go test -race`, pinned golangci-lint v2.15.0, coverage profile, extension bundle-size check.
-
+- **Extension.** Code-file watches are extension-filtered and debounce a path list into an incremental `@spec` scan. Problems panel refreshes up to three projects at once. The READMEs show the dashboard on a sample billing project.
+- **CI.** `go test -race`, the Go toolchain pinned to 1.27.3 (local `go fmt` and CI format alike), golangci-lint pinned
+  to v2.15.0, a coverage profile and an extension bundle-size check. The prose lint skips HTML-only lines.
 - **Archive gate.** A committed file your `.gitignore` matches (an app log written while you click through the app)
   no longer makes finish stale, and a stale finish lists the files that changed since it passed.
 - **Data states.** The plan instructions ask for a visual `state:` per data state of a list, table, grid, feed or cart

@@ -30,7 +30,7 @@ const (
 )
 
 // Version is set at build time with -ldflags "-X github.com/Spreizu/wingman-spec/internal/cli.Version=...".
-var Version = "0.12.0-dev"
+var Version = "0.12.1-dev"
 
 // exitError carries an exit code; its message (if any) goes to stderr.
 type exitError struct {
