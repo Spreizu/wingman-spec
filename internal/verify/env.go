@@ -19,9 +19,11 @@ import (
 	"github.com/Spreizu/wingman-spec/internal/quality"
 
 	"github.com/Spreizu/wingman-spec/internal/change"
+	"github.com/Spreizu/wingman-spec/internal/codeindex"
 	"github.com/Spreizu/wingman-spec/internal/config"
 	"github.com/Spreizu/wingman-spec/internal/gitx"
 	"github.com/Spreizu/wingman-spec/internal/layout"
+	"github.com/Spreizu/wingman-spec/internal/report"
 	"github.com/Spreizu/wingman-spec/internal/runstate"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
 	"github.com/Spreizu/wingman-spec/internal/timeline"
@@ -75,7 +77,8 @@ type Options struct {
 	Scenarios         []string
 	Note, Reason, All string
 	Accept, JSON      bool
-	Apply, Text       bool
+	Apply, Text, Fix  bool
+	Report            string // json|sarif|markdown|junit (drift, problems, finish, lint, trace)
 	Base, Key         string
 	ReviewFix, Anchor string // progress: a `Review fix:` or `Reviewed anchors:` entry
 	Untestable        string
@@ -103,6 +106,9 @@ func (o *Options) Check() error {
 	}
 	if !slices.Contains([]string{"json", "prompt"}, o.Format) {
 		return die(Usage, "--format must be json|prompt")
+	}
+	if o.Report != "" && !slices.Contains([]string{"json", "sarif", "markdown", "junit"}, o.Report) {
+		return die(Usage, "--format must be json|sarif|markdown|junit")
 	}
 	if o.Reviewer == "self" {
 		return die(Usage, "--reviewer self is not allowed: the implementer does not review its own screenshots. Dispatch an independent spec-visual-reviewer subagent, or record the review as skipped with --reviewer none")
@@ -138,6 +144,7 @@ type Env struct {
 	t0     time.Time
 	wave   int // the wave and lane (1-based) this command works on, for the timeline
 	lane   int
+	idx    *codeindex.Index
 }
 
 // New prepares a command run.
@@ -147,10 +154,29 @@ func New(r *layout.Root, cfg *config.Config, o Options, out, errOut io.Writer) *
 
 func (e *Env) say(format string, a ...any) { fmt.Fprintf(e.Err, "wingman-spec: "+format+"\n", a...) }
 
-func (e *Env) tr() trace.Ctx { return trace.Ctx{R: e.R, Cfg: e.Cfg} }
+func (e *Env) index() *codeindex.Index {
+	if e.idx == nil {
+		c := trace.Ctx{R: e.R, Cfg: e.Cfg}
+		e.idx = codeindex.Scan(e.code, c.IsScannable)
+	}
+	return e.idx
+}
+
+func (e *Env) tr() trace.Ctx { return trace.Ctx{R: e.R, Cfg: e.Cfg, Idx: e.index()} }
+
+func (e *Env) skippedObj() any {
+	sk := e.index().Skipped
+	if len(sk) == 0 {
+		return Skip
+	}
+	return sk
+}
 
 // print writes v as indented JSON (keys in order for *Obj).
 func (e *Env) print(v any) {
+	if o, ok := v.(*Obj); ok && !o.Has("schema_version") {
+		v = O("schema_version", report.SchemaVersion).Merge(o)
+	}
 	b, err := marshal(v)
 	if err != nil {
 		e.say("cannot write JSON: %v", err)
@@ -171,7 +197,17 @@ func (e *Env) emit(x *Obj) {
 		x.Set("run_status", e.status)
 	}
 	e.timelineOf(x)
-	e.print(x)
+	if e.O.Report != "" && e.O.Report != "json" {
+		var fs []report.Finding
+		if v, ok := x.Get("failures").([]string); ok {
+			for _, f := range v {
+				fs = append(fs, report.Finding{Source: e.O.Cmd, Code: e.O.Cmd, Severity: "error", Message: f})
+			}
+		}
+		_ = e.writeReport(e.O.Cmd, fs, nil, false)
+	} else {
+		e.print(x)
+	}
 	if e.O.Timing || os.Getenv("WINGMAN_SPEC_PROFILE") == "1" {
 		e.profile()
 	}

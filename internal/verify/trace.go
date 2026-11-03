@@ -10,6 +10,7 @@ import (
 
 	"github.com/Spreizu/wingman-spec/internal/change"
 	"github.com/Spreizu/wingman-spec/internal/quality"
+	"github.com/Spreizu/wingman-spec/internal/report"
 )
 
 // tagAt is one test tag with where it is.
@@ -97,6 +98,7 @@ func (e *Env) Trace() error {
 		lines = append(lines, fmt.Sprintf("%s:%d: unknown tag: [%s]: %s", t.File, t.Line, t.Tag, t.Why))
 	}
 	ok := len(res.Missing) == 0 && len(unknown) == 0
+	e.saySkipped()
 	if e.O.Text {
 		for _, l := range lines {
 			fmt.Fprintln(e.Out, l)
@@ -106,16 +108,22 @@ func (e *Env) Trace() error {
 			verdict = "FAILED"
 		}
 		fmt.Fprintf(e.Out, "trace %s: %d scenarios, %d tagged, %d visual, %d untested, %d unknown tags: %s\n", scope, res.Total, len(res.Covered), len(res.Visual), len(res.Missing), len(unknown), verdict)
-	} else {
-		x := O("ok", ok, "scope", scope, "scenarios", res.Total, "test_files", len(files), "tagged", res.Covered, "visual", res.Visual,
-			"untested", untested, "unknown_tags", unknown, "problems", list(lines))
 		if !ok {
-			x.Set("next", "tag a test of each untested scenario with `[<capability>/<scenario-slug>]` in its title; fix or drop each unknown tag")
+			return quit(Fail)
 		}
-		e.print(x)
+		return nil
 	}
+	x := O("ok", ok, "scope", scope, "scenarios", res.Total, "test_files", len(files), "tagged", res.Covered, "visual", res.Visual,
+		"untested", untested, "unknown_tags", unknown, "problems", list(lines), "skipped", e.skippedObj())
 	if !ok {
-		return quit(Fail)
+		x.Set("next", "tag a test of each untested scenario with `[<capability>/<scenario-slug>]` in its title; fix or drop each unknown tag")
 	}
-	return nil
+	var fs []report.Finding
+	for _, s := range res.Missing {
+		fs = append(fs, report.Finding{Source: "trace", Code: "untested", Severity: "error", Message: fmt.Sprintf("no test carries [%s]", s.ID), File: rel(s.File), Line: s.Line})
+	}
+	for _, t := range unknown {
+		fs = append(fs, report.Finding{Source: "trace", Code: "unknown-tag", Severity: "error", Message: t.Why, File: t.File, Line: t.Line, Key: t.Tag})
+	}
+	return e.writeReport("Trace", fs, x, !ok)
 }

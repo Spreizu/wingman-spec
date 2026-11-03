@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Spreizu/wingman-spec/schemas/output.schema.json",
+  "title": "Wingman Spec CLI JSON output",
+  "type": "object",
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 }
+  },
+  "allOf": [
+    {
+      "if": { "required": ["findings"] },
+      "then": {
+        "properties": {
+          "ok": { "type": "boolean" },
+          "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["source", "code", "severity", "message"],
+      "properties": {
+        "source": { "type": "string" },
+        "code": { "type": "string" },
+        "severity": { "enum": ["error", "warning", "info"] },
+        "message": { "type": "string" },
+        "file": { "type": "string" },
+        "line": { "type": "integer" },
+        "col": { "type": "integer" }
+      }
+    }
+  }
+}

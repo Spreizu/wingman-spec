@@ -11,6 +11,7 @@ import (
 
 	"github.com/Spreizu/wingman-spec/internal/change"
 	"github.com/Spreizu/wingman-spec/internal/quality"
+	"github.com/Spreizu/wingman-spec/internal/report"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
 	"github.com/Spreizu/wingman-spec/internal/trace"
 	"github.com/Spreizu/wingman-spec/internal/visual"
@@ -436,6 +437,13 @@ func (e *Env) Lint() error {
 	if err != nil {
 		return err
 	}
+	if e.O.Fix {
+		if n, err := quality.Fix(changeDir); err != nil {
+			return die(Fail, "%v", err)
+		} else if n > 0 {
+			e.say("applied %d mechanical fix(es)", n)
+		}
+	}
 	x, ok, located := e.lint(changeDir)
 	if e.O.Text {
 		for _, l := range located {
@@ -446,13 +454,16 @@ func (e *Env) Lint() error {
 			verdict = "ok"
 		}
 		fmt.Fprintf(e.Out, "lint %s: %s\n", e.O.Change, verdict)
-	} else {
-		e.print(x)
+		if ok {
+			return nil
+		}
+		return quit(Fail)
 	}
-	if ok {
-		return nil
+	var fs []report.Finding
+	for _, l := range located {
+		fs = append(fs, report.Finding{Source: "lint", Code: "lint", Severity: "error", Message: l})
 	}
-	return quit(Fail)
+	return e.writeReport("Lint", fs, x, !ok)
 }
 
 // lint is the planning lint of a change: its JSON, whether it passes, and every finding as one located line

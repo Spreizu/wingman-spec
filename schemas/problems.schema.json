@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Spreizu/wingman-spec/schemas/problems.schema.json",
+  "title": "wingman-spec problems --json",
+  "type": "object",
+  "required": ["schema_version", "ok", "findings", "counts"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "ok": { "type": "boolean" },
+    "mode": { "type": "string" },
+    "counts": {
+      "type": "object",
+      "properties": {
+        "error": { "type": "integer" },
+        "warning": { "type": "integer" },
+        "info": { "type": "integer" }
+      }
+    },
+    "findings": { "type": "array" },
+    "notes": { "type": "array" },
+    "skipped": { "type": "array" }
+  }
+}

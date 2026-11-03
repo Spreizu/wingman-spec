@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Spreizu/wingman-spec/schemas/drift.schema.json",
+  "title": "wingman-spec drift --json",
+  "type": "object",
+  "required": ["schema_version", "ok", "mode"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "ok": { "type": "boolean" },
+    "mode": { "type": "string" },
+    "requirements": { "type": "integer" },
+    "counts": { "type": "object" },
+    "open": { "type": "array" },
+    "advisory": { "type": "array" },
+    "accepted": { "type": "array" },
+    "notes": { "type": "array" },
+    "skipped": { "type": "array" }
+  }
+}

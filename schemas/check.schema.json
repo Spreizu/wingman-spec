@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Spreizu/wingman-spec/schemas/check.schema.json",
+  "title": "wingman-spec check --json",
+  "type": "object",
+  "required": ["schema_version", "result"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "result": { "type": "string" },
+    "run_status": { "type": "string" },
+    "checks": { "type": "array" },
+    "failures": { "type": "array" },
+    "warnings": { "type": "array" }
+  }
+}

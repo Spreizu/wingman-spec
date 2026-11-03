@@ -331,8 +331,9 @@ func (e *Env) Problems() error {
 	for _, f := range fs {
 		counts[f.Severity]++
 	}
-	e.print(O("ok", counts["error"] == 0, "mode", md, "counts", O("error", counts["error"], "warning", counts["warning"], "info", counts["info"]), "findings", list(fs), "notes", NonEmpty(notes)))
-	return nil
+	e.saySkipped()
+	x := O("ok", counts["error"] == 0, "mode", md, "counts", O("error", counts["error"], "warning", counts["warning"], "info", counts["info"]), "findings", list(fs), "notes", NonEmpty(notes), "skipped", e.skippedObj())
+	return e.writeReport("Problems", findingsOfProblems(fs), x, false)
 }
 
 // finishFindings drops identical findings and sorts: errors first, then by file and line.

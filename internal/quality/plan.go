@@ -22,6 +22,7 @@ type Finding struct {
 	Severity string `json:"severity"`
 	Kind     string `json:"kind"`
 	Text     string `json:"text"`
+	Fix      string `json:"fix,omitempty"`
 }
 
 // Caps are the implementation-task caps per size.

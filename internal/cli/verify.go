@@ -151,6 +151,7 @@ func (a *app) verifyCmds() []*cobra.Command {
 	drift := a.vcmd("drift", "Gaps between the living specs, code anchors and test tags; `drift decide <key> --accept --note` records an accepted gap", cobra.NoArgs, 0, (*verify.Env).Drift,
 		func(f *pflag.FlagSet, o *verify.Options) {
 			f.BoolVar(&o.Text, "text", false, "a readable list instead of JSON")
+			f.StringVar(&o.Report, "format", "json", "json|sarif|markdown")
 		})
 	drift.Long = drift.Short + ".\n\nGap kinds: unanchored-requirement, untested-requirement, orphan-anchor, stale-anchor, over-anchored,\n" +
 		"duplicate-marker, misplaced-marker, stale-test-tag, unsynced-archive, unconfirmed-requirement (an adopted requirement\n" +
@@ -205,10 +206,15 @@ func (a *app) verifyCmds() []*cobra.Command {
 		a.vcmd("next <change>", "Hand out the next task (or parallel batch) as a packet for one implementer subagent", one, run|fNext, (*verify.Env).Next),
 		a.vcmd("check <change>", "Verify the task in progress: done-when, tests, validate, visual, quality; tick it on pass", one, run|fCheck, (*verify.Env).Check),
 		a.vcmd("review <change>", "Record the visual reviewer's reply for the task in progress", one, run|fReview, (*verify.Env).Review),
-		a.vcmd("finish <change>", "Close-out once every task is ticked: full commands, validate, visual, trace, anchors, test evidence", one, run, (*verify.Env).Finish),
+		a.vcmd("finish <change>", "Close-out once every task is ticked: full commands, validate, visual, trace, anchors, test evidence", one, run, (*verify.Env).Finish,
+			func(f *pflag.FlagSet, o *verify.Options) {
+				f.StringVar(&o.Report, "format", "json", "json|junit|markdown")
+			}),
 		a.vcmd("lint <change>", "Validate the plan: proposal, delta specs, tasks, design (no command runs)", one, run, (*verify.Env).Lint,
 			func(f *pflag.FlagSet, o *verify.Options) {
 				f.BoolVar(&o.Text, "text", false, "one file:line finding per line instead of JSON")
+				f.BoolVar(&o.Fix, "fix", false, "apply mechanical fixes (missing Why, ## Purpose heading)")
+				f.StringVar(&o.Report, "format", "json", "json|sarif|markdown")
 			}),
 		a.vcmd("size <change>", "Declared size against what the change needs", one, 0, (*verify.Env).Size),
 		appMap,
@@ -219,8 +225,12 @@ func (a *app) verifyCmds() []*cobra.Command {
 		a.vcmd("trace [<change>]", "Link scenarios to tests: scenarios no test tags (the change's, or all living) and tags naming no scenario", opt, 0, (*verify.Env).Trace,
 			func(f *pflag.FlagSet, o *verify.Options) {
 				f.BoolVar(&o.Text, "text", false, "one file:line finding per line instead of JSON")
+				f.StringVar(&o.Report, "format", "json", "json|sarif|markdown")
 			}),
 		runChecks, progress,
-		a.vcmd("problems [<change>]", "Every finding as one located list, for editors (read-only)", opt, 0, (*verify.Env).Problems),
+		a.vcmd("problems [<change>]", "Every finding as one located list, for editors (read-only)", opt, 0, (*verify.Env).Problems,
+			func(f *pflag.FlagSet, o *verify.Options) {
+				f.StringVar(&o.Report, "format", "json", "json|sarif|markdown")
+			}),
 	}
 }

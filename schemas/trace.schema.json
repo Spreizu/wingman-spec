@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Spreizu/wingman-spec/schemas/trace.schema.json",
+  "title": "wingman-spec trace --json",
+  "type": "object",
+  "required": ["schema_version", "ok", "scope", "scenarios"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "ok": { "type": "boolean" },
+    "scope": { "type": "string" },
+    "scenarios": { "type": "integer" },
+    "test_files": { "type": "integer" },
+    "tagged": { "type": "array" },
+    "visual": { "type": "array" },
+    "untested": { "type": "array" },
+    "unknown_tags": { "type": "array" },
+    "problems": { "type": "array" },
+    "skipped": { "type": "array" }
+  }
+}
