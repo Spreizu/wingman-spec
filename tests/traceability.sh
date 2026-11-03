@@ -415,6 +415,17 @@ expect "next rewrites the old key in code and test markers and lists each rewrit
 expect "...leaves a longer key and the scenario tags alone" 'grep -q "todo/remove-a-todo-twice" test/remove.test.js && grep -q "\[todo/removed\]" test/remove.test.js'
 $V next rename > "$T/n.json" 2>/dev/null || true
 expect "...and is idempotent: a second next rewrites nothing" '[ "$(J "$T/n.json" renamed_markers)" = undefined ]'
+
+echo "== lint warns when two active changes change the same requirement"
+mkdir -p .wingman-spec/changes/tidy/specs
+printf '## MODIFIED\n\n### Requirement: Remove a todo\nThe system SHALL remove the todo at the given index and keep the order.\nWhy: A person wants to drop what is done, so that the list stays short.\n\n#### Scenario: Removed\n- **WHEN** the user removes index 0\n- **THEN** the list is empty\n' > .wingman-spec/changes/tidy/specs/todo.md
+printf 'Size: S\nRisk: none\n\n## Why\nKeep the order.\n\n## What Changes\n- Keeps the order.\n' > .wingman-spec/changes/tidy/proposal.md
+cp .wingman-spec/changes/rename/tasks.md .wingman-spec/changes/tidy/tasks.md
+rc=0; $V lint tidy > "$T/l.json" 2>/dev/null || rc=$?
+expect "lint of one change warns (not fails) on the requirement the other active change renames" 'grep -q "MODIFIED todo/remove-a-todo, which the active change \\\\\"rename\\\\\" also changes (RENAMED)" "$T/l.json" && grep -q "\"kind\": \"overlap\"" "$T/l.json" && ! grep -B3 "\"kind\": \"overlap\"" "$T/l.json" | grep -q "\"severity\": \"error\""'
+$V lint rename > "$T/l.json" 2>/dev/null || true
+expect "...and the other one, at its RENAMED line" 'grep -q "specs/todo.md:3: RENAMED todo/remove-a-todo" "$T/l.json"'
+rm -rf .wingman-spec/changes/tidy
 cd "$T/p" || exit 1
 
 echo

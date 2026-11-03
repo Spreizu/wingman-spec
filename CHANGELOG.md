@@ -4,6 +4,8 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
 ## Unreleased
 
+- **Overlap warning.** `lint` (and so `problems` and the editor) warns, at the delta line, when another active change
+  also adds, modifies, removes or renames the same requirement: the change archived later overwrites the other.
 - **RENAMED rewrites the markers.** `next` rewrites the `@spec` markers (code and tests) of each requirement a
   RENAMED entry renames to the new key, prints each rewrite and lists them as `renamed_markers` in its JSON; it only
   touches marker lines and is idempotent. Test tags stay: they name scenarios, which a rename keeps.

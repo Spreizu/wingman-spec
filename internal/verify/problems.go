@@ -232,17 +232,7 @@ func (e *Env) lintFindings(ps []PlanFinding, name, changeDir string) []Finding {
 	return out
 }
 
-func (e *Env) activeChanges() []string {
-	ents, _ := os.ReadDir(e.R.Changes())
-	var out []string
-	for _, d := range ents {
-		if d.IsDir() && d.Name() != "archive" && !strings.HasPrefix(d.Name(), ".") {
-			out = append(out, d.Name())
-		}
-	}
-	slices.Sort(out)
-	return out
-}
+func (e *Env) activeChanges() []string { return e.tr().ActiveChanges() }
 
 // Problems is every finding of the verifier as one located list, for editors: the lint of the active changes (or the
 // named one), drift gaps and the anchor guard of changes that have begun. Read-only; exit 0.
