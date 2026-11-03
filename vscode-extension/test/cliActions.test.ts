@@ -143,20 +143,26 @@ test('panel: runs a known action of a known change once, asks before archiving, 
   const panel = new SpecPanel(store as never, () => [], extras);
   panel.show({ page: 'change', root, name: 'demo' });
   const post = async (m: unknown) => { host.panels[0].webview.post(m); await new Promise((r) => setTimeout(r, 20)); };
+  // A slow runner can render after the 20 ms: wait (up to 2 s) for what an action that runs must produce.
+  const until = async (ok: () => boolean) => { for (let i = 0; i < 100 && !ok(); i++) await new Promise((r) => setTimeout(r, 20)); };
   await post({ type: 'cli', action: 'validate', root, change: 'demo' });
+  await until(() => /validate done\./.test(host.panels[0].webview.html));
   assert.deepEqual(calls, ['validate demo']);
   assert.match(host.panels[0].webview.html, /validate done\./);
   await post({ type: 'cli', action: 'rm', root, change: 'demo' });
   await post({ type: 'cli', action: 'sync', root, change: 'nope' });
   await post({ type: 'cli', action: 'sync', root: '/elsewhere', change: 'demo' });
   await post({ type: 'cli', action: 'archive', root, change: 'demo' });
+  await until(() => host.messages.includes('Archive demo?'));
   assert.deepEqual(calls, ['validate demo'], 'unknown action, change or root, and a declined archive, run nothing');
   assert.ok(host.messages.includes('Archive demo?'));
   host.warningAnswer = 'Archive';
   await post({ type: 'cli', action: 'archive', root, change: 'demo' });
+  await until(() => calls.length === 3 && /archive done\./.test(host.panels[0].webview.html));
   assert.deepEqual(calls, ['validate demo', 'archive demo', 'refresh']);
   assert.match(host.panels[0].webview.html, /archive done\./, 'after an archive the overview shows the answer');
   await post({ type: 'cli', action: 'doctor', root });
+  await until(() => calls.at(-1) === 'doctor');
   assert.equal(calls.at(-1), 'doctor');
   host.trusted = false;
   await post({ type: 'cli', action: 'doctor', root });
