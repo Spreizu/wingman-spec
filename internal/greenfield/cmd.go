@@ -25,7 +25,9 @@ type opts struct {
 
 var valued = []string{"by", "reply", "reviewer", "reason", "out", "from", "for", "text"}
 
-type exit struct{ code int }
+type cmdErr struct{ code int }
+
+func (c cmdErr) Error() string { return "greenfield" }
 
 func (e *Env) out(s string) { fmt.Fprintln(e.Out, s) }
 
@@ -38,12 +40,12 @@ func (e *Env) json(v any) {
 
 const usageLine = "usage: wingman-spec mode [--for CMD] | greenfield status|start|new|approve|review|readme ... | roadmap [--next] | handover [--write]  (add --json for machine output)"
 
-func (e *Env) usage(msg string) {
+func (e *Env) usage(msg string) error {
 	fmt.Fprintf(e.Err, "%s\n%s\n", msg, usageLine)
-	panic(exit{2})
+	return cmdErr{2}
 }
 
-func (e *Env) parse(args []string) opts {
+func (e *Env) parse(args []string) (opts, error) {
 	o := opts{val: map[string]string{}, flags: map[string]bool{}}
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -54,7 +56,7 @@ func (e *Env) parse(args []string) opts {
 			}
 			if slices.Contains(valued, k) {
 				if i+1 >= len(args) {
-					e.usage(a + " needs a value")
+					return opts{}, e.usage(a + " needs a value")
 				}
 				o.val[k] = args[i+1]
 				i++
@@ -65,48 +67,53 @@ func (e *Env) parse(args []string) opts {
 		}
 		o.args = append(o.args, a)
 	}
-	return o
+	return o, nil
 }
 
 // Main runs one of mode | greenfield | roadmap | handover with its raw arguments and returns the exit code.
-func Main(p *Project, e *Env, cmd string, args []string) (code int) {
-	defer func() {
-		if r := recover(); r != nil {
-			if x, ok := r.(exit); ok {
-				code = x.code
-				return
-			}
-			panic(r)
-		}
-	}()
-	o := e.parse(args)
+func Main(p *Project, e *Env, cmd string, args []string) int {
+	err := e.dispatch(p, cmd, args)
+	if err == nil {
+		return 0
+	}
+	if x, ok := err.(cmdErr); ok {
+		return x.code
+	}
+	fmt.Fprintln(e.Err, err)
+	return 1
+}
+
+func (e *Env) dispatch(p *Project, cmd string, args []string) error {
+	o, err := e.parse(args)
+	if err != nil {
+		return err
+	}
 	switch cmd {
 	case "mode":
-		e.cmdMode(p, o)
+		return e.cmdMode(p, o)
 	case "roadmap":
-		e.cmdRoadmap(p, o)
+		return e.cmdRoadmap(p, o)
 	case "handover":
-		e.cmdHandover(p, o)
+		return e.cmdHandover(p, o)
 	case "greenfield":
 		if len(o.args) == 0 {
-			e.usage("greenfield <status|start|new|approve|review|readme>")
+			return e.usage("greenfield <status|start|new|approve|review|readme>")
 		}
 		sub := o.args[0]
 		o.args = o.args[1:]
-		f := map[string]func(*Project, opts){"status": e.cmdStatus, "start": e.cmdStart, "new": e.cmdNew, "approve": e.cmdApprove, "review": e.cmdReview, "readme": e.cmdReadme}[sub]
+		f := map[string]func(*Project, opts) error{"status": e.cmdStatus, "start": e.cmdStart, "new": e.cmdNew, "approve": e.cmdApprove, "review": e.cmdReview, "readme": e.cmdReadme}[sub]
 		if f == nil {
-			e.usage("greenfield <status|start|new|approve|review|readme>")
+			return e.usage("greenfield <status|start|new|approve|review|readme>")
 		}
-		f(p, o)
+		return f(p, o)
 	default:
-		e.usage("unknown greenfield command '" + cmd + "'")
+		return e.usage("unknown greenfield command '" + cmd + "'")
 	}
-	return 0
 }
 
 var cmdName = map[string]string{"start": "/spec-green-start", "status": "/spec-green-start", "plan": "/spec-green-plan", "next": "/spec-green-next", "adopt": "/spec-adopt"}
 
-func (e *Env) refuse(m Mode, cmd string, js bool) {
+func (e *Env) refuse(m Mode, cmd string, js bool) error {
 	r := Refuse(m, cmd)
 	if js {
 		e.json(r)
@@ -121,19 +128,19 @@ func (e *Env) refuse(m Mode, cmd string, js bool) {
 			e.out("  " + r.Alternative)
 		}
 	}
-	panic(exit{ExitRefused})
+	return cmdErr{ExitRefused}
 }
 
-func (e *Env) guard(p *Project, cmd string, o opts) Mode {
+func (e *Env) guard(p *Project, cmd string, o opts) (Mode, error) {
 	m := p.ModeOf()
 	if !Allowed(m.Mode, cmd) {
-		e.refuse(m, cmd, o.flags["json"])
+		return m, e.refuse(m, cmd, o.flags["json"])
 	}
-	return m
+	return m, nil
 }
 
 // guardKind: read works in progress and in implementation; write only in progress.
-func (e *Env) guardKind(p *Project, kind string, o opts) {
+func (e *Env) guardKind(p *Project, kind string, o opts) error {
 	m := p.ModeOf()
 	ok := m.Mode == InProgress || (kind == "read" && m.Mode == Implementation)
 	if !ok {
@@ -141,11 +148,12 @@ func (e *Env) guardKind(p *Project, kind string, o opts) {
 		if kind == "write" {
 			c = "plan"
 		}
-		e.refuse(m, c, o.flags["json"])
+		return e.refuse(m, c, o.flags["json"])
 	}
+	return nil
 }
 
-func (e *Env) cmdMode(p *Project, o opts) {
+func (e *Env) cmdMode(p *Project, o opts) error {
 	m := p.ModeOf()
 	if m.Mode == Unsupported {
 		if o.flags["json"] {
@@ -154,9 +162,9 @@ func (e *Env) cmdMode(p *Project, o opts) {
 			e.out("mode: unsupported layout\n" + Alternative[Unsupported])
 		}
 		if o.val["for"] != "" {
-			panic(exit{ExitRefused})
+			return cmdErr{ExitRefused}
 		}
-		return
+		return nil
 	}
 	f := o.val["for"]
 	if f != "" {
@@ -167,10 +175,10 @@ func (e *Env) cmdMode(p *Project, o opts) {
 				ks = append(ks, k)
 			}
 			slices.Sort(ks)
-			e.usage(fmt.Sprintf("unknown command '%s' (one of %s)", f, strings.Join(ks, ", ")))
+			return e.usage(fmt.Sprintf("unknown command '%s' (one of %s)", f, strings.Join(ks, ", ")))
 		}
 		if !Allowed(m.Mode, c) {
-			e.refuse(m, c, o.flags["json"])
+			return e.refuse(m, c, o.flags["json"])
 		}
 	}
 	if o.flags["json"] {
@@ -179,7 +187,7 @@ func (e *Env) cmdMode(p *Project, o opts) {
 			Allowed bool `json:"allowed,omitempty"`
 		}
 		e.json(withAllowed{m, f != ""})
-		return
+		return nil
 	}
 	l := "mode: " + m.Mode
 	if m.MarkerMissing {
@@ -192,90 +200,113 @@ func (e *Env) cmdMode(p *Project, o opts) {
 	if f != "" {
 		e.out("allowed: /" + strings.TrimPrefix(f, "/"))
 	}
+	return nil
 }
 
-func (e *Env) write(f, text string) {
+func (e *Env) write(f, text string) error {
 	if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
 		fmt.Fprintln(e.Err, err)
-		panic(exit{1})
+		return cmdErr{1}
 	}
 	if err := os.WriteFile(f, []byte(text), 0o644); err != nil {
 		fmt.Fprintln(e.Err, err)
-		panic(exit{1})
+		return cmdErr{1}
 	}
+	return nil
 }
 
-func (e *Env) cmdStart(p *Project, o opts) {
-	m := e.guard(p, "start", o)
+func (e *Env) cmdStart(p *Project, o opts) error {
+	m, err := e.guard(p, "start", o)
+	if err != nil {
+		return err
+	}
 	if m.Marker {
 		e.out(fmt.Sprintf("already started (%s); nothing changed. Run: %s", m.Mode, run("greenfield status")))
-		return
+		return nil
 	}
 	marker, readme := p.Rel(p.Marker()), p.Rel(p.path("inputs", "README.md"))
 	if !o.flags["yes"] {
 		e.out(fmt.Sprintf("dry run. This would mark %s as a NEW product (no existing code, specs written from requirements): it writes %s and %s and nothing else.\nConfirm with the analyst that this is a new product, then re-run with: greenfield start --by \"<analyst name>\" --yes", p.Root.Code, marker, readme))
-		return
+		return nil
 	}
 	by := strings.TrimSpace(o.val["by"])
 	if len(by) < 2 {
-		e.usage(`start needs --by "<analyst name>"`)
+		return e.usage(`start needs --by "<analyst name>"`)
 	}
 	_ = os.MkdirAll(p.G(), 0o755)
-	e.write(p.Marker(), "# Marks this repository as a new product (greenfield). Written once, after the analyst confirmed it. Do not delete.\nschema: wingman-spec\nmode: greenfield\nstarted: "+p.today()+"\nconfirmed_by: "+by+"\n")
+	if err := e.write(p.Marker(), "# Marks this repository as a new product (greenfield). Written once, after the analyst confirmed it. Do not delete.\nschema: wingman-spec\nmode: greenfield\nstarted: "+p.today()+"\nconfirmed_by: "+by+"\n"); err != nil {
+		return err
+	}
 	if !exists(p.path("inputs", "README.md")) {
-		e.write(p.path("inputs", "README.md"), InputsReadme)
+		if err := e.write(p.path("inputs", "README.md"), InputsReadme); err != nil {
+			return err
+		}
 	}
 	e.out(fmt.Sprintf("started: wrote %s and %s. Next: put the client material into %s/, then run /spec-green-start.", marker, readme, p.Rel(p.path("inputs"))))
+	return nil
 }
 
-func (e *Env) cmdReadme(p *Project, _ opts) {
+func (e *Env) cmdReadme(p *Project, _ opts) error {
 	m := p.ModeOf()
 	if m.Mode != Greenfield && m.Mode != InProgress {
 		e.out("not a greenfield project (" + m.Mode + "); nothing written")
-		return
+		return nil
 	}
 	f := p.path("inputs", "README.md")
 	if exists(f) {
 		e.out(p.Rel(f) + " exists; unchanged")
-		return
+		return nil
 	}
-	e.write(f, InputsReadme)
+	if err := e.write(f, InputsReadme); err != nil {
+		return err
+	}
 	e.out("wrote " + p.Rel(f))
+	return nil
 }
 
-func (e *Env) cmdStatus(p *Project, o opts) {
-	m := e.guard(p, "status", o)
+func (e *Env) cmdStatus(p *Project, o opts) error {
+	m, err := e.guard(p, "status", o)
+	if err != nil {
+		return err
+	}
 	st := p.Derive()
 	st.ModeSignals = m.Signals
 	if o.flags["json"] {
 		e.json(st)
-		return
+		return nil
 	}
 	if st.Step == "confirm-start" {
 		e.out("Phase: not started   Step: confirm-start\n")
 		e.out("Done: nothing yet\nNext: Ask the analyst: \"Is this a NEW product with no existing code, and are we writing its specification from requirements?\" If yes, run:\n      run: " + run(`greenfield start --by "<analyst name>" --yes`) + "\n      needs a person: analyst\nBlocked by: the analyst's confirmation")
-		return
+		return nil
 	}
 	e.out(st.Text())
+	return nil
 }
 
-func (e *Env) slugOK(n, what string) {
+func (e *Env) slugOK(n, what string) error {
 	if !kebabRE.MatchString(n) {
-		e.usage(fmt.Sprintf("%s must be kebab-case (a-z, 0-9, -): got '%s'", what, n))
+		return e.usage(fmt.Sprintf("%s must be kebab-case (a-z, 0-9, -): got '%s'", what, n))
 	}
+	return nil
 }
 
-func (e *Env) writeNew(p *Project, f, text string) {
+func (e *Env) writeNew(p *Project, f, text string) error {
 	if exists(f) {
 		e.out("exists, not overwritten: " + p.Rel(f))
-		return
+		return nil
 	}
-	e.write(f, text)
+	if err := e.write(f, text); err != nil {
+		return err
+	}
 	e.out("created " + p.Rel(f))
+	return nil
 }
 
-func (e *Env) cmdNew(p *Project, o opts) {
-	e.guardKind(p, "write", o)
+func (e *Env) cmdNew(p *Project, o opts) error {
+	if err := e.guardKind(p, "write", o); err != nil {
+		return err
+	}
 	kind, name := "", ""
 	if len(o.args) > 0 {
 		kind = o.args[0]
@@ -286,48 +317,77 @@ func (e *Env) cmdNew(p *Project, o opts) {
 	rec := func(f string) string { return p.G(records, f) }
 	switch kind {
 	case "exploration":
-		e.writeNew(p, p.G("exploration.md"), p.tplExploration())
+		if err := e.writeNew(p, p.G("exploration.md"), p.tplExploration()); err != nil {
+			return err
+		}
 	case "understood":
-		e.writeNew(p, p.G("understood.md"), tplUnderstood)
+		if err := e.writeNew(p, p.G("understood.md"), tplUnderstood); err != nil {
+			return err
+		}
 	case "questions":
 		for _, t := range Topics {
-			e.writeNew(p, rec("Q-"+t.Name+".md"), tplQuestion(t.Name, ""))
+			if err := e.writeNew(p, rec("Q-"+t.Name+".md"), tplQuestion(t.Name, "")); err != nil {
+				return err
+			}
 		}
 	case "question":
-		e.slugOK(name, "question topic")
-		e.writeNew(p, rec("Q-"+name+".md"), tplQuestion(name, o.val["text"]))
+		if err := e.slugOK(name, "question topic"); err != nil {
+			return err
+		}
+		if err := e.writeNew(p, rec("Q-"+name+".md"), tplQuestion(name, o.val["text"])); err != nil {
+			return err
+		}
 	case "assumption":
-		e.slugOK(name, "assumption slug")
-		e.writeNew(p, rec("A-"+name+".md"), tplAssumption(name, o.val["from"]))
+		if err := e.slugOK(name, "assumption slug"); err != nil {
+			return err
+		}
+		if err := e.writeNew(p, rec("A-"+name+".md"), tplAssumption(name, o.val["from"])); err != nil {
+			return err
+		}
 	case "capability":
-		e.slugOK(name, "capability name")
+		if err := e.slugOK(name, "capability name"); err != nil {
+			return err
+		}
 		k := "capability"
 		if o.flags["integration"] {
 			k = "integration"
 		}
-		e.writeNew(p, p.G("capabilities", name+".md"), tplCapability(name, k))
+		if err := e.writeNew(p, p.G("capabilities", name+".md"), tplCapability(name, k)); err != nil {
+			return err
+		}
 	case "environment":
-		e.slugOK(name, "environment name")
-		e.writeNew(p, rec("ENV-"+name+".md"), tplEnvironment(name))
+		if err := e.slugOK(name, "environment name"); err != nil {
+			return err
+		}
+		if err := e.writeNew(p, rec("ENV-"+name+".md"), tplEnvironment(name)); err != nil {
+			return err
+		}
 	case "slice":
-		e.slugOK(name, "slice id")
-		e.writeNew(p, p.path("roadmap", name+".md"), tplSlice(name))
+		if err := e.slugOK(name, "slice id"); err != nil {
+			return err
+		}
+		if err := e.writeNew(p, p.path("roadmap", name+".md"), tplSlice(name)); err != nil {
+			return err
+		}
 	default:
-		e.usage(`new <exploration|understood|questions|question <topic> [--text "..."]|assumption <slug> [--from Q-x]|capability <name> [--integration]|environment <name>|slice <id>>`)
+		return e.usage(`new <exploration|understood|questions|question <topic> [--text "..."]|assumption <slug> [--from Q-x]|capability <name> [--integration]|environment <name>|slice <id>>`)
 	}
+	return nil
 }
 
 var specGateItems = []string{"understood", "questions", "requirements", "capabilities", "integrations", "nfr", "glossary", "adrs", "no-secrets", "assumptions"}
 
-func (e *Env) cmdApprove(p *Project, o opts) {
-	e.guardKind(p, "write", o)
+func (e *Env) cmdApprove(p *Project, o opts) error {
+	if err := e.guardKind(p, "write", o); err != nil {
+		return err
+	}
 	what := ""
 	if len(o.args) > 0 {
 		what = o.args[0]
 	}
 	by := strings.TrimSpace(o.val["by"])
 	if len(by) < 2 {
-		e.usage(`approve needs --by "<name of the person who approved>"`)
+		return e.usage(`approve needs --by "<name of the person who approved>"`)
 	}
 	switch what {
 	case "understood":
@@ -337,7 +397,7 @@ func (e *Env) cmdApprove(p *Project, o opts) {
 			for _, x := range us.Problems {
 				e.out("  - " + x)
 			}
-			panic(exit{1})
+			return cmdErr{1}
 		}
 		var open []string
 		for _, q := range p.questions() {
@@ -347,16 +407,18 @@ func (e *Env) cmdApprove(p *Project, o opts) {
 		}
 		if len(open) > 0 {
 			e.out("not approved: blocking question(s) still open: " + strings.Join(open, ", "))
-			panic(exit{1})
+			return cmdErr{1}
 		}
 		f := p.G("understood.md")
-		e.write(f, SetFM(readS(f), []string{"approved_by", "approved_on", "approved_hash"}, map[string]string{"approved_by": by, "approved_on": p.today(), "approved_hash": us.Hash}))
+		if err := e.write(f, SetFM(readS(f), []string{"approved_by", "approved_on", "approved_hash"}, map[string]string{"approved_by": by, "approved_on": p.today(), "approved_hash": us.Hash})); err != nil {
+			return err
+		}
 		e.out(`recorded: "what we understood" approved by ` + by)
 	case "spec":
 		rv := p.reviewOf("spec")
 		if !rvOK(rv) {
 			e.out("not signed off: the spec needs a current passing review first (run /spec-green-start)")
-			panic(exit{1})
+			return cmdErr{1}
 		}
 		g := p.Gate()
 		var blocking []Item
@@ -374,62 +436,71 @@ func (e *Env) cmdApprove(p *Project, o opts) {
 				}
 				e.out("  - " + b.Text + ": " + d)
 			}
-			panic(exit{1})
+			return cmdErr{1}
 		}
 		sc := ""
 		if rv.Score != 0 {
 			sc = " (score " + fmtScore(rv.Score) + ")"
 		}
-		e.write(p.G("signoff.md"), "---\nspec_hash: "+p.specHash()+"\napproved_by: "+by+"\napproved_on: "+p.today()+"\nreview: "+rv.Verdict+sc+"\n---\nThe client signed off the reviewed specification (living specs, glossary, ADRs, capability files). A later change to any of them makes this sign-off stale.\n")
+		if err := e.write(p.G("signoff.md"), "---\nspec_hash: "+p.specHash()+"\napproved_by: "+by+"\napproved_on: "+p.today()+"\nreview: "+rv.Verdict+sc+"\n---\nThe client signed off the reviewed specification (living specs, glossary, ADRs, capability files). A later change to any of them makes this sign-off stale.\n"); err != nil {
+			return err
+		}
 		e.out("recorded: spec signed off by " + by)
 	default:
-		e.usage(`approve <understood|spec> --by "<name>"`)
+		return e.usage(`approve <understood|spec> --by "<name>"`)
 	}
+	return nil
 }
 
-func (e *Env) cmdReview(p *Project, o opts) {
+func (e *Env) cmdReview(p *Project, o opts) error {
 	kind := ""
 	if len(o.args) > 0 {
 		kind = o.args[0]
 	}
 	if kind != "spec" && kind != "plan" && kind != "dryrun" {
-		e.usage("review <spec|plan|dryrun> --packet [--out FILE] | --reply FILE | --reviewer none --reason TEXT")
+		return e.usage("review <spec|plan|dryrun> --packet [--out FILE] | --reply FILE | --reviewer none --reason TEXT")
 	}
 	if o.flags["packet"] {
-		e.guardKind(p, "read", o)
+		if err := e.guardKind(p, "read", o); err != nil {
+			return err
+		}
 		t := p.Packet(kind)
 		if of := o.val["out"]; of != "" {
 			f := of
 			if !filepath.IsAbs(f) {
 				f = filepath.Join(e.Cwd, f)
 			}
-			e.write(f, t)
+			if err := e.write(f, t); err != nil {
+				return err
+			}
 			e.out("wrote " + p.Rel(f) + " (give this file to the spec-reviewer subagent; it is not committed)")
 		} else {
 			_, _ = fmt.Fprint(e.Out, t)
 		}
-		return
+		return nil
 	}
-	e.guardKind(p, "write", o)
+	if err := e.guardKind(p, "write", o); err != nil {
+		return err
+	}
 	switch o.val["reviewer"] {
 	case "self":
 		e.out(`refused: the agent that wrote the spec cannot review it; use the spec-reviewer subagent, or --reviewer none --reason "<why>" to record a waiver`)
-		panic(exit{1})
+		return cmdErr{1}
 	case "none":
 		reason := o.val["reason"]
 		if len(strings.TrimSpace(reason)) < 10 {
-			e.usage(`--reviewer none needs --reason "<why, at least 10 characters>"`)
+			return e.usage(`--reviewer none needs --reason "<why, at least 10 characters>"`)
 		}
 		if _, err := p.writeReview(kind, &reply{Verdict: "waived", Reviewer: "none", Reason: reason}); err != nil {
 			fmt.Fprintln(e.Err, err)
-			panic(exit{1})
+			return cmdErr{1}
 		}
 		e.out(fmt.Sprintf("recorded: %s review waived (%s); it is listed in the handover manifest", kind, reason))
-		return
+		return nil
 	}
 	rf := o.val["reply"]
 	if rf == "" {
-		e.usage("review needs --reply FILE (or - for stdin)")
+		return e.usage("review needs --reply FILE (or - for stdin)")
 	}
 	var text string
 	if rf == "-" {
@@ -442,20 +513,20 @@ func (e *Env) cmdReview(p *Project, o opts) {
 		}
 		t, ok := read(f)
 		if !ok {
-			e.usage("cannot read " + rf)
+			return e.usage("cannot read " + rf)
 		}
 		text = t
 	}
 	r, msg := parseReply(text, kind)
 	if r == nil {
 		e.out("reply rejected: " + msg + ". Nothing was recorded.")
-		panic(exit{2})
+		return cmdErr{2}
 	}
 	r.Reviewer = "subagent"
 	rounds, err := p.writeReview(kind, r)
 	if err != nil {
 		fmt.Fprintln(e.Err, err)
-		panic(exit{1})
+		return cmdErr{1}
 	}
 	sc := ""
 	if r.Score != nil {
@@ -463,22 +534,25 @@ func (e *Env) cmdReview(p *Project, o opts) {
 	}
 	e.out(fmt.Sprintf("recorded: %s review %s%s, %d blocker(s), %d major (round %d)", kind, r.Verdict, sc, r.Blockers, r.Majors, rounds))
 	if r.Verdict != "pass" {
-		panic(exit{1})
+		return cmdErr{1}
 	}
+	return nil
 }
 
-func (e *Env) cmdRoadmap(p *Project, o opts) {
-	e.guardKind(p, "read", o)
+func (e *Env) cmdRoadmap(p *Project, o opts) error {
+	if err := e.guardKind(p, "read", o); err != nil {
+		return err
+	}
 	rm := p.Roadmap()
-	fail := func() {
+	fail := func() error {
 		if !rm.OK {
-			panic(exit{1})
+			return cmdErr{1}
 		}
+		return nil
 	}
 	if o.flags["json"] {
 		e.json(rm)
-		fail()
-		return
+		return fail()
 	}
 	if o.flags["next"] {
 		switch {
@@ -489,8 +563,7 @@ func (e *Env) cmdRoadmap(p *Project, o opts) {
 		default:
 			e.out("(no slices)")
 		}
-		fail()
-		return
+		return fail()
 	}
 	c := rm.Counts
 	e.out(fmt.Sprintf("roadmap: %d slice(s); %d done, %d in progress, %d planned", len(rm.Slices), c["done"], c["applying"]+c["proposed"], c["planned"]))
@@ -522,15 +595,19 @@ func (e *Env) cmdRoadmap(p *Project, o opts) {
 	} else {
 		e.out(fmt.Sprintf("roadmap has %d error(s)", len(rm.Errors)))
 	}
-	fail()
+	return fail()
 }
 
-func (e *Env) cmdHandover(p *Project, o opts) {
+func (e *Env) cmdHandover(p *Project, o opts) error {
 	w := o.flags["write"]
 	if w {
-		e.guardKind(p, "write", o)
+		if err := e.guardKind(p, "write", o); err != nil {
+			return err
+		}
 	} else {
-		e.guardKind(p, "read", o)
+		if err := e.guardKind(p, "read", o); err != nil {
+			return err
+		}
 	}
 	g := p.Gate()
 	h := p.handoverState()
@@ -539,14 +616,14 @@ func (e *Env) cmdHandover(p *Project, o opts) {
 		rev, err := p.writeHandover(g)
 		if err != nil {
 			fmt.Fprintln(e.Err, err)
-			panic(exit{1})
+			return cmdErr{1}
 		}
 		if o.flags["json"] {
 			e.json(map[string]any{"ready": true, "manifest": man, "rev": rev})
 		} else {
 			e.out(fmt.Sprintf("READY FOR HANDOVER\nmanifest: %s (rev %d). Send the repository to the development team; they run /spec-green-next.", man, rev))
 		}
-		return
+		return nil
 	}
 	if o.flags["json"] {
 		e.json(struct {
@@ -558,9 +635,9 @@ func (e *Env) cmdHandover(p *Project, o opts) {
 			Warnings []string  `json:"warnings"`
 		}{g.Ready && h != nil && h.Current, g.Ready, h, g.Items, g.Missing, g.Warnings})
 		if !g.Ready {
-			panic(exit{1})
+			return cmdErr{1}
 		}
-		return
+		return nil
 	}
 	if g.Ready {
 		if h != nil && h.Current {
@@ -568,7 +645,7 @@ func (e *Env) cmdHandover(p *Project, o opts) {
 		} else {
 			e.out("The gate passes. Write the manifest: " + run("handover --write"))
 		}
-		return
+		return nil
 	}
 	e.out(fmt.Sprintf("NOT READY: %d item(s) missing", len(g.Missing)))
 	for _, it := range g.Items {
@@ -587,7 +664,7 @@ func (e *Env) cmdHandover(p *Project, o opts) {
 	for _, x := range g.Warnings {
 		e.out("warning: " + x)
 	}
-	panic(exit{1})
+	return cmdErr{1}
 }
 
 // InputsReadme writes inputs/README.md when the project is a new product (init calls it); it returns the step line or "".
