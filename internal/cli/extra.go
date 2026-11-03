@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
-
 	"github.com/Spreizu/wingman-spec/internal/adr"
 	"github.com/Spreizu/wingman-spec/internal/artifacts"
 	"github.com/Spreizu/wingman-spec/internal/change"
@@ -21,12 +19,12 @@ import (
 	"github.com/Spreizu/wingman-spec/internal/verify"
 )
 
-func (a *app) instructionsCmd() *cobra.Command {
-	return &cobra.Command{
+func (a *app) instructionsCmd() *command {
+	return &command{
 		Use:   "instructions <artifact> <change>",
 		Short: "Print the instruction, template and project context for one artifact (apply: the apply instruction)",
-		Args:  cobra.ExactArgs(2),
-		RunE: func(_ *cobra.Command, args []string) error {
+		Args:  exactArgs(2),
+		RunE: func(_ *command, args []string) error {
 			set := artifacts.MustLoad()
 			r, d, err := a.changeDir(args[1])
 			if err != nil {
@@ -73,13 +71,13 @@ func (a *app) instructionsCmd() *cobra.Command {
 	}
 }
 
-func (a *app) validateCmd() *cobra.Command {
+func (a *app) validateCmd() *command {
 	var specs, all bool
-	c := &cobra.Command{
+	c := &command{
 		Use:   "validate [<change>]",
 		Short: "Validate a change (proposal, delta specs against the living specs), --specs or --all",
-		Args:  cobra.MaximumNArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		Args:  maxArgs(1),
+		RunE: func(_ *command, args []string) error {
 			r, err := a.root()
 			if err != nil {
 				return err
@@ -151,14 +149,14 @@ func (a *app) validateCmd() *cobra.Command {
 	return c
 }
 
-func (a *app) syncCmd() *cobra.Command {
+func (a *app) syncCmd() *command {
 	var check, dry, rebase bool
-	var c *cobra.Command
-	c = &cobra.Command{
+	var c *command
+	c = &command{
 		Use:   "sync <change>",
 		Short: "Merge the change's delta specs into the living specs and promote its ADRs (--check: report only; archive runs it)",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		Args:  exactArgs(1),
+		RunE: func(_ *command, args []string) error {
 			r, err := a.root()
 			if err != nil {
 				return err
@@ -199,19 +197,19 @@ func (a *app) syncCmd() *cobra.Command {
 }
 
 // recordRebase writes the rebase event (which requirements' base moved) to the change's timeline.
-func (a *app) recordRebase(c *cobra.Command, name string, moved []string) {
+func (a *app) recordRebase(c *command, name string, moved []string) {
 	if e, err := a.env(c, newVflags(), "sync", name); err == nil {
 		ok := true
 		e.Record(timeline.Event{Event: "rebase", OK: &ok, Summary: fmt.Sprintf("spec base recorded again (%d moved)", len(moved)), Details: map[string]any{"moved": moved}})
 	}
 }
 
-func (a *app) archiveCmd() *cobra.Command {
-	return a.vcmd("archive <change>", "Gate (tasks, findings, finish on this tree, lint, a clean merge), sync, then move the change to archive/YYYY-MM-DD-HHMM-<change>", cobra.ExactArgs(1), 0, (*verify.Env).Archive)
+func (a *app) archiveCmd() *command {
+	return a.vcmd("archive <change>", "Gate (tasks, findings, finish on this tree, lint, a clean merge), sync, then move the change to archive/YYYY-MM-DD-HHMM-<change>", exactArgs(1), 0, (*verify.Env).Archive)
 }
 
 // recordSync writes the sync event to the change's timeline (a record, never a gate).
-func (a *app) recordSync(c *cobra.Command, name string, problems []string, took time.Duration) {
+func (a *app) recordSync(c *command, name string, problems []string, took time.Duration) {
 	e, err := a.env(c, newVflags(), "sync", name)
 	if err != nil {
 		return
@@ -226,7 +224,7 @@ func (a *app) recordSync(c *cobra.Command, name string, problems []string, took 
 }
 
 // syncCheck is `sync --check`: specs merged, ADRs promoted and, with traceability on, anchors and drift. Writes nothing.
-func (a *app) syncCheck(c *cobra.Command, name string) error {
+func (a *app) syncCheck(c *command, name string) error {
 	e, err := a.env(c, newVflags(), "sync", name)
 	if err != nil {
 		return err
@@ -244,14 +242,14 @@ func (a *app) syncCheck(c *cobra.Command, name string) error {
 	return nil
 }
 
-func (a *app) importCmd() *cobra.Command {
+func (a *app) importCmd() *command {
 	var dir, to string
 	var dry bool
-	c := &cobra.Command{
+	c := &command{
 		Use:   "import openspec",
 		Short: "Convert an OpenSpec-based project (openspec/, adr/) to .wingman-spec/",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		Args:  exactArgs(1),
+		RunE: func(_ *command, args []string) error {
 			if args[0] != "openspec" {
 				return fail(ExitUsage, "import %q: the only source is openspec", args[0])
 			}
@@ -292,12 +290,12 @@ func (a *app) importCmd() *cobra.Command {
 	return c
 }
 
-func (a *app) configCmd() *cobra.Command {
-	return &cobra.Command{
+func (a *app) configCmd() *command {
+	return &command{
 		Use:   "config",
 		Short: "Print the merged configuration (code repo file first, then the specs root's)",
-		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
+		Args:  noArgs,
+		RunE: func(*command, []string) error {
 			r, err := a.root()
 			if err != nil {
 				return err
@@ -311,13 +309,13 @@ func (a *app) configCmd() *cobra.Command {
 	}
 }
 
-func (a *app) adrsCmd() *cobra.Command {
+func (a *app) adrsCmd() *command {
 	var fix bool
-	c := &cobra.Command{
+	c := &command{
 		Use:   "adrs",
 		Short: "List the promoted ADRs; exit 1 when two share a number (--fix renumbers the later ones)",
-		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
+		Args:  noArgs,
+		RunE: func(*command, []string) error {
 			r, err := a.root()
 			if err != nil {
 				return err

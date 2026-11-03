@@ -30,7 +30,7 @@ function defaultFiles() {
   const out = [], walk = (d, re) => { for (const e of fs.readdirSync(path.join(ROOT, d), { withFileTypes: true })) {
     const p = path.posix.join(d, e.name); if (e.isDirectory()) walk(p, re); else if (re.test(e.name)) out.push(p); } };
   out.push('internal/artifacts/artifacts.yaml'); walk('internal/artifacts/templates', /\.md$/); walk('harness', /\.md$/);
-  out.push('internal/scaffold/wingman-spec.yaml.tmpl', 'README.md');
+  out.push('internal/scaffold/wingman-spec.yaml.sections', 'README.md');
   for (const f of fs.readdirSync(path.join(ROOT, 'docs'))) if (f.endsWith('.md')) out.push('docs/' + f);
   for (const s of fs.readdirSync(path.join(ROOT, 'skills'), { withFileTypes: true }))
     if (s.isDirectory() && fs.existsSync(path.join(ROOT, 'skills', s.name, 'SKILL.md'))) out.push(`skills/${s.name}/SKILL.md`);
@@ -47,6 +47,7 @@ function units(text, yaml) {
     if (/^\s*(```|~~~)/.test(l)) { fence = !fence; flush(); return; }
     if (fence) return;
     if (yaml) {
+      if (/^@@ /.test(l)) { flush(); return; } // a section name of the scaffold's config file
       if (/^\s*#/.test(l)) l = l.replace(/^\s*#\s?/, '');
       if (/^\s*[\w.-]+:\s/.test(l) && /\s#\s/.test(l)) { flush(); out.push({ line: i + 1, t: l.slice(l.search(/\s#\s/) + 3) }); return; }
       else if (/^\s*[\w.-]+:\s*(\||>-?)?\s*$/.test(l) || /^\s*[\w.-]+:\s+[^\s'"][^\s]*\s*$/.test(l)) { flush(); return; }
@@ -71,7 +72,7 @@ function sentences(t) {
 }
 const words = (s) => s.split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length;
 function lintFile(f, text) {
-  const findings = [], stats = [], yaml = /\.ya?ml(\.tmpl)?$/.test(f);
+  const findings = [], stats = [], yaml = /\.ya?ml(\.tmpl|\.sections)?$/.test(f);
   for (const u of units(text, yaml)) for (const s of sentences(u.t)) {
     const n = words(s), parens = (s.match(/\(/g) || []).length, vague = [...s.replace(/"[^"]*"/g, "").matchAll(VAGUE_RE)].map((m) => m[1].toLowerCase().replace(/\s+/g, ' '));
     stats.push({ n, parens, vague: vague.length });

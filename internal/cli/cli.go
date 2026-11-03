@@ -6,12 +6,11 @@ import (
 
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
 	"strings"
-
-	"github.com/spf13/cobra"
 
 	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/verify"
@@ -87,11 +86,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 // RunIn is Run with dir as the current directory.
 func RunIn(dir string, args []string, stdout, stderr io.Writer) int {
 	a := &app{out: stdout, errOut: stderr, cwd: dir}
-	cmd := a.command()
-	cmd.SetArgs(args)
-	cmd.SetOut(stdout)
-	cmd.SetErr(stderr)
-	c, err := cmd.ExecuteC()
+	c, err := a.command().execute(args)
 	code := a.exitCode(err)
 	a.record(c, code)
 	return code
@@ -136,23 +131,21 @@ func isUsage(err error) bool {
 //go:embed reference.md
 var reference string
 
-func (a *app) command() *cobra.Command {
-	root := &cobra.Command{
-		Use:           "wingman-spec",
-		Short:         "Spec-driven planning and test-first, script-verified implementation for coding agents",
-		Version:       Version,
-		SilenceUsage:  true,
-		SilenceErrors: true,
+func (a *app) command() *command {
+	root := &command{
+		Use:   "wingman-spec",
+		Short: "Spec-driven planning and test-first, script-verified implementation for coding agents",
+		out:   a.out,
 	}
-	root.CompletionOptions.DisableDefaultCmd = true
-	root.PersistentFlags().StringVar(&a.rootFlag, "root", "", "specs root directory (default: found from the current directory; env WINGMAN_SPEC_ROOT)")
-	root.PersistentFlags().BoolVar(&a.json, "json", false, "print JSON")
+	root.global = &flagSet{flag.NewFlagSet("global", flag.ContinueOnError)}
+	root.global.StringVar(&a.rootFlag, "root", "", "specs root directory (default: found from the current directory; env WINGMAN_SPEC_ROOT)")
+	root.global.BoolVar(&a.json, "json", false, "print JSON")
 	root.AddCommand(
 		a.rootCmd(), a.initCmd(), a.updateCmd(), a.newCmd(), a.listCmd(), a.statusCmd(), a.instructionsCmd(), a.validateCmd(),
 		a.syncCmd(), a.archiveCmd(), a.importCmd(), a.configCmd(), a.adrsCmd(), a.logCmd(),
 	)
 	root.AddCommand(a.verifyCmds()...)
 	root.AddCommand(a.greenfieldCmds()...)
-	root.AddCommand(&cobra.Command{Use: "reference", Short: "Exit codes, checks, run state and configuration in one page", Long: reference})
+	root.AddCommand(&command{Use: "reference", Short: "Exit codes, checks, run state and configuration in one page", Long: reference})
 	return root
 }

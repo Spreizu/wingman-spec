@@ -2,7 +2,6 @@
 package scaffold
 
 import (
-	"bytes"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -13,13 +12,12 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"text/template"
 
 	"github.com/Spreizu/wingman-spec/internal/layout"
 )
 
-//go:embed wingman-spec.yaml.tmpl
-var configTemplate string
+//go:embed wingman-spec.yaml.sections
+var configSections string
 
 // Gitignore is .wingman-spec/.gitignore next to code: the local run state.
 const Gitignore = "runs/\nbin/\ncache/\nlocal/\n"
@@ -52,16 +50,58 @@ func q(s string) string {
 	return s
 }
 
-// Config renders the wingman-spec.yaml for a layout.
-func Config(o Options) (string, error) {
-	t, err := template.New("cfg").Funcs(template.FuncMap{"q": q}).Parse(configTemplate)
-	if err != nil {
-		return "", err
+// sections are the named parts of configSections, each ending in a newline.
+func sections() map[string]string {
+	m := map[string]string{}
+	for part := range strings.SplitSeq(configSections, "\n@@ ") {
+		name, body, _ := strings.Cut(part, "\n")
+		m[name] = strings.TrimSuffix(body, "\n") + "\n"
 	}
-	var b bytes.Buffer
-	err = t.Execute(&b, map[string]any{"Specs": o.SpecsPath, "SpecsRemote": o.SpecsRemote, "Linked": o.Layout == Link, "SpecsRepo": o.Layout == Specs,
-		"Test": o.Test, "Typecheck": o.Typecheck, "Lint": o.Lint, "Visual": o.Visual, "URL": o.URL})
-	return b.String(), err
+	return m
+}
+
+// Config renders the wingman-spec.yaml for a layout: blocks set apart by a blank line, the visual block with its
+// command or placeholders, and the specs-repository and linked-repository parts only where they apply.
+func Config(o Options) (string, error) {
+	sec, linked := sections(), o.Layout == Link
+	fill := strings.NewReplacer("<<specs>>", o.SpecsPath, "<<specs-remote>>", o.SpecsRemote, "<<test>>", q(o.Test),
+		"<<typecheck>>", q(o.Typecheck), "<<lint>>", q(o.Lint), "<<visual>>", q(o.Visual), "<<url>>", o.URL)
+	b := []string{sec["header"]}
+	add := func(blank bool, names ...string) {
+		for _, n := range names {
+			if blank {
+				b = append(b, "\n")
+				blank = false
+			}
+			b = append(b, fill.Replace(sec[n]))
+		}
+	}
+	if o.SpecsPath != "" {
+		add(true, "specs")
+		if o.SpecsRemote != "" {
+			add(false, "specs-remote")
+		}
+	}
+	if !linked {
+		add(true, "context")
+	}
+	add(true, "commands")
+	if !linked {
+		add(true, "traceability")
+	}
+	add(true, "visual")
+	switch o.Visual {
+	case "off":
+		add(false, "visual-off")
+	case "":
+		add(false, "visual-on", "visual-fill", "visual-options")
+	default:
+		add(false, "visual-on", "visual-command", "visual-options")
+	}
+	if o.Layout == Specs {
+		add(true, "repos")
+	}
+	return strings.Join(b, ""), nil
 }
 
 // Init creates the skeleton in dir and returns the files it wrote (existing files are kept).

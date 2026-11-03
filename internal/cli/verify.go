@@ -1,18 +1,17 @@
 package cli
 
 import (
+	"context"
 	"errors"
+	"os"
 	"strings"
-
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"github.com/Spreizu/wingman-spec/internal/config"
 	"github.com/Spreizu/wingman-spec/internal/trace"
 	"github.com/Spreizu/wingman-spec/internal/verify"
 )
 
-// vflags are the verify options a command takes, bound to cobra flags.
+// vflags are the verify options a command takes, bound to the command's flags.
 type vflags struct {
 	o       verify.Options
 	testCmd string
@@ -26,7 +25,7 @@ const (
 	fVisual             // --scenario --changed-only
 )
 
-func (v *vflags) bind(c *cobra.Command, which int) {
+func (v *vflags) bind(c *command, which int) {
 	f := c.Flags()
 	if which&fRun != 0 {
 		f.IntVar(&v.o.Timeout, "timeout", v.o.Timeout, "seconds per command")
@@ -65,7 +64,7 @@ func (v *vflags) bind(c *cobra.Command, which int) {
 func newVflags() *vflags { return &vflags{o: verify.Defaults()} }
 
 // env resolves the root and config and prepares a verify run.
-func (a *app) env(c *cobra.Command, v *vflags, cmd, changeName string) (*verify.Env, error) {
+func (a *app) env(c *command, v *vflags, cmd, changeName string) (*verify.Env, error) {
 	r, err := a.root()
 	if err != nil {
 		return nil, err
@@ -97,16 +96,16 @@ func (a *app) env(c *cobra.Command, v *vflags, cmd, changeName string) (*verify.
 		return nil, err
 	}
 	e := verify.New(r, cfg, o, a.out, a.errOut)
-	e.Ctx = c.Context()
-	e.Stdin = c.InOrStdin()
+	e.Ctx = context.Background()
+	e.Stdin = os.Stdin
 	return e, nil
 }
 
 // vcmd is a verify command: run builds the Env and calls do. extra binds the command's own flags.
-func (a *app) vcmd(use, short string, args cobra.PositionalArgs, which int, do func(*verify.Env) error, extra ...func(*pflag.FlagSet, *verify.Options)) *cobra.Command {
+func (a *app) vcmd(use, short string, args argCheck, which int, do func(*verify.Env) error, extra ...func(*flagSet, *verify.Options)) *command {
 	v := newVflags()
-	c := &cobra.Command{Use: use, Short: short, Args: args}
-	c.RunE = func(c *cobra.Command, args []string) error {
+	c := &command{Use: use, Short: short, Args: args}
+	c.RunE = func(c *command, args []string) error {
 		name := ""
 		if len(args) > 0 {
 			name = args[0]
@@ -129,27 +128,27 @@ func (a *app) vcmd(use, short string, args cobra.PositionalArgs, which int, do f
 	return c
 }
 
-func (a *app) verifyCmds() []*cobra.Command {
-	one := cobra.ExactArgs(1)
-	opt := cobra.MaximumNArgs(1)
+func (a *app) verifyCmds() []*command {
+	one := exactArgs(1)
+	opt := maxArgs(1)
 	run := fRun
 	anchors := a.vcmd("anchors [<change>]", "Code and test anchors of every requirement (or the change's); `anchors prune` drops over-anchored markers", opt, 0, (*verify.Env).Anchors)
 	var sel *string
-	prune := a.vcmd("prune", "List (or --apply: remove) the markers anchor_fit flags as removable; the last code anchor stays", cobra.NoArgs, 0, func(e *verify.Env) error {
+	prune := a.vcmd("prune", "List (or --apply: remove) the markers anchor_fit flags as removable; the last code anchor stays", noArgs, 0, func(e *verify.Env) error {
 		for s := range strings.SplitSeq(*sel, ",") {
 			if s = strings.TrimSpace(s); s != "" {
 				e.O.Select = append(e.O.Select, s)
 			}
 		}
 		return e.AnchorsPrune()
-	}, func(f *pflag.FlagSet, o *verify.Options) {
+	}, func(f *flagSet, o *verify.Options) {
 		f.BoolVar(&o.Apply, "apply", false, "remove the markers")
 		sel = f.String("select", "", "only these markers: file:line,...")
 	})
 	anchors.AddCommand(prune)
 
-	drift := a.vcmd("drift", "Gaps between the living specs, code anchors and test tags; `drift decide <key> --accept --note` records an accepted gap", cobra.NoArgs, 0, (*verify.Env).Drift,
-		func(f *pflag.FlagSet, o *verify.Options) {
+	drift := a.vcmd("drift", "Gaps between the living specs, code anchors and test tags; `drift decide <key> --accept --note` records an accepted gap", noArgs, 0, (*verify.Env).Drift,
+		func(f *flagSet, o *verify.Options) {
 			f.BoolVar(&o.Text, "text", false, "a readable list instead of JSON")
 			f.StringVar(&o.Report, "format", "json", "json|sarif|markdown")
 		})
@@ -157,12 +156,12 @@ func (a *app) verifyCmds() []*cobra.Command {
 		"duplicate-marker, misplaced-marker, stale-test-tag, unsynced-archive, unconfirmed-requirement (an adopted requirement\n" +
 		"without a Confirmed: line) and observed-incomplete (an entry in .wingman-spec/observed/<capability>.md that lacks a\n" +
 		"field). An observed entry's `Why unconfirmed:` starts with one of: " + strings.Join(trace.ObservedKinds, ", ") + "."
-	decide := &cobra.Command{Use: "decide [<gap-key>]", Short: "Accept one open gap (or --all <type>) with a note", Args: opt}
+	decide := &command{Use: "decide [<gap-key>]", Short: "Accept one open gap (or --all <type>) with a note", Args: opt}
 	xv := newVflags()
 	decide.Flags().BoolVar(&xv.o.Accept, "accept", false, "accept the gap")
 	decide.Flags().StringVar(&xv.o.Note, "note", "", "why the gap is accepted")
 	decide.Flags().StringVar(&xv.o.All, "all", "", "accept every open gap of this type")
-	decide.RunE = func(c *cobra.Command, args []string) error {
+	decide.RunE = func(c *command, args []string) error {
 		if len(args) > 0 {
 			xv.o.Key = args[0]
 		}
@@ -175,13 +174,13 @@ func (a *app) verifyCmds() []*cobra.Command {
 	drift.AddCommand(decide)
 
 	guard := a.vcmd("guard <change>", "The anchor guard over the change's diff", one, 0, (*verify.Env).Guard,
-		func(f *pflag.FlagSet, o *verify.Options) {
+		func(f *flagSet, o *verify.Options) {
 			f.StringVar(&o.Base, "base", "", "diff base (default: the commit `next` recorded, else HEAD)")
 		})
 	appMap := a.vcmd("app-map <change>", "The two-line app map of a Size S change (--apply writes app-map.md)", one, 0, (*verify.Env).AppMap,
-		func(f *pflag.FlagSet, o *verify.Options) { f.BoolVar(&o.Apply, "apply", false, "write app-map.md") })
+		func(f *flagSet, o *verify.Options) { f.BoolVar(&o.Apply, "apply", false, "write app-map.md") })
 	progress := a.vcmd("progress <change>", "Append an entry to progress.md (a note, a review fix or a reviewed anchor) and record it in the timeline", one, 0, (*verify.Env).Progress,
-		func(f *pflag.FlagSet, o *verify.Options) {
+		func(f *flagSet, o *verify.Options) {
 			f.StringVar(&o.Session, "session", "", "this agent session's id (env WINGMAN_SPEC_SESSION)")
 			f.StringVar(&o.Task, "task", "", "the task the entry is for (its label, e.g. 1.2)")
 			f.StringVar(&o.Note, "note", "", "the entry: what was done, the finding fixed, or why the anchored requirement still holds")
@@ -198,20 +197,20 @@ func (a *app) verifyCmds() []*cobra.Command {
 			}
 		}
 		return e.RunChecks()
-	}, func(f *pflag.FlagSet, o *verify.Options) {
+	}, func(f *flagSet, o *verify.Options) {
 		f.BoolVar(&o.Text, "text", false, "the summary as text instead of JSON")
 		f.StringVar(&only, "only", "", "only these checks: lint,typecheck,test,visual")
 	})
-	return []*cobra.Command{
+	return []*command{
 		a.vcmd("next <change>", "Hand out the next task (or parallel batch) as a packet for one implementer subagent", one, run|fNext, (*verify.Env).Next),
 		a.vcmd("check <change>", "Verify the task in progress: done-when, tests, validate, visual, quality; tick it on pass", one, run|fCheck, (*verify.Env).Check),
 		a.vcmd("review <change>", "Record the visual reviewer's reply for the task in progress", one, run|fReview, (*verify.Env).Review),
 		a.vcmd("finish <change>", "Close-out once every task is ticked: full commands, validate, visual, trace, anchors, test evidence", one, run, (*verify.Env).Finish,
-			func(f *pflag.FlagSet, o *verify.Options) {
+			func(f *flagSet, o *verify.Options) {
 				f.StringVar(&o.Report, "format", "json", "json|junit|markdown")
 			}),
 		a.vcmd("lint <change>", "Validate the plan: proposal, delta specs, tasks, design (no command runs)", one, run, (*verify.Env).Lint,
-			func(f *pflag.FlagSet, o *verify.Options) {
+			func(f *flagSet, o *verify.Options) {
 				f.BoolVar(&o.Text, "text", false, "one file:line finding per line instead of JSON")
 				f.BoolVar(&o.Fix, "fix", false, "apply mechanical fixes (missing Why, ## Purpose heading)")
 				f.StringVar(&o.Report, "format", "json", "json|sarif|markdown")
@@ -219,17 +218,17 @@ func (a *app) verifyCmds() []*cobra.Command {
 		a.vcmd("size <change>", "Declared size against what the change needs", one, 0, (*verify.Env).Size),
 		appMap,
 		a.vcmd("visual <change>", "The implementer's visual self-check (the task in progress, or --scenario ids)", one, run|fVisual, (*verify.Env).Visual),
-		a.vcmd("doctor", "Check the setup: test command, visual config, Playwright, Chromium, axe, roles, local credentials", cobra.NoArgs, run, (*verify.Env).Doctor),
-		a.vcmd("design-system", "What the project already has to build a design with (tokens, components, variants)", cobra.NoArgs, 0, (*verify.Env).DesignSystem),
+		a.vcmd("doctor", "Check the setup: test command, visual config, Playwright, Chromium, axe, roles, local credentials", noArgs, run, (*verify.Env).Doctor),
+		a.vcmd("design-system", "What the project already has to build a design with (tokens, components, variants)", noArgs, 0, (*verify.Env).DesignSystem),
 		anchors, drift, guard,
 		a.vcmd("trace [<change>]", "Link scenarios to tests: scenarios no test tags (the change's, or all living) and tags naming no scenario", opt, 0, (*verify.Env).Trace,
-			func(f *pflag.FlagSet, o *verify.Options) {
+			func(f *flagSet, o *verify.Options) {
 				f.BoolVar(&o.Text, "text", false, "one file:line finding per line instead of JSON")
 				f.StringVar(&o.Report, "format", "json", "json|sarif|markdown")
 			}),
 		runChecks, progress,
 		a.vcmd("problems [<change>]", "Every finding as one located list, for editors (read-only)", opt, 0, (*verify.Env).Problems,
-			func(f *pflag.FlagSet, o *verify.Options) {
+			func(f *flagSet, o *verify.Options) {
 				f.StringVar(&o.Report, "format", "json", "json|sarif|markdown")
 			}),
 	}

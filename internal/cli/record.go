@@ -6,8 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/spf13/cobra"
-
 	"github.com/Spreizu/wingman-spec/internal/change"
 	"github.com/Spreizu/wingman-spec/internal/timeline"
 )
@@ -21,11 +19,11 @@ var LogEvents = []string{"start", "explore", "grill", "approval", "note"}
 // record appends the timeline event of a planning command (and of any command the editor ran for a change), after
 // one artifact event per artifact written or rewritten since the last record. Commands that record their own events
 // (next, check, finish, sync, archive) are not recorded here.
-func (a *app) record(c *cobra.Command, code int) {
+func (a *app) record(c *command, code int) {
 	if c == nil || c.Parent() == nil || c.Parent().Parent() != nil {
 		return
 	}
-	cmd, args, src := c.Name(), c.Flags().Args(), os.Getenv(SourceEnv)
+	cmd, args, src := c.Name(), c.args, os.Getenv(SourceEnv)
 	planning := slices.Contains([]string{"new", "instructions", "validate", "lint", "size", "app-map"}, cmd)
 	if !planning && (src != "editor" || cmd != "status") {
 		return
@@ -49,7 +47,7 @@ func (a *app) record(c *cobra.Command, code int) {
 	ok := code == ExitOK
 	sum := map[string][2]string{
 		"new":          {"change created", ""},
-		"instructions": {"instructions for " + c.Flags().Arg(0), "instructions refused"},
+		"instructions": {"instructions for " + c.args[0], "instructions refused"},
 		"validate":     {"valid", "not valid"},
 		"lint":         {"planning lint passed", "planning lint found problems"},
 		"size":         {"size fits", "size does not fit"},
@@ -70,12 +68,12 @@ func (a *app) record(c *cobra.Command, code int) {
 	timeline.Append(runs, ev)
 }
 
-func (a *app) logCmd() *cobra.Command {
-	return &cobra.Command{
+func (a *app) logCmd() *command {
+	return &command{
 		Use:   "log <change> <event> [<summary>]",
 		Short: "Record an agent step in the change's timeline: " + strings.Join(LogEvents, ", "),
-		Args:  cobra.RangeArgs(2, 3),
-		RunE: func(_ *cobra.Command, args []string) error {
+		Args:  rangeArgs(2, 3),
+		RunE: func(_ *command, args []string) error {
 			if !slices.Contains(LogEvents, args[1]) {
 				return fail(ExitUsage, "unknown event %q: use one of %s", args[1], strings.Join(LogEvents, ", "))
 			}

@@ -4,8 +4,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/cobra"
-
 	wingmanspec "github.com/Spreizu/wingman-spec"
 
 	"github.com/Spreizu/wingman-spec/internal/detect"
@@ -15,11 +13,11 @@ import (
 	"github.com/Spreizu/wingman-spec/internal/scaffold"
 )
 
-func (a *app) initCmd() *cobra.Command {
+func (a *app) initCmd() *command {
 	var o scaffold.Options
 	var harnesses, workspaceFile string
 	var noDetect bool
-	c := &cobra.Command{
+	c := &command{
 		Use:   "init",
 		Short: "Create the Wingman Spec skeleton and install it for your coding agents",
 		Long: "Layouts:\n  repo   specs next to the code, in .wingman-spec/ (default)\n" +
@@ -30,8 +28,8 @@ func (a *app) initCmd() *cobra.Command {
 			"detected from the code; a detected typecheck or lint command runs once and is left out when it fails\n" +
 			"(WINGMAN_SPEC_INIT_PROBE=0 skips that run). Existing files are kept; `wingman-spec update` refreshes the\n" +
 			"generated ones after an upgrade.",
-		Args: cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
+		Args: noArgs,
+		RunE: func(*command, []string) error {
 			hs, err := harness.ParseList(harnesses)
 			if err != nil {
 				return fail(ExitUsage, "%v", err)

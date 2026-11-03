@@ -4,17 +4,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spf13/cobra"
-
 	"github.com/Spreizu/wingman-spec/internal/greenfield"
 )
 
 // greenfieldCmds are mode, greenfield, roadmap and handover: the new-product flow. They parse their own arguments.
-func (a *app) greenfieldCmds() []*cobra.Command {
-	mk := func(use, short string) *cobra.Command {
-		return &cobra.Command{
-			Use: use, Short: short, DisableFlagParsing: true,
-			RunE: func(c *cobra.Command, args []string) error {
+func (a *app) greenfieldCmds() []*command {
+	mk := func(use, short string) *command {
+		return &command{
+			Use: use, Short: short, Raw: true,
+			RunE: func(c *command, args []string) error {
 				var rest []string
 				for i := 0; i < len(args); i++ {
 					switch {
@@ -41,7 +39,7 @@ func (a *app) greenfieldCmds() []*cobra.Command {
 			},
 		}
 	}
-	return []*cobra.Command{
+	return []*command{
 		mk("mode", "The project mode (greenfield, brownfield, greenfield-in-progress, implementation); --for CMD exits 6 when CMD is not allowed"),
 		mk("greenfield", "The new-product flow: status | start --by NAME --yes | new <kind> | approve <understood|spec> | review <spec|plan|dryrun> | readme"),
 		mk("roadmap", "The roadmap check: dependency graph, order, size caps, coverage (--next: the slices ready to start)"),

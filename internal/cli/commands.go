@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/cobra"
-
 	wingmanspec "github.com/Spreizu/wingman-spec"
 
 	"github.com/Spreizu/wingman-spec/internal/artifacts"
@@ -18,12 +16,12 @@ import (
 	"github.com/Spreizu/wingman-spec/internal/verify"
 )
 
-func (a *app) rootCmd() *cobra.Command {
-	return &cobra.Command{
+func (a *app) rootCmd() *command {
+	return &command{
 		Use:   "root",
 		Short: "Show where the specs and the code root are",
-		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
+		Args:  noArgs,
+		RunE: func(*command, []string) error {
 			r, err := a.root()
 			if err != nil {
 				return err
@@ -37,16 +35,16 @@ func (a *app) rootCmd() *cobra.Command {
 	}
 }
 
-func (a *app) updateCmd() *cobra.Command {
+func (a *app) updateCmd() *command {
 	var harnesses string
 	var check bool
-	c := &cobra.Command{
+	c := &command{
 		Use:   "update",
 		Short: "Refresh the generated agent files, bundled skills, AGENTS.md block and shim from this binary",
 		Long: "Re-renders what `init --harness` installed for the harnesses already present (or --harness), so an upgraded\n" +
 			"wingman-spec brings its commands and skills into the project. Your own files and the config are not touched.",
-		Args: cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
+		Args: noArgs,
+		RunE: func(*command, []string) error {
 			dir := a.cwd
 			if r, err := a.root(); err == nil {
 				dir = r.Code
@@ -116,12 +114,12 @@ func gitRemote(dir string) string {
 	return layout.CleanURL(strings.TrimSpace(string(out)))
 }
 
-func (a *app) newCmd() *cobra.Command {
-	return &cobra.Command{
+func (a *app) newCmd() *command {
+	return &command{
 		Use:   "new <change>",
 		Short: "Create a change folder",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		Args:  exactArgs(1),
+		RunE: func(_ *command, args []string) error {
 			r, err := a.root()
 			if err != nil {
 				return err
@@ -139,13 +137,13 @@ func (a *app) newCmd() *cobra.Command {
 	}
 }
 
-func (a *app) listCmd() *cobra.Command {
+func (a *app) listCmd() *command {
 	var archived bool
-	c := &cobra.Command{
+	c := &command{
 		Use:   "list",
 		Short: "List the active changes (or --archived)",
-		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
+		Args:  noArgs,
+		RunE: func(*command, []string) error {
 			r, err := a.root()
 			if err != nil {
 				return err
@@ -200,13 +198,13 @@ func specsNone(dir string) bool {
 	return validate.SpecsNone(string(b))
 }
 
-func (a *app) statusCmd() *cobra.Command {
+func (a *app) statusCmd() *command {
 	v := newVflags()
-	c := &cobra.Command{
+	c := &command{
 		Use:   "status <change>",
 		Short: "Show which planning artifacts the change has",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(c *cobra.Command, args []string) error {
+		Args:  exactArgs(1),
+		RunE: func(c *command, args []string) error {
 			_, d, err := a.changeDir(args[0])
 			if err != nil {
 				return err
