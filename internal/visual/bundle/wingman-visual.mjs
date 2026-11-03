@@ -666,6 +666,13 @@ var require_roles = __commonJS({
       if (!fs.existsSync(gi)) fs.writeFileSync(gi, "*\n");
       return dir;
     }
+    function authFile(codeRoot, name) {
+      localDir(codeRoot);
+      const dir = path.join(codeRoot, AUTH_DIR);
+      fs.mkdirSync(dir, { recursive: true, mode: 448 });
+      return path.join(dir, `${name}.json`);
+    }
+    var LOGIN_MS = 15e3;
     var envBase = (name) => `WINGMAN_ROLE_${name.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
     var envNames = (name, role) => ({ user: role && role.user_env || `${envBase(name)}_USER`, password: role && role.password_env || `${envBase(name)}_PASSWORD` });
     function parseHeaders(v) {
@@ -700,7 +707,8 @@ var require_roles = __commonJS({
       }
       return out;
     }
-    function credentials(name, role, codeRoot, env = process.env) {
+    function credentials(name, role, codeRoot) {
+      const env = process.env;
       if (role.storage_state) return { via: "storage_state", missing: [] };
       if (role.login_command) return { via: "login_command", missing: [] };
       if (!role.login && role.headers_env) return { via: "headers", missing: [] };
@@ -714,9 +722,10 @@ var require_roles = __commonJS({
       const src = env[names.user] && env[names.password] ? "env" : local.user && local.password && !env[names.user] && !env[names.password] ? "local-file" : missing.length ? null : "env+local-file";
       return { via: "login", user, password, source: src, missing, names };
     }
-    function describe(roles, codeRoot, env = process.env) {
+    function describe(roles, codeRoot) {
+      const env = process.env;
       return Object.values(roles || {}).map((r) => {
-        const c = credentials(r.name, r, codeRoot, env);
+        const c = credentials(r.name, r, codeRoot);
         if (c.via === "storage_state") {
           const f = path.resolve(codeRoot, r.storage_state);
           return { role: r.name, via: "storage_state", file: r.storage_state, ready: fs.existsSync(f), missing: fs.existsSync(f) ? [] : [`file ${r.storage_state}`] };
@@ -732,8 +741,8 @@ var require_roles = __commonJS({
     var scrub = (text, secrets) => secrets.filter((s) => s && String(s).length >= 3).reduce((t, s) => String(t).split(String(s)).join("***"), String(text));
     var firstLine = (e) => String(e && e.message || e).split("\n")[0];
     async function login(browser, name, role, o) {
-      const env = o.env || process.env;
-      const c = credentials(name, role, o.codeRoot, env);
+      const env = process.env;
+      const c = credentials(name, role, o.codeRoot);
       const hdr = role.headers_env ? parseHeaders(role.headers_env).list : [];
       const missingH = hdr.filter((h) => !env[h.env]).map((h) => h.env);
       if (missingH.length) return { ok: false, code: "role:no-credentials", error: `role ${name}: set the env var${missingH.length > 1 ? "s" : ""} ${missingH.join(", ")} (header values come from the environment). Nothing gated by this role was verified.` };
@@ -741,15 +750,12 @@ var require_roles = __commonJS({
       const hsecrets = Object.values(headers);
       if (c.via === "headers") return { ok: true, via: "headers", state: void 0, headers };
       if (c.via === "login_command") {
-        localDir(o.codeRoot);
-        const dir = path.join(o.codeRoot, AUTH_DIR);
-        fs.mkdirSync(dir, { recursive: true, mode: 448 });
-        const f = path.join(dir, `${name}.json`);
+        const f = authFile(o.codeRoot, name);
         try {
           fs.rmSync(f, { force: true });
         } catch (e) {
         }
-        const r = __require("child_process").spawnSync(role.login_command, { shell: true, cwd: o.codeRoot, encoding: "utf8", timeout: (o.timeoutMs || 15e3) * 4, env: { ...env, WINGMAN_ROLE: name, WINGMAN_ROLE_STATE_FILE: f, WINGMAN_BASE_URL: o.base.href } });
+        const r = __require("child_process").spawnSync(role.login_command, { shell: true, cwd: o.codeRoot, encoding: "utf8", timeout: LOGIN_MS * 4, env: { ...env, WINGMAN_ROLE: name, WINGMAN_ROLE_STATE_FILE: f, WINGMAN_BASE_URL: o.base.href } });
         const tail = scrub(String(r.stderr || r.stdout || "").trim().split("\n").slice(-3).join(" | ").slice(0, 300), hsecrets);
         if (r.error || r.status !== 0) return { ok: false, code: "role:login-failed", error: `role ${name}: login_command exited ${r.status === null ? "abnormally" : r.status}${tail ? `; last output: ${tail}` : ""}` };
         if (!fs.existsSync(f)) return { ok: false, code: "role:no-storage-state", error: `role ${name}: login_command finished but wrote no storage state to $WINGMAN_ROLE_STATE_FILE (${path.join(AUTH_DIR, name + ".json")})` };
@@ -770,7 +776,7 @@ var require_roles = __commonJS({
       }
       if (c.missing.length) return { ok: false, code: "role:no-credentials", error: `role ${name}: no credentials; set the env vars ${c.names.user} and ${c.names.password}, or add \`${name}:\` with \`user:\` and \`password:\` to ${LOCAL_FILE} (gitignored). Nothing gated by this role was verified.` };
       const secrets = [c.user, c.password, ...hsecrets];
-      const timeout = o.timeoutMs || 15e3;
+      const timeout = LOGIN_MS;
       const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, ignoreHTTPSErrors: o.ignoreHttps !== false, ...hdr.length ? { extraHTTPHeaders: headers } : {} });
       ctx.setDefaultTimeout(timeout);
       const page = await ctx.newPage();
@@ -789,10 +795,7 @@ var require_roles = __commonJS({
         await page.waitForLoadState("load").catch(() => {
         });
         const state = await ctx.storageState();
-        localDir(o.codeRoot);
-        const dir = path.join(o.codeRoot, AUTH_DIR);
-        fs.mkdirSync(dir, { recursive: true, mode: 448 });
-        const f = path.join(dir, `${name}.json`);
+        const f = authFile(o.codeRoot, name);
         fs.writeFileSync(f, JSON.stringify(state), { mode: 384 });
         fs.chmodSync(f, 384);
         await ctx.close();
@@ -834,15 +837,9 @@ var require_visual_check = __commonJS({
     var IGNORE_HTTP_CODES = ["runtime:http-error", "runtime:request-failed", "runtime:console-error", "content:broken-image"];
     var slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "scenario";
     function resolveReferences(s, changeDir, root) {
-      return (s.references || []).filter((r) => !r.error).map((r) => ({ ...r, abs: resolveReference({ ...s, reference: r.path }, changeDir, root) }));
-    }
-    function resolveReference(s, changeDir, root) {
-      if (!s.reference) return null;
-      for (const base of [changeDir, root, process.env.WINGMAN_CODE_ROOT, path.dirname(s.file)].filter(Boolean)) {
-        const p = path.resolve(base, s.reference);
-        if (fs.existsSync(p)) return p;
-      }
-      return null;
+      const bases = [changeDir, root, process.env.WINGMAN_CODE_ROOT, path.dirname(s.file)].filter(Boolean);
+      const abs = (ref) => ref && bases.map((b) => path.resolve(b, ref)).find((p) => fs.existsSync(p)) || null;
+      return (s.references || []).filter((r) => !r.error).map((r) => ({ ...r, abs: abs(r.path) }));
     }
     function resolveFrom(name, codeRoot) {
       for (const p of [codeRoot, __dirname]) {
@@ -1179,11 +1176,11 @@ ${server.tail()}`));
         rep.roles = {};
         for (const name of new Set(o.items.map((x) => x.scenario.role).filter((r) => r && r !== "anonymous"))) {
           const role = (c.roles || {})[name];
-          const r = role ? await RL.login(browser, name, role, { base: new URL(c.url), codeRoot: o.codeRoot, ignoreHttps: c.ignore_https_errors !== false, timeoutMs: o.roleTimeoutMs }) : { ok: false, code: "role:undefined", error: `role ${name} is not defined under visual.roles in wingman-spec.yaml` };
+          const r = role ? await RL.login(browser, name, role, { base: new URL(c.url), codeRoot: o.codeRoot, ignoreHttps: c.ignore_https_errors !== false }) : { ok: false, code: "role:undefined", error: `role ${name} is not defined under visual.roles in wingman-spec.yaml` };
           sessions[name] = r;
           rep.roles[name] = r.ok ? { ok: true, via: r.via } : { ok: false, error: r.error };
         }
-        const known = { hung: /* @__PURE__ */ new Set(), seen: /* @__PURE__ */ new Map(), aborted: 0, timeouts: 0 };
+        const known = { hung: /* @__PURE__ */ new Set(), seen: /* @__PURE__ */ new Map(), aborted: 0, timeouts: 0, repeats: 0 };
         const parts = o.items.map(() => ({ defects: [], ignored: [], notes: [], captures: {}, shots: [], warnings: [] }));
         const width = Math.max(1, Math.min(o.items.length, Number(process.env.WINGMAN_SPEC_VISUAL_CONTEXTS) || c.contexts || 4));
         let next = 0;
@@ -1198,7 +1195,7 @@ ${server.tail()}`));
           Object.assign(rep.captures, p.captures);
         }
         rep.timings.contexts = width;
-        if (known.timeouts || known.aborted || known.repeats) rep.perf = { load_timeouts: known.timeouts, aborted_known_hung: known.aborted, repeated_runtime_defects: known.repeats || 0 };
+        if (known.timeouts || known.aborted || known.repeats) rep.perf = { load_timeouts: known.timeouts, aborted_known_hung: known.aborted, repeated_runtime_defects: known.repeats };
         rep.timings.pages_s = (Date.now() - tPages) / 1e3;
       } finally {
         if (browser && !(o.shared && o.shared.browser === browser)) await browser.close().catch(() => {
@@ -1265,37 +1262,25 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
     var capKey = (id, st, vw) => `${id}|${st}|${vw}`;
     var defectKey = (d) => [d.code, d.scenario, d.state, d.viewport, d.selector || d.rule || String(d.message).replace(/^.*?\]: /, "").replace(/[0-9]+/g, "#")].join("|");
     var defectSig = (d) => [d.code, d.scenario, d.state, d.viewport, String(d.message).replace(/^.*?\]: /, "")].join("|");
-    function pagePresent(groups) {
+    function pageShows(sels) {
       const vis = (e) => {
         const r = e.getBoundingClientRect();
         if (r.width < 1 || r.height < 1) return false;
         const cs = getComputedStyle(e);
         return cs.visibility !== "hidden" && cs.display !== "none";
       };
-      return groups.map((sels) => sels.every((sel) => {
+      return sels.map((sel) => {
         try {
           return [...document.querySelectorAll(sel)].some(vis);
         } catch (e) {
-          return true;
+          return null;
         }
-      }));
+      });
     }
-    function pageVisible(sels) {
-      const vis = (e) => {
-        const r = e.getBoundingClientRect();
-        if (r.width < 1 || r.height < 1) return false;
-        const cs = getComputedStyle(e);
-        return cs.visibility !== "hidden" && cs.display !== "none";
-      };
-      const out = [];
-      for (const sel of sels) {
-        try {
-          if ([...document.querySelectorAll(sel)].some(vis)) out.push({ sel });
-        } catch (e) {
-          out.push({ sel, invalid: true });
-        }
-      }
-      return out;
+    async function present(page, groups) {
+      const shown = await page.evaluate(pageShows, groups.flat());
+      let k = 0;
+      return groups.map((sels) => sels.map(() => shown[k++]).every((v) => v !== false));
     }
     function expectScope(s) {
       const block = (s.expects || []).filter((x) => !x.state && !x.error);
@@ -1308,7 +1293,7 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
       const s = it.scenario;
       const base = new URL(o.config.url);
       const auth = s.role && s.role !== "anonymous" ? s.role : null;
-      const sess = auth ? (o.sessions || {})[auth] : null;
+      const sess = auth ? o.sessions[auth] : null;
       if (auth && !(sess && sess.ok)) {
         rep.defects.push(defect(sess && sess.code || "role:login-failed", s.id, null, null, `${s.id}: ${sess && sess.error || `no session for role ${auth}`}`, { role: it.role, auth }));
         return;
@@ -1323,14 +1308,14 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
       const loadedPage = async (page, vw, add, note) => {
         const vex = scope.block.filter((x) => DC.vpMatch(x.vps, vw));
         if (!vex.length) return;
-        const pres = await page.evaluate(pagePresent, vex.map((x) => DC.expectSelectors(x)));
+        const pres = await present(page, vex.map((x) => DC.expectSelectors(x)));
         await runExpects(page, vex.filter((x, i) => pres[i]), add, note);
         if (!deferred.has(vw)) deferred.set(vw, new Map(vex.filter((x, i) => !pres[i]).map((x) => [x.raw, { x, matched: false }])));
       };
       const ignores = ignoreRules(s, o.config);
-      const K = o.known || { hung: /* @__PURE__ */ new Set(), seen: /* @__PURE__ */ new Map(), aborted: 0, timeouts: 0 };
-      const pageMs = o.stepTimeoutMs || (o.before ? 1500 : Math.round((o.config && o.config.page_timeout || 5) * 1e3));
-      const reqMs = Math.round((o.config && o.config.request_timeout || 0) * 1e3);
+      const K = o.known;
+      const pageMs = o.before ? 1500 : Math.round((o.config.page_timeout || 5) * 1e3);
+      const reqMs = Math.round((o.config.request_timeout || 0) * 1e3);
       for (const st of scope.order) {
         let unreachable = false;
         for (const vw of s.viewports) {
@@ -1430,7 +1415,12 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
                 if (norm(got) !== norm(s.redirects_to)) add("role:no-redirect", `the route ended on ${got}, expected ${s.redirects_to}${auth ? ` for role ${auth}` : " for an anonymous visitor"}`);
               }
               const gone = [...s.absents, ...st.absents || []];
-              if (gone.length) for (const g of await page.evaluate(pageVisible, gone)) add(g.invalid ? "role:bad-selector" : "role:forbidden-visible", g.invalid ? `absent: ${g.sel} is not a valid selector` : `${g.sel} is visible${auth ? ` for role ${auth}` : " to an anonymous visitor"}, but the scenario says it must be absent`, { selector: g.sel });
+              if (gone.length) {
+                for (const [i, v] of (await page.evaluate(pageShows, gone)).entries()) if (v !== false) {
+                  const g = { sel: gone[i], invalid: v === null };
+                  add(g.invalid ? "role:bad-selector" : "role:forbidden-visible", g.invalid ? `absent: ${g.sel} is not a valid selector` : `${g.sel} is visible${auth ? ` for role ${auth}` : " to an anonymous visitor"}, but the scenario says it must be absent`, { selector: g.sel });
+                }
+              }
               const r = await page.evaluate(pageChecks, { keys: keys(st), overlays: s.overlays });
               if (r.overflow.length || r.scroll_width > vw + 1) add("layout:horizontal-overflow", `the page scrolls sideways: document is ${r.scroll_width}px wide in a ${vw}px viewport${r.overflow.length ? `; widest offenders: ${r.overflow.map((x) => `${x.el} (right edge ${x.right}px, width ${x.width}px)`).join(", ")}` : ""}`);
               for (const k of r.keys) add(`layout:key-${k.problem}`, k.problem === "missing" ? `key element ${k.sel} is not in the page` : `key element ${k.sel} is ${k.problem}${k.detail ? ` (${k.detail})` : ""}`, { selector: k.sel });
@@ -1439,7 +1429,7 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
               if (scope.stepFree.has(st.name)) await loadedPage(page, vw, add);
               else if (deferred.has(vw) && deferred.get(vw).size) {
                 const dl = [...deferred.get(vw).values()];
-                const pres = await page.evaluate(pagePresent, dl.map((d) => DC.expectSelectors(d.x)));
+                const pres = await present(page, dl.map((d) => DC.expectSelectors(d.x)));
                 const here = dl.filter((d, i) => pres[i]);
                 here.forEach((d) => {
                   d.matched = true;
@@ -1496,7 +1486,7 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
             seen.add(msg);
             const sk = `${s.id}|${vw}|${code}|${msg}`;
             if (K.seen.has(sk) && K.seen.get(sk) !== st.name) {
-              K.repeats = (K.repeats || 0) + 1;
+              K.repeats++;
               continue;
             }
             K.seen.set(sk, st.name);
@@ -1557,6 +1547,7 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
     async function doStep(page, step, base, note, vw) {
       switch (step.op) {
         case "click":
+        case "hover":
           await pointerStep(page, step, note, vw);
           break;
         case "fill":
@@ -1564,9 +1555,6 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
           break;
         case "press":
           await page.keyboard.press(step.target);
-          break;
-        case "hover":
-          await pointerStep(page, step, note, vw);
           break;
         case "wait":
           await page.waitForTimeout(+step.target);
@@ -1586,18 +1574,14 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
       }
     }
     var QUIET_MS = Math.max(20, Number(process.env.WINGMAN_SPEC_VISUAL_QUIET_MS) || 100);
-    async function settle(page, ms = 5e3, pending) {
-      if (!pending) await page.waitForLoadState("networkidle", { timeout: ms }).catch(() => {
-      });
-      else {
-        const t0 = Date.now();
-        let quietSince = pending.size ? 0 : Date.now();
-        while (Date.now() - t0 < ms) {
-          await sleep(20);
-          if (pending.size) quietSince = 0;
-          else if (!quietSince) quietSince = Date.now();
-          else if (Date.now() - quietSince >= QUIET_MS) break;
-        }
+    async function settle(page, ms, pending) {
+      const t0 = Date.now();
+      let quietSince = pending.size ? 0 : Date.now();
+      while (Date.now() - t0 < ms) {
+        await sleep(20);
+        if (pending.size) quietSince = 0;
+        else if (!quietSince) quietSince = Date.now();
+        else if (Date.now() - quietSince >= QUIET_MS) break;
       }
       await page.evaluate(() => document.fonts ? document.fonts.ready : null).catch(() => {
       });
@@ -1728,14 +1712,6 @@ var require_wingman_visual = __commonJS({
       x.url = x.url || null;
       x.port = x.port || null;
       x.browsers_path = x.browsers_path || null;
-      if (x.url && !x.port) {
-        try {
-          const u = new URL(x.url);
-          x.port = +(u.port || (u.protocol === "https:" ? 443 : 80));
-        } catch (e) {
-        }
-      }
-      if (!x.url && x.port) x.url = `http://127.0.0.1:${x.port}/`;
       return x;
     }
     function loadReport(f) {
@@ -1754,7 +1730,8 @@ var require_wingman_visual = __commonJS({
         return { rep: null, note: `no git worktree of HEAD (${(add.stderr || "").trim().split("\n")[0] || "not a git repository"})` };
       }
       try {
-        for (const d of ["node_modules"]) if (fs.existsSync(path.join(codeRoot, d)) && !fs.existsSync(path.join(wt, d))) fs.symlinkSync(fs.realpathSync(path.join(codeRoot, d)), path.join(wt, d));
+        const nm = path.join(codeRoot, "node_modules");
+        if (fs.existsSync(nm) && !fs.existsSync(path.join(wt, "node_modules"))) fs.symlinkSync(fs.realpathSync(nm), path.join(wt, "node_modules"));
         const rep = await VC.run({ codeRoot: wt, outDir, config: cfg, items, before: true, shared });
         return { rep, note: "temporary git worktree of HEAD (uncommitted work of earlier tasks counts as changed)" };
       } finally {

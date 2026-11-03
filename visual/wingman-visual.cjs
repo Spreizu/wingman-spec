@@ -22,15 +22,13 @@ const VC = require('./lib/visual-check.cjs');
 const DC = require('./lib/design-contract.cjs');
 const RL = require('./lib/roles.cjs');
 
-/** The CLI's `visual:` section in the shape visual-check.cjs reads. */
+/** The CLI's `visual:` section in the shape visual-check.cjs reads (the CLI has already derived url and port from each other). */
 function cfgOf(c) {
   const x = { ...(c || {}) };
   for (const k of ['ignore', 'ignore_http']) x[k] = x[k] || [];
   x.roles = x.roles || {};
   x.ui_files = x.ui_files && x.ui_files.length ? x.ui_files : null;
   x.command = x.command || null; x.url = x.url || null; x.port = x.port || null; x.browsers_path = x.browsers_path || null;
-  if (x.url && !x.port) { try { const u = new URL(x.url); x.port = +(u.port || (u.protocol === 'https:' ? 443 : 80)); } catch (e) { /* the CLI reports it */ } }
-  if (!x.url && x.port) x.url = `http://127.0.0.1:${x.port}/`;
   return x;
 }
 
@@ -43,7 +41,7 @@ async function captureAtHead(codeRoot, items, cfg, outDir, shared) {
   const add = spawnSync('git', ['worktree', 'add', '--detach', '--quiet', wt, 'HEAD'], { cwd: codeRoot, encoding: 'utf8' });
   if (add.status !== 0) { fs.rmSync(tmp, { recursive: true, force: true }); return { rep: null, note: `no git worktree of HEAD (${(add.stderr || '').trim().split('\n')[0] || 'not a git repository'})` }; }
   try {
-    for (const d of ['node_modules']) if (fs.existsSync(path.join(codeRoot, d)) && !fs.existsSync(path.join(wt, d))) fs.symlinkSync(fs.realpathSync(path.join(codeRoot, d)), path.join(wt, d));
+    const nm = path.join(codeRoot, 'node_modules'); if (fs.existsSync(nm) && !fs.existsSync(path.join(wt, 'node_modules'))) fs.symlinkSync(fs.realpathSync(nm), path.join(wt, 'node_modules'));
     const rep = await VC.run({ codeRoot: wt, outDir, config: cfg, items, before: true, shared });
     return { rep, note: 'temporary git worktree of HEAD (uncommitted work of earlier tasks counts as changed)' };
   } finally {

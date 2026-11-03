@@ -101,11 +101,7 @@ func resolveRefs(r vrefs, scens []*visual.Scenario) (found []*visual.Scenario, u
 }
 
 func (e *Env) scenarios(dir string) []*visual.Scenario {
-	s, err := visual.Scenarios(e.Ctx, e.code, dir)
-	if err != nil {
-		e.say("WARNING: cannot read the visual blocks of %s: %v", e.R.Rel(dir), err)
-	}
-	return s
+	return visual.Scenarios(dir)
 }
 
 // vplan is what the visual check of one dispatch covers.

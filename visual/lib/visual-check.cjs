@@ -33,14 +33,9 @@ const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
 
 /** Every reference of a scenario with its resolved path (`abs`, null when missing): for the side-by-side images. */
 function resolveReferences(s, changeDir, root) {
-  return (s.references || []).filter((r) => !r.error).map((r) => ({ ...r, abs: resolveReference({ ...s, reference: r.path }, changeDir, root) }));
-}
-function resolveReference(s, changeDir, root) {
-  if (!s.reference) return null;
-  for (const base of [changeDir, root, process.env.WINGMAN_CODE_ROOT, path.dirname(s.file)].filter(Boolean)) {
-    const p = path.resolve(base, s.reference); if (fs.existsSync(p)) return p;
-  }
-  return null;
+  const bases = [changeDir, root, process.env.WINGMAN_CODE_ROOT, path.dirname(s.file)].filter(Boolean);
+  const abs = (ref) => (ref && bases.map((b) => path.resolve(b, ref)).find((p) => fs.existsSync(p))) || null;
+  return (s.references || []).filter((r) => !r.error).map((r) => ({ ...r, abs: abs(r.path) }));
 }
 
 // ---------- environment ----------
@@ -266,11 +261,11 @@ async function run(o) {
     const sessions = {}; rep.roles = {};
     for (const name of new Set(o.items.map((x) => x.scenario.role).filter((r) => r && r !== 'anonymous'))) {
       const role = (c.roles || {})[name];
-      const r = role ? await RL.login(browser, name, role, { base: new URL(c.url), codeRoot: o.codeRoot, ignoreHttps: c.ignore_https_errors !== false, timeoutMs: o.roleTimeoutMs })
+      const r = role ? await RL.login(browser, name, role, { base: new URL(c.url), codeRoot: o.codeRoot, ignoreHttps: c.ignore_https_errors !== false })
         : { ok: false, code: 'role:undefined', error: `role ${name} is not defined under visual.roles in wingman-spec.yaml` };
       sessions[name] = r; rep.roles[name] = r.ok ? { ok: true, via: r.via } : { ok: false, error: r.error };   // never the session itself
     }
-    const known = { hung: new Set(), seen: new Map(), aborted: 0, timeouts: 0 };  // shared by the scenarios of this run (see runScenario)
+    const known = { hung: new Set(), seen: new Map(), aborted: 0, timeouts: 0, repeats: 0 };  // shared by the scenarios of this run (see runScenario)
     // Scenarios run in a pool of browser contexts (visual.contexts, default 4); the states of one scenario stay in order.
     // Each scenario fills its own part of the report; the parts are merged in item order, so the report is deterministic.
     const parts = o.items.map(() => ({ defects: [], ignored: [], notes: [], captures: {}, shots: [], warnings: [] }));
@@ -284,7 +279,7 @@ async function run(o) {
       Object.assign(rep.captures, p.captures);
     }
     rep.timings.contexts = width;
-    if (known.timeouts || known.aborted || known.repeats) rep.perf = { load_timeouts: known.timeouts, aborted_known_hung: known.aborted, repeated_runtime_defects: known.repeats || 0 };
+    if (known.timeouts || known.aborted || known.repeats) rep.perf = { load_timeouts: known.timeouts, aborted_known_hung: known.aborted, repeated_runtime_defects: known.repeats };
     rep.timings.pages_s = (Date.now() - tPages) / 1000;
   } finally {
     if (browser && !(o.shared && o.shared.browser === browser)) await browser.close().catch(() => {});
@@ -352,17 +347,15 @@ const defectKey = (d) => [d.code, d.scenario, d.state, d.viewport, d.selector ||
 /** The exact identity of a defect for visual.baseline: state, viewport, code and the whole message (an axe rule that fails on another element is another defect). */
 const defectSig = (d) => [d.code, d.scenario, d.state, d.viewport, String(d.message).replace(/^.*?\]: /, '')].join('|');
 
-/** Per selector group: every selector matches at least one visible element (invalid selectors count as present). */
-function pagePresent(groups) {
+/** In the page, per selector: true when it matches a visible element, false when not, null when it is not a valid selector. */
+function pageShows(sels) {
   const vis = (e) => { const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const cs = getComputedStyle(e); return cs.visibility !== 'hidden' && cs.display !== 'none'; };
-  return groups.map((sels) => sels.every((sel) => { try { return [...document.querySelectorAll(sel)].some(vis); } catch (e) { return true; } }));
+  return sels.map((sel) => { try { return [...document.querySelectorAll(sel)].some(vis); } catch (e) { return null; } });
 }
-/** `absent:` selectors that match a visible element (or are invalid selectors). */
-function pageVisible(sels) {
-  const vis = (e) => { const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; const cs = getComputedStyle(e); return cs.visibility !== 'hidden' && cs.display !== 'none'; };
-  const out = [];
-  for (const sel of sels) { try { if ([...document.querySelectorAll(sel)].some(vis)) out.push({ sel }); } catch (e) { out.push({ sel, invalid: true }); } }
-  return out;
+/** Per selector group: every selector matches at least one visible element (invalid selectors count as present). */
+async function present(page, groups) {
+  const shown = await page.evaluate(pageShows, groups.flat()); let k = 0;
+  return groups.map((sels) => sels.map(() => shown[k++]).every((v) => v !== false));
 }
 /**
  * Where the block-level expects of a scenario are checked (see "Scope" above): the state that stands for the loaded
@@ -378,7 +371,7 @@ function expectScope(s) {
 
 async function runScenario(it, o, browser, axe, rep) {
   const s = it.scenario; const base = new URL(o.config.url);
-  const auth = s.role && s.role !== 'anonymous' ? s.role : null; const sess = auth ? (o.sessions || {})[auth] : null;
+  const auth = s.role && s.role !== 'anonymous' ? s.role : null; const sess = auth ? o.sessions[auth] : null;
   if (auth && !(sess && sess.ok)) { rep.defects.push(defect((sess && sess.code) || 'role:login-failed', s.id, null, null, `${s.id}: ${(sess && sess.error) || `no session for role ${auth}`}`, { role: it.role, auth })); return; }
   const keys = (st) => [...s.keys, ...st.keys];
   const scope = expectScope(s);
@@ -390,14 +383,14 @@ async function runScenario(it, o, browser, axe, rep) {
   /** The loaded page (before steps): check the block expects present there, defer the rest to the states. */
   const loadedPage = async (page, vw, add, note) => {
     const vex = scope.block.filter((x) => DC.vpMatch(x.vps, vw)); if (!vex.length) return;
-    const pres = await page.evaluate(pagePresent, vex.map((x) => DC.expectSelectors(x)));
+    const pres = await present(page, vex.map((x) => DC.expectSelectors(x)));
     await runExpects(page, vex.filter((x, i) => pres[i]), add, note);
     if (!deferred.has(vw)) deferred.set(vw, new Map(vex.filter((x, i) => !pres[i]).map((x) => [x.raw, { x, matched: false }])));
   };
   const ignores = ignoreRules(s, o.config);
-  const K = o.known || { hung: new Set(), seen: new Map(), aborted: 0, timeouts: 0 };
-  const pageMs = o.stepTimeoutMs || (o.before ? 1500 : Math.round(((o.config && o.config.page_timeout) || 5) * 1000));
-  const reqMs = Math.round(((o.config && o.config.request_timeout) || 0) * 1000);
+  const K = o.known;
+  const pageMs = o.before ? 1500 : Math.round((o.config.page_timeout || 5) * 1000);
+  const reqMs = Math.round((o.config.request_timeout || 0) * 1000);
   for (const st of scope.order) {
     let unreachable = false;  // pre-task capture: a state the task has not built yet fails its steps at every width
     for (const vw of s.viewports) {
@@ -449,7 +442,7 @@ async function runScenario(it, o, browser, axe, rep) {
           cap.reached = true;
           if (s.redirects_to) { const norm = (p) => (p.length > 1 ? p.replace(/\/+$/, '') : p); const got = new URL(page.url()).pathname; if (norm(got) !== norm(s.redirects_to)) add('role:no-redirect', `the route ended on ${got}, expected ${s.redirects_to}${auth ? ` for role ${auth}` : ' for an anonymous visitor'}`); }
           const gone = [...s.absents, ...(st.absents || [])];
-          if (gone.length) for (const g of await page.evaluate(pageVisible, gone)) add(g.invalid ? 'role:bad-selector' : 'role:forbidden-visible', g.invalid ? `absent: ${g.sel} is not a valid selector` : `${g.sel} is visible${auth ? ` for role ${auth}` : ' to an anonymous visitor'}, but the scenario says it must be absent`, { selector: g.sel });
+          if (gone.length) for (const [i, v] of (await page.evaluate(pageShows, gone)).entries()) if (v !== false) { const g = { sel: gone[i], invalid: v === null }; add(g.invalid ? 'role:bad-selector' : 'role:forbidden-visible', g.invalid ? `absent: ${g.sel} is not a valid selector` : `${g.sel} is visible${auth ? ` for role ${auth}` : ' to an anonymous visitor'}, but the scenario says it must be absent`, { selector: g.sel }); }
           const r = await page.evaluate(pageChecks, { keys: keys(st), overlays: s.overlays });
           if (r.overflow.length || r.scroll_width > vw + 1) add('layout:horizontal-overflow', `the page scrolls sideways: document is ${r.scroll_width}px wide in a ${vw}px viewport${r.overflow.length ? `; widest offenders: ${r.overflow.map((x) => `${x.el} (right edge ${x.right}px, width ${x.width}px)`).join(', ')}` : ''}`);
           for (const k of r.keys) add(`layout:key-${k.problem}`, k.problem === 'missing' ? `key element ${k.sel} is not in the page` : `key element ${k.sel} is ${k.problem}${k.detail ? ` (${k.detail})` : ''}`, { selector: k.sel });
@@ -461,7 +454,7 @@ async function runScenario(it, o, browser, axe, rep) {
           if (scope.stepFree.has(st.name)) await loadedPage(page, vw, add);
           else if (deferred.has(vw) && deferred.get(vw).size) {
             const dl = [...deferred.get(vw).values()];
-            const pres = await page.evaluate(pagePresent, dl.map((d) => DC.expectSelectors(d.x)));
+            const pres = await present(page, dl.map((d) => DC.expectSelectors(d.x)));
             const here = dl.filter((d, i) => pres[i]); here.forEach((d) => { d.matched = true; });
             await runExpects(page, here.map((d) => d.x), add);
           }
@@ -500,7 +493,7 @@ async function runScenario(it, o, browser, axe, rep) {
         seen.add(msg);
         // the same request or console error in a later state of the same viewport is the same defect: reported once, counted
         const sk = `${s.id}|${vw}|${code}|${msg}`;
-        if (K.seen.has(sk) && K.seen.get(sk) !== st.name) { K.repeats = (K.repeats || 0) + 1; continue; }
+        if (K.seen.has(sk) && K.seen.get(sk) !== st.name) { K.repeats++; continue; }
         K.seen.set(sk, st.name);
         if (pass === 1) { add(code, msg, undefined, meta ? consoleErrorSkipped(ignores, meta, skippedLoads) : null); continue; }
         const by = add(code, msg);
@@ -550,10 +543,9 @@ async function pointerStep(page, step, note, vw) {
 }
 async function doStep(page, step, base, note, vw) {
   switch (step.op) {
-    case 'click': await pointerStep(page, step, note, vw); break;
+    case 'click': case 'hover': await pointerStep(page, step, note, vw); break;
     case 'fill': await page.fill(step.target, step.value); break;
     case 'press': await page.keyboard.press(step.target); break;
-    case 'hover': await pointerStep(page, step, note, vw); break;
     case 'wait': await page.waitForTimeout(+step.target); break;
     case 'goto': await page.goto(new URL(step.target, base).href, { waitUntil: 'load' }); break;
     case 'storage': await page.evaluate(([k, v]) => localStorage.setItem(k, v), [step.target, step.value]); await page.reload({ waitUntil: 'load' }); break;
@@ -567,14 +559,11 @@ const QUIET_MS = Math.max(20, Number(process.env.WINGMAN_SPEC_VISUAL_QUIET_MS) |
  * Wait until the page is settled: no request in flight for QUIET_MS (the same condition as networkidle with a shorter window,
  * read from the page's own in-flight map; capped at ms), fonts ready, motion off, two animation frames.
  */
-async function settle(page, ms = 5000, pending) {
-  if (!pending) await page.waitForLoadState('networkidle', { timeout: ms }).catch(() => {});
-  else {
-    const t0 = Date.now(); let quietSince = pending.size ? 0 : Date.now();
-    while (Date.now() - t0 < ms) {
-      await sleep(20);
-      if (pending.size) quietSince = 0; else if (!quietSince) quietSince = Date.now(); else if (Date.now() - quietSince >= QUIET_MS) break;
-    }
+async function settle(page, ms, pending) {
+  const t0 = Date.now(); let quietSince = pending.size ? 0 : Date.now();
+  while (Date.now() - t0 < ms) {
+    await sleep(20);
+    if (pending.size) quietSince = 0; else if (!quietSince) quietSince = Date.now(); else if (Date.now() - quietSince >= QUIET_MS) break;
   }
   await page.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
   await page.addStyleTag({ content: '*,*::before,*::after{transition:none!important;animation:none!important;caret-color:transparent!important}' }).catch(() => {});

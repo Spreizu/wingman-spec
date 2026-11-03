@@ -41,9 +41,14 @@ function localDir(codeRoot) {
   return dir;
 }
 
+/** Where the session of a role is saved (the private folder and auth/ made first). */
+function authFile(codeRoot, name) {
+  localDir(codeRoot); const dir = path.join(codeRoot, AUTH_DIR); fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  return path.join(dir, `${name}.json`);
+}
+const LOGIN_MS = 15000;
 const envBase = (name) => `WINGMAN_ROLE_${name.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}`;
 const envNames = (name, role) => ({ user: (role && role.user_env) || `${envBase(name)}_USER`, password: (role && role.password_env) || `${envBase(name)}_PASSWORD` });
-
 
 /** `Name=ENV_VAR, Name2=ENV_VAR2` -> [{ name, env }]. The header values live in the environment, never in the config. */
 function parseHeaders(v) {
@@ -71,7 +76,8 @@ function readLocalSecrets(codeRoot) {
 }
 
 /** Where the credentials of a role come from. Never returns more than names: `value` is for the login only. */
-function credentials(name, role, codeRoot, env = process.env) {
+function credentials(name, role, codeRoot) {
+  const env = process.env;
   if (role.storage_state) return { via: 'storage_state', missing: [] };
   if (role.login_command) return { via: 'login_command', missing: [] };
   if (!role.login && role.headers_env) return { via: 'headers', missing: [] };
@@ -84,9 +90,10 @@ function credentials(name, role, codeRoot, env = process.env) {
 }
 
 /** For `doctor`: what every role needs and whether it has it. No values. */
-function describe(roles, codeRoot, env = process.env) {
+function describe(roles, codeRoot) {
+  const env = process.env;
   return Object.values(roles || {}).map((r) => {
-    const c = credentials(r.name, r, codeRoot, env);
+    const c = credentials(r.name, r, codeRoot);
     if (c.via === 'storage_state') { const f = path.resolve(codeRoot, r.storage_state); return { role: r.name, via: 'storage_state', file: r.storage_state, ready: fs.existsSync(f), missing: fs.existsSync(f) ? [] : [`file ${r.storage_state}`] }; }
     if (c.via === 'login_command') return { role: r.name, via: 'login_command', ready: true, missing: [] };
     if (r.headers_env) { const miss = parseHeaders(r.headers_env).list.filter((h) => !env[h.env]).map((h) => `env ${h.env}`); if (c.via === 'headers' || miss.length) return { role: r.name, via: c.via === 'headers' ? 'headers' : 'login+headers', ready: !miss.length, missing: miss }; }
@@ -99,11 +106,11 @@ const firstLine = (e) => String(e && e.message || e).split('\n')[0];
 
 /**
  * Logs in as `name` in a fresh browser context and returns { ok, via, state } or { ok:false, code, error, shot? }.
- * o: { base: URL, codeRoot, ignoreHttps, timeoutMs, env }
+ * o: { base: URL, codeRoot, ignoreHttps }
  */
 async function login(browser, name, role, o) {
-  const env = o.env || process.env;
-  const c = credentials(name, role, o.codeRoot, env);
+  const env = process.env;
+  const c = credentials(name, role, o.codeRoot);
   const hdr = role.headers_env ? parseHeaders(role.headers_env).list : [];
   const missingH = hdr.filter((h) => !env[h.env]).map((h) => h.env);
   if (missingH.length) return { ok: false, code: 'role:no-credentials', error: `role ${name}: set the env var${missingH.length > 1 ? 's' : ''} ${missingH.join(', ')} (header values come from the environment). Nothing gated by this role was verified.` };
@@ -111,9 +118,8 @@ async function login(browser, name, role, o) {
   const hsecrets = Object.values(headers);
   if (c.via === 'headers') return { ok: true, via: 'headers', state: undefined, headers };
   if (c.via === 'login_command') {
-    localDir(o.codeRoot); const dir = path.join(o.codeRoot, AUTH_DIR); fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-    const f = path.join(dir, `${name}.json`); try { fs.rmSync(f, { force: true }); } catch (e) { /* none */ }
-    const r = require('child_process').spawnSync(role.login_command, { shell: true, cwd: o.codeRoot, encoding: 'utf8', timeout: (o.timeoutMs || 15000) * 4, env: { ...env, WINGMAN_ROLE: name, WINGMAN_ROLE_STATE_FILE: f, WINGMAN_BASE_URL: o.base.href } });
+    const f = authFile(o.codeRoot, name); try { fs.rmSync(f, { force: true }); } catch (e) { /* none */ }
+    const r = require('child_process').spawnSync(role.login_command, { shell: true, cwd: o.codeRoot, encoding: 'utf8', timeout: LOGIN_MS * 4, env: { ...env, WINGMAN_ROLE: name, WINGMAN_ROLE_STATE_FILE: f, WINGMAN_BASE_URL: o.base.href } });
     const tail = scrub(String(r.stderr || r.stdout || '').trim().split('\n').slice(-3).join(' | ').slice(0, 300), hsecrets);
     if (r.error || r.status !== 0) return { ok: false, code: 'role:login-failed', error: `role ${name}: login_command exited ${r.status === null ? 'abnormally' : r.status}${tail ? `; last output: ${tail}` : ''}` };
     if (!fs.existsSync(f)) return { ok: false, code: 'role:no-storage-state', error: `role ${name}: login_command finished but wrote no storage state to $WINGMAN_ROLE_STATE_FILE (${path.join(AUTH_DIR, name + '.json')})` };
@@ -125,7 +131,7 @@ async function login(browser, name, role, o) {
     try { return { ok: true, via: 'storage_state', state: JSON.parse(fs.readFileSync(f, 'utf8')), headers }; } catch (e) { return { ok: false, code: 'role:no-storage-state', error: `role ${name}: ${role.storage_state} is not valid JSON` }; }
   }
   if (c.missing.length) return { ok: false, code: 'role:no-credentials', error: `role ${name}: no credentials; set the env vars ${c.names.user} and ${c.names.password}, or add \`${name}:\` with \`user:\` and \`password:\` to ${LOCAL_FILE} (gitignored). Nothing gated by this role was verified.` };
-  const secrets = [c.user, c.password, ...hsecrets]; const timeout = o.timeoutMs || 15000;
+  const secrets = [c.user, c.password, ...hsecrets]; const timeout = LOGIN_MS;
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, ignoreHTTPSErrors: o.ignoreHttps !== false, ...(hdr.length ? { extraHTTPHeaders: headers } : {}) });
   ctx.setDefaultTimeout(timeout);
   const page = await ctx.newPage();
@@ -143,8 +149,7 @@ async function login(browser, name, role, o) {
     else await page.waitForURL((u) => u.pathname !== loginUrl.pathname, { timeout });
     await page.waitForLoadState('load').catch(() => {});
     const state = await ctx.storageState();
-    localDir(o.codeRoot); const dir = path.join(o.codeRoot, AUTH_DIR); fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-    const f = path.join(dir, `${name}.json`); fs.writeFileSync(f, JSON.stringify(state), { mode: 0o600 }); fs.chmodSync(f, 0o600);
+    const f = authFile(o.codeRoot, name); fs.writeFileSync(f, JSON.stringify(state), { mode: 0o600 }); fs.chmodSync(f, 0o600);
     await ctx.close();
     return { ok: true, via: 'login', state, headers, file: path.join(AUTH_DIR, `${name}.json`) };
   } catch (e) {

@@ -22,6 +22,10 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
   and every entry is checked against its file's size and modification time, so a reopen reads only changed files and
   the Requirements view appears about 40% sooner. The `git log` calls behind change and archive times run in parallel
   without blocking. The views show the same content.
+- **Simpler visual helper.** The browser helper drops code nothing used (a networkidle wait no caller reached, unused
+  timeout options, fallbacks for values the CLI always sends, its own url/port derivation the CLI already does) and shares
+  one in-page visibility test between expects and `absent:` checks; the embedded bundle is a little smaller. What it
+  checks, reports and prints is unchanged.
 - **Extension package.** The README screenshots load from GitHub instead of being packed into the vsix (about 1.1 MB
   smaller per platform), which also fixes the broken images on the Marketplace and Open VSX pages.
 

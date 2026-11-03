@@ -28,8 +28,9 @@ const HelperName = "wingman-visual.cjs"
 // ErrNoHelper means neither node nor the helper could be found.
 var ErrNoHelper = errors.New("the visual helper needs Node.js (node on PATH)")
 
-// Item is one scenario to check, with why it is checked: "task" (named by the task), "other" (a declared scenario of the
-// change, checked for regressions) ; InScope when its component is in the task's Files:.
+// Item is one scenario to check, with why it is checked: "task" (named by the task), "change" (another scenario of the
+// change) or "guard" (a scenario of the specs that shares its page, checked for regressions); InScope when its component
+// is in the task's Files:.
 type Item struct {
 	Scenario *Scenario `json:"scenario"`
 	Role     string    `json:"role"`
@@ -138,7 +139,6 @@ func Call(ctx context.Context, codeRoot, op string, job map[string]any, out any,
 	}
 	cmd := exec.CommandContext(ctx, node, script)
 	cmd.Stdin = bytes.NewReader(in)
-	cmd.Env = os.Environ()
 	var so bytes.Buffer
 	cmd.Stdout = &so
 	var tail bytes.Buffer
@@ -186,9 +186,9 @@ func lastLine(b []byte) []byte {
 }
 
 // Scenarios parses the ```visual blocks of the capability files in dir (no helper: the grammar is parsed here).
-func Scenarios(_ context.Context, _ string, dir string) ([]*Scenario, error) {
+func Scenarios(dir string) []*Scenario {
 	if !HasBlocks(dir) {
-		return nil, nil
+		return nil
 	}
-	return ParseScenarios(dir), nil
+	return ParseScenarios(dir)
 }
