@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.12.2
 
 - The bundled CLI no longer leaves a `wingman-visual-before-*` folder in the temp folder when a visual run is stopped mid-run. Details in the repository changelog.
 - Requirement IDs: `@spec` markers may name a requirement by its `ID:` line (e.g. `@spec BILLING-7KQ3`) or its slug, in any case, and **Go to Requirement ID** opens a requirement by ID. The Requirements view shows each requirement's last recorded test result, and a `Verify:` line counts as verified without a test. Details in the repository changelog.

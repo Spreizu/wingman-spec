@@ -2,7 +2,7 @@
 
 Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
-## Unreleased
+## 0.12.2
 
 - **No leftover before folders.** A visual run's capture at HEAD (a temporary git worktree in
   `wingman-visual-before-<pid>-*` under the temp folder) is removed when the run or the warm helper stops, also on
