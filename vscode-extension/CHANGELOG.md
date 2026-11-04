@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The bundled CLI no longer leaves a `wingman-visual-before-*` folder in the temp folder when a visual run is stopped mid-run. Details in the repository changelog.
 - Requirement IDs: `@spec` markers may name a requirement by its `ID:` line (e.g. `@spec BILLING-7KQ3`) or its slug, in any case, and **Go to Requirement ID** opens a requirement by ID. The Requirements view shows each requirement's last recorded test result, and a `Verify:` line counts as verified without a test. Details in the repository changelog.
 - Hover on the name of a function without a `@spec` marker: **Used by** lists the requirements whose marked functions call it (up to 4 calls up, through the language server's call hierarchy, test callers not counted), each with the call chain and links. Asked only on hover and cached until a file changes; nothing is shown when no requirement reaches it or the language has no call hierarchy.
 - The Branch Review page and the `Open Branch Review` command are removed, with its traceability tree node. Removed settings: `wingmanSpec.branchReviewBase`, `wingmanSpec.branchReviewGit`.

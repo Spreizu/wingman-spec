@@ -44,22 +44,32 @@ function cfgOf(c) {
 
 function loadReport(f) { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return null; } }
 
-/** The "before" from a temporary git worktree of HEAD, when the task's own pre-task capture is missing. */
+/** The "before" from a temporary git worktree of HEAD, when the task's own pre-task capture is missing. Its folder (named after
+ * this process) goes on any exit, a signal included; one a killed process left behind goes at the next capture at HEAD. */
 async function captureAtHead(codeRoot, items, cfg, outDir, shared) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wingman-visual-before-'));
+  for (const f of fs.readdirSync(os.tmpdir())) {
+    const m = /^wingman-visual-before-(\d+)-/.exec(f);
+    if (m) try { process.kill(+m[1], 0); } catch (e) { if (e.code === 'ESRCH') dropBefore(path.join(os.tmpdir(), f), codeRoot); }  // its process is gone
+  }
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), `wingman-visual-before-${process.pid}-`)); BEFORES.set(tmp, codeRoot);
   const wt = path.join(tmp, 'tree');
-  const add = spawnSync('git', ['worktree', 'add', '--detach', '--quiet', wt, 'HEAD'], { cwd: codeRoot, encoding: 'utf8' });
-  if (add.status !== 0) { fs.rmSync(tmp, { recursive: true, force: true }); return { rep: null, note: `no git worktree of HEAD (${(add.stderr || '').trim().split('\n')[0] || 'not a git repository'})` }; }
   try {
+    const add = spawnSync('git', ['worktree', 'add', '--detach', '--quiet', wt, 'HEAD'], { cwd: codeRoot, encoding: 'utf8' });
+    if (add.status !== 0) return { rep: null, note: `no git worktree of HEAD (${(add.stderr || '').trim().split('\n')[0] || 'not a git repository'})` };
     const nm = path.join(codeRoot, 'node_modules'); if (fs.existsSync(nm) && !fs.existsSync(path.join(wt, 'node_modules'))) fs.symlinkSync(fs.realpathSync(nm), path.join(wt, 'node_modules'));
     const rep = await VC.run({ codeRoot: wt, outDir, config: cfg, items, before: true, shared });
     return { rep, note: 'temporary git worktree of HEAD (uncommitted work of earlier tasks counts as changed)' };
-  } finally {
-    spawnSync('git', ['worktree', 'remove', '--force', wt], { cwd: codeRoot });
-    spawnSync('git', ['worktree', 'prune'], { cwd: codeRoot });
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
+  } finally { dropBefore(tmp, codeRoot); }
 }
+const BEFORES = new Map();  // this process's before folders -> code root
+/** Removes a before folder and, with `git worktree prune`, its worktree's record in the code root. */
+function dropBefore(tmp, codeRoot) {
+  BEFORES.delete(tmp); fs.rmSync(tmp, { recursive: true, force: true });
+  spawnSync('git', ['worktree', 'prune'], { cwd: codeRoot, stdio: 'ignore' });
+}
+let warmSock = null;  // the warm helper's socket, removed on a signal
+for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { try { if (warmSock) fs.unlinkSync(warmSock); } catch (e) { /* gone */ } process.exit(1); });
+process.on('exit', () => { for (const [tmp, root] of BEFORES) dropBefore(tmp, root); });  // (visual-check's 'exit' stops a running app server)
 
 async function capture(j, warm) {
   const rep = await VC.run({ codeRoot: j.code_root, outDir: j.out_dir, config: cfgOf(j.config), items: j.items, before: true, shared: warm });
@@ -198,7 +208,7 @@ async function startWarm(sock, job) {
 /** The warm helper: Playwright loaded, one Chromium running, one job at a time. */
 async function serveWarm(sock, codeRoot, browsersPath) {
   process.title = `wingman-visual-warm ${codeRoot}`;  // ps names the project
-  for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { try { fs.unlinkSync(sock); } catch (e) { /* gone */ } process.exit(1); });  // 'exit' stops a running app server
+  warmSock = sock;
   const srv = net.createServer();
   const listen = () => new Promise((resolve, reject) => { srv.once('error', reject); srv.listen(sock, () => { srv.removeListener('error', reject); resolve(); }); });
   try { await listen(); } catch (e) {  // listen first, so a second caller finds this helper while it warms up

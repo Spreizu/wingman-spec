@@ -4,6 +4,10 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
 ## Unreleased
 
+- **No leftover before folders.** A visual run's capture at HEAD (a temporary git worktree in
+  `wingman-visual-before-<pid>-*` under the temp folder) is removed when the run or the warm helper stops, also on
+  SIGTERM, SIGINT or SIGHUP and when the helper exits idle or after its code root is deleted. A folder whose process was
+  killed outright goes at the next capture at HEAD; one of a running process is kept.
 - **Docs: trace and anchors.** The README and the reference explain the two links (trace: specs to tests; anchors:
   specs to code) and document IDs, renames, `Verify:`, test results, overlap and `finish --affected`. `/spec-propose`,
   `/spec-fix` and `/spec-garden` run `lint --fix` (it writes the `ID:` lines), and `/spec-garden` handles the new gaps.

@@ -1740,24 +1740,45 @@ var require_wingman_visual = __commonJS({
       }
     }
     async function captureAtHead(codeRoot, items, cfg, outDir, shared) {
-      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "wingman-visual-before-"));
-      const wt = path.join(tmp, "tree");
-      const add = spawnSync("git", ["worktree", "add", "--detach", "--quiet", wt, "HEAD"], { cwd: codeRoot, encoding: "utf8" });
-      if (add.status !== 0) {
-        fs.rmSync(tmp, { recursive: true, force: true });
-        return { rep: null, note: `no git worktree of HEAD (${(add.stderr || "").trim().split("\n")[0] || "not a git repository"})` };
+      for (const f of fs.readdirSync(os.tmpdir())) {
+        const m = /^wingman-visual-before-(\d+)-/.exec(f);
+        if (m) try {
+          process.kill(+m[1], 0);
+        } catch (e) {
+          if (e.code === "ESRCH") dropBefore(path.join(os.tmpdir(), f), codeRoot);
+        }
       }
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), `wingman-visual-before-${process.pid}-`));
+      BEFORES.set(tmp, codeRoot);
+      const wt = path.join(tmp, "tree");
       try {
+        const add = spawnSync("git", ["worktree", "add", "--detach", "--quiet", wt, "HEAD"], { cwd: codeRoot, encoding: "utf8" });
+        if (add.status !== 0) return { rep: null, note: `no git worktree of HEAD (${(add.stderr || "").trim().split("\n")[0] || "not a git repository"})` };
         const nm = path.join(codeRoot, "node_modules");
         if (fs.existsSync(nm) && !fs.existsSync(path.join(wt, "node_modules"))) fs.symlinkSync(fs.realpathSync(nm), path.join(wt, "node_modules"));
         const rep = await VC.run({ codeRoot: wt, outDir, config: cfg, items, before: true, shared });
         return { rep, note: "temporary git worktree of HEAD (uncommitted work of earlier tasks counts as changed)" };
       } finally {
-        spawnSync("git", ["worktree", "remove", "--force", wt], { cwd: codeRoot });
-        spawnSync("git", ["worktree", "prune"], { cwd: codeRoot });
-        fs.rmSync(tmp, { recursive: true, force: true });
+        dropBefore(tmp, codeRoot);
       }
     }
+    var BEFORES = /* @__PURE__ */ new Map();
+    function dropBefore(tmp, codeRoot) {
+      BEFORES.delete(tmp);
+      fs.rmSync(tmp, { recursive: true, force: true });
+      spawnSync("git", ["worktree", "prune"], { cwd: codeRoot, stdio: "ignore" });
+    }
+    var warmSock = null;
+    for (const s of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(s, () => {
+      try {
+        if (warmSock) fs.unlinkSync(warmSock);
+      } catch (e) {
+      }
+      process.exit(1);
+    });
+    process.on("exit", () => {
+      for (const [tmp, root] of BEFORES) dropBefore(tmp, root);
+    });
     async function capture(j, warm) {
       const rep = await VC.run({ codeRoot: j.code_root, outDir: j.out_dir, config: cfgOf(j.config), items: j.items, before: true, shared: warm });
       return { dir: j.out_dir, report: path.join(j.out_dir, "report.json"), source: "pre-task tree (next)", seconds: rep.seconds, ok: rep.ran, skipped: rep.skipped, server: rep.defects.filter((d) => d.code.startsWith("server:")).map((d) => d.code) };
@@ -1947,13 +1968,7 @@ var require_wingman_visual = __commonJS({
     }
     async function serveWarm(sock, codeRoot, browsersPath) {
       process.title = `wingman-visual-warm ${codeRoot}`;
-      for (const s of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(s, () => {
-        try {
-          fs.unlinkSync(sock);
-        } catch (e) {
-        }
-        process.exit(1);
-      });
+      warmSock = sock;
       const srv = net.createServer();
       const listen = () => new Promise((resolve, reject) => {
         srv.once("error", reject);

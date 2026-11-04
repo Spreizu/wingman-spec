@@ -4,7 +4,7 @@
 # a changed test or Markdown file does not matter, a changed page does) and visual.scope: task (a task is checked against its own
 # scenarios; the change's other scenarios and the specs it does not change are checked at `finish`, against HEAD), and the warm
 # helper (the next visual run is served by it with the same report; WINGMAN_SPEC_VISUAL_WARM=off; a stopped helper; its code root
-# deleted mid-run: it ends within 10 s with its Chromium and app server).
+# deleted mid-run: it ends within 10 s with its Chromium and app server; a run killed mid-run leaves no before folder).
 # Needs the wingman-spec binary (tests/lib/ws.sh) and node; Playwright + axe-core (PLAYWRIGHT_NODE_MODULES) for the browser part. Usage: tests/visual-cache.sh
 set -uo pipefail
 PKG="$(cd "$(dirname "$0")/.." && pwd)"
@@ -137,6 +137,29 @@ JS
   expect "the code root deleted mid-run: the helper ends within 10 s, with its Chromium and app server" '[ -z "$(left)" ] && [ "$gone" -le 12 ]'
   expect "and the run fails, naming the deleted code root" '[ "$(cat "$T/g.rc")" != 0 ] && grep -q "is gone" "$T/g.out"'
   kill $(left) 2>/dev/null || true
+
+  echo "== a killed run leaves no before folder (its capture at HEAD in a temporary git worktree)"
+  K="$T/kill"; cp -a "$(pwd -P)" "$K"; K="$(cd "$K" && pwd -P)"
+  ( cd "$K" && WINGMAN_SPEC_NO_CACHE=1 $V visual demo >/dev/null 2>&1 ); for _ in $(seq 50); do pgrep -f "^wingman-visual-warm $K\$" >/dev/null && break; sleep 0.1; done
+  sed -i -e 's/^  command: .*/  command: sleep 298/' -e 's/^  ready_timeout: 20$/  ready_timeout: 40/' "$K/$WCFG"; ( cd "$K" && cfg $'  baseline: on\n' )
+  bdirs() { ls -d "$WTMP"/wingman-visual-before-* 2>/dev/null; }
+  owner() { bdirs | sed -E 's/.*before-([0-9]+)-.*/\1/' | grep -vx "$$" | grep -vx "${1:-x}" | head -1; }  # the pid a before folder names
+  until_up() { local _; for _ in $(seq 150); do [ -n "$(pgrep -fx 'sleep 298')" ] && [ -n "$(owner "$@")" ] && return; sleep 0.1; done; }
+  dies() { local _; for _ in $(seq 100); do kill -0 "$1" 2>/dev/null || return 0; sleep 0.1; done; return 1; }
+  ( cd "$K" && WINGMAN_SPEC_NO_CACHE=1 $V visual demo >/dev/null 2>&1 ) & until_up; P="$(owner)"
+  expect "a run in the warm helper captures at HEAD in a before folder named after it (setup)" '[ -n "$P" ] && ps -o args= -p "$P" | grep -q wingman-visual-warm'
+  kill -TERM "$P"; dies "$P"; until_up "$P"; Q="$(owner "$P")"
+  expect "the warm helper stopped mid-run (SIGTERM): its before folder is gone" '! ls -d "$WTMP"/wingman-visual-before-"$P"-* >/dev/null 2>&1'
+  kill -INT "$Q" 2>/dev/null; dies "$Q"; S="$(pgrep -fx 'sleep 298')"; pkill -fx 'sleep 298'; wait  # (a run left waiting fails then)
+  expect "the caller that took the run over, stopped (SIGINT): no before folder, no app server" '[ -n "$Q" ] && [ -z "$(bdirs)" ] && [ -z "$S" ]'
+  ( cd "$K" && WINGMAN_SPEC_VISUAL_WARM=off WINGMAN_SPEC_NO_CACHE=1 $V visual demo >/dev/null 2>&1 ) & until_up; P="$(owner)"
+  kill -KILL "$P"; dies "$P"; pkill -fx 'sleep 298'; wait; mkdir "$WTMP/wingman-visual-before-$$-live"
+  expect "a run killed outright (SIGKILL) leaves its folder (setup)" '[ -n "$P" ] && ls -d "$WTMP"/wingman-visual-before-"$P"-* >/dev/null 2>&1'
+  ( cd "$K" && WINGMAN_SPEC_VISUAL_WARM=off WINGMAN_SPEC_NO_CACHE=1 $V visual demo >/dev/null 2>&1 ) & until_up "$P"; Q="$(owner "$P")"
+  expect "the next capture at HEAD removes the folder of the dead process, not one of a live process" '! ls -d "$WTMP"/wingman-visual-before-"$P"-* >/dev/null 2>&1 && [ -d "$WTMP/wingman-visual-before-$$-live" ]'
+  kill -TERM "$Q" 2>/dev/null; dies "$Q"; pkill -fx 'sleep 298'; wait; rmdir "$WTMP/wingman-visual-before-$$-live"
+  expect "a run stopped with SIGTERM: no before folder, and git lists no leftover worktree" '[ -z "$(bdirs)" ] && [ "$(git -C "$K" worktree list | wc -l | tr -d " ")" = 1 ]'
+  pkill -f "wingman-visual.* $K( |\$)" 2>/dev/null || true
 
   echo "== a release binary: the helper embedded in the CLI"
   mkdir -p "$T/rel/bin"; cp "$WS" "$T/rel/bin/wingman-spec"; rm -rf .wingman-spec/bin
