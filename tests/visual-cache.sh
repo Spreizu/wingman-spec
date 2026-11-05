@@ -56,6 +56,14 @@ if [ -d "$PWM/playwright" ] && [ -d "$PWM/axe-core" ]; then
   expect "a clean page passes and the pass is stored (1 cache file)" '[ $rc = 0 ] && [ "$(cached)" = 1 ] && [ "$(hits)" = 0 ]'
   vrun visual demo --changed-only
   expect "the identical run is not repeated: the report says so" '[ $rc = 0 ] && [ "$(hits)" = 1 ]'
+  sed -i 's/- \*\*WHEN\*\* the page is opened/- **WHEN** the page is opened quietly/' .wingman-spec/changes/demo/specs/gallery.md
+  vrun visual demo --changed-only
+  expect "a WHEN line edit does not repeat a passing run" '[ $rc = 0 ] && [ "$(hits)" = 1 ]'
+  git checkout -q -- .wingman-spec/changes/demo/specs/gallery.md
+  sed -i 's/^key: \[data-testid="grid"\]$/key: [data-testid="grid"]\nexpect: [data-testid="missing"] display = block/' .wingman-spec/changes/demo/specs/gallery.md
+  vrun visual demo --changed-only
+  expect "an expect edit misses the cache" '[ "$(hits)" = 0 ]'
+  git checkout -q -- .wingman-spec/changes/demo/specs/gallery.md
   echo "a test" > page.test.js; echo "notes" > NOTES.md; mkdir -p tests; echo "x" > tests/a.js
   vrun visual demo --changed-only
   expect "a new test file, a Markdown file and a tests/ file do not matter: still not repeated" '[ $rc = 0 ] && [ "$(hits)" = 1 ]'

@@ -24,23 +24,10 @@ var require_design_contract = __commonJS({
     var fs = __require("fs");
     var path = __require("path");
     var SOURCES = ["token", "component", "framework", "arbitrary"];
-    function vpMatch(f, vw) {
-      if (!f) return true;
-      const n = f.nums[0];
-      switch (f.op) {
-        case "<":
-          return vw < n;
-        case "<=":
-          return vw <= n;
-        case ">":
-          return vw > n;
-        case ">=":
-          return vw >= n;
-        default:
-          return f.nums.includes(vw);
-      }
+    function widthsOk(x, vw) {
+      return !x.vps || (x.widths || []).includes(vw);
     }
-    var expectSelectors = (x) => x.error ? [] : x.kind === "rel" ? [x.sel, x.other] : [x.sel];
+    var selsOf = (x) => x.selectors || [];
     var tokenRefs = (x) => [x.value].filter((v) => v && /^token:/.test(v)).map((v) => v.slice(6));
     function pageExpect(arg) {
       const vw = window.innerWidth;
@@ -365,10 +352,23 @@ var require_design_contract = __commonJS({
     function discover(codeRoot) {
       const ds = { tokens: [], components: [], sources: [], tailwind: null, ui_library: [] };
       const rel = (f) => path.relative(codeRoot, f);
+      const seen = /* @__PURE__ */ new Set();
       const add = (name, value, file, kind) => {
-        if (!ds.tokens.some((t) => t.name === name && t.file === file)) ds.tokens.push({ name, value: String(value).trim(), norm: normValue(value), file, kind, utilities: kind === "tailwind-theme" ? utilitiesFor(name) : [] });
+        const id = `${name}\0${file}`;
+        if (seen.has(id)) return;
+        seen.add(id);
+        ds.tokens.push({ name, value: String(value).trim(), norm: normValue(value), file, kind, utilities: kind === "tailwind-theme" ? utilitiesFor(name) : [] });
       };
-      for (const f of walk(codeRoot, (p) => /\.(css|scss|sass|less|pcss)$/.test(p) && !/\.(min)\.css$/.test(p))) {
+      const css = [], jsons = [], tws = [], uis = [], comps = [];
+      for (const f of walk(codeRoot, () => true, 1e6)) {
+        const relp = path.relative(codeRoot, f);
+        if (/\.(css|scss|sass|less|pcss)$/.test(f) && !/\.min\.css$/.test(f)) css.push(f);
+        if (/(^|[\\/])(tokens?|design-tokens)([\\/].*)?\.json$|\.tokens\.json$/.test(f) && !/package(-lock)?\.json$/.test(f)) jsons.push(f);
+        if (/(^|[\\/])tailwind\.config\.(js|cjs|mjs|ts)$/.test(f)) tws.push(f);
+        if (/(^|[\\/])(app\.config\.(ts|js|mjs)|components\.json)$/.test(f)) uis.push(f);
+        if (/\.(vue|tsx|jsx|svelte)$/.test(f) && /(^|[\\/])(components|ui|design-system|lib[\\/]components)([\\/]|$)/.test(relp) && !/\.(test|spec|stories)\./.test(f)) comps.push(f);
+      }
+      for (const f of css) {
         const text = fs.readFileSync(f, "utf8");
         let any = false;
         const theme = [...text.matchAll(/@theme(?:\s+[a-z]+)?\s*\{([^}]*)\}/g)].map((m) => [m.index, m.index + m[0].length]);
@@ -380,7 +380,7 @@ var require_design_contract = __commonJS({
         if (/@import\s+["']tailwindcss["']|@tailwind\s+base/.test(text)) ds.tailwind = ds.tailwind || { version: /@import\s+["']tailwindcss/.test(text) ? 4 : 3, entry: rel(f) };
         if (any) ds.sources.push({ kind: theme.length ? "tailwind @theme / css variables" : "css variables", file: rel(f) });
       }
-      for (const f of walk(codeRoot, (p) => /(^|[\\/])(tokens?|design-tokens)([\\/].*)?\.json$|\.tokens\.json$/.test(p) && !/package(-lock)?\.json$/.test(p))) {
+      for (const f of jsons) {
         let j;
         try {
           j = JSON.parse(fs.readFileSync(f, "utf8"));
@@ -399,22 +399,21 @@ var require_design_contract = __commonJS({
         visit(j, []);
         ds.sources.push({ kind: "design tokens (json)", file: rel(f) });
       }
-      for (const f of walk(codeRoot, (p) => /(^|[\\/])tailwind\.config\.(js|cjs|mjs|ts)$/.test(p))) {
+      for (const f of tws) {
         const text = fs.readFileSync(f, "utf8");
         ds.tailwind = ds.tailwind || { version: 3, entry: rel(f) };
         for (const m of text.matchAll(/['"]?([a-zA-Z][\w-]*)['"]?\s*:\s*['"](#[0-9a-fA-F]{3,8}|-?[\d.]+(?:px|rem))['"]/g)) add(`tw-${m[1]}`, m[2], rel(f), "tailwind-config");
         if (/presets\s*:/.test(text)) ds.sources.push({ kind: "tailwind preset (see config)", file: rel(f) });
         ds.sources.push({ kind: "tailwind config", file: rel(f) });
       }
-      for (const f of walk(codeRoot, (p) => /(^|[\\/])(app\.config\.(ts|js|mjs)|components\.json)$/.test(p))) {
+      for (const f of uis) {
         const text = fs.readFileSync(f, "utf8");
         if (/app\.config/.test(f)) {
           for (const m of text.matchAll(/(primary|secondary|neutral|success|info|warning|error)\s*:\s*['"]([\w-]+)['"]/g)) add(`ui-${m[1]}`, m[2], rel(f), "ui-library");
           ds.ui_library.push({ name: "nuxt-ui (app.config)", file: rel(f) });
         } else if (/"aliases"|"tailwind"/.test(text)) ds.ui_library.push({ name: "shadcn (components.json)", file: rel(f) });
       }
-      const compDir = /(^|[\\/])(components|ui|design-system|lib[\\/]components)([\\/]|$)/;
-      for (const f of walk(codeRoot, (p) => /\.(vue|tsx|jsx|svelte)$/.test(p) && compDir.test(path.relative(codeRoot, p)) && !/\.(test|spec|stories)\./.test(p))) {
+      for (const f of comps) {
         const text = fs.readFileSync(f, "utf8");
         const props = {};
         const set = (k, typ) => {
@@ -512,7 +511,7 @@ var require_design_contract = __commonJS({
           P(s, "error", `${at}: ${x.error}`);
           continue;
         }
-        if (x.vps && !s.viewports.some((v) => vpMatch(x.vps, v))) P(s, "error", `${at}: expect "${x.raw}" matches none of the scenario's viewports (${s.viewports.join(", ")})`);
+        if (x.vps && !(x.widths && x.widths.length)) P(s, "error", `${at}: expect "${x.raw}" matches none of the scenario's viewports (${s.viewports.join(", ")})`);
         for (const t of tokenRefs(x)) if (!tokenNames.has(t.replace(/^--/, ""))) P(s, "error", `${at}: expect "${x.raw}" names token:${t}, but the project defines no --${t.replace(/^--/, "")} (known: ${[...tokenNames].slice(0, 12).join(", ")}${tokenNames.size > 12 ? ", ..." : ""}); run \`wingman-spec design-system\``);
         if (x.value && !/^token:/.test(x.value)) {
           const n = normValue(x.value);
@@ -529,7 +528,7 @@ var require_design_contract = __commonJS({
       if (!map.rows.length) P(null, "error", `${mf}: no map rows (a table with Region/element | Selector | Implemented with | Source columns)`);
       const mapped = new Set(map.rows.map((r) => normSel(r.selector)));
       for (const s of referenced) {
-        const sels = [...new Set([...s.keys, ...s.states.flatMap((x) => x.keys), ...(s.expects || []).flatMap(expectSelectors)].map(normSel))];
+        const sels = [...new Set([...s.keys, ...s.states.flatMap((x) => x.keys), ...(s.expects || []).flatMap(selsOf)].map(normSel))];
         for (const sel of sels) if (!mapped.has(sel)) P(s, "error", `${rel(s.file)}:${s.line}: ${sel} (scenario ${s.id} has a design reference) has no row in ${mf}: add the region with what implements it and its source`);
       }
       const gapText = map.gaps.join("\n").toLowerCase();
@@ -552,7 +551,7 @@ var require_design_contract = __commonJS({
           const miss = TYPO.filter((p) => !props.has(p));
           if (miss.length) P(null, "error", `${mf}:${r.line}: text element "${name}" has no ${miss.join(", ")} in its Expect column; read ${miss.length > 1 ? "them" : "it"} from the design and write e.g. "${miss.map((p) => `${p} ~ ${TYPO_EX[p]}`).join("; ")}" (a token when the project has one, else the literal design value)`);
         }
-        const mine = specExp.filter((x) => expectSelectors(x).map(normSel).includes(sel));
+        const mine = specExp.filter((x) => selsOf(x).map(normSel).includes(sel));
         if (!mine.length) {
           P(null, "error", `${mf}:${r.line}: "${name}" (${sel}) has no expect: line in the specs; turn its Expect column into expect: lines of the visual scenario that shows it${facts.length ? "" : " (and give the row Expect facts: typography, colour, spacing or a relation)"}`);
           continue;
@@ -621,7 +620,7 @@ var require_design_contract = __commonJS({
     }
     function pickReference(refs, vw) {
       if (!refs || !refs.length) return null;
-      return refs.find((r) => r.vps && vpMatch(r.vps, vw)) || refs.find((r) => !r.vps && new RegExp(`(^|[^0-9])${vw}([^0-9]|$)`).test(path.basename(r.path))) || refs.find((r) => !r.vps) || null;
+      return refs.find((r) => r.widths && r.widths.includes(vw)) || refs.find((r) => !r.vps && new RegExp(`(^|[^0-9])${vw}([^0-9]|$)`).test(path.basename(r.path))) || refs.find((r) => !r.vps) || null;
     }
     async function sideBySide(browser, o) {
       const b64 = (f) => `data:image/png;base64,${fs.readFileSync(f).toString("base64")}`;
@@ -642,7 +641,7 @@ var require_design_contract = __commonJS({
         await ctx.close();
       }
     }
-    module.exports = { expectSelectors, vpMatch, pageExpect, discover, formatDesignSystem, readDesignMap, lintDesign, tokenLint, pickReference, sideBySide };
+    module.exports = { widthsOk, selsOf, pageExpect, discover, formatDesignSystem, readDesignMap, lintDesign, tokenLint, pickReference, sideBySide };
   }
 });
 
@@ -673,17 +672,6 @@ var require_roles = __commonJS({
       return path.join(dir, `${name}.json`);
     }
     var LOGIN_MS = 15e3;
-    var envBase = (name) => `WINGMAN_ROLE_${name.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
-    var envNames = (name, role) => ({ user: role && role.user_env || `${envBase(name)}_USER`, password: role && role.password_env || `${envBase(name)}_PASSWORD` });
-    function parseHeaders(v) {
-      const list = [];
-      for (const part of String(v).split(",").map((x) => x.trim()).filter(Boolean)) {
-        const m = part.match(/^([A-Za-z0-9-]+)\s*=\s*([A-Za-z_][A-Za-z0-9_]*)$/);
-        if (!m) return { error: `expected "Header-Name=ENV_VAR", got "${part.replace(/=.*/, "=...")}"` };
-        list.push({ name: m[1], env: m[2] });
-      }
-      return { list };
-    }
     function readLocalSecrets(codeRoot) {
       const f = path.join(codeRoot, LOCAL_FILE);
       const out = {};
@@ -711,8 +699,8 @@ var require_roles = __commonJS({
       const env = process.env;
       if (role.storage_state) return { via: "storage_state", missing: [] };
       if (role.login_command) return { via: "login_command", missing: [] };
-      if (!role.login && role.headers_env) return { via: "headers", missing: [] };
-      const names = envNames(name, role);
+      if (!role.login && role.headers && role.headers.length) return { via: "headers", missing: [] };
+      const names = { user: role.user_env, password: role.password_env };
       const local = readLocalSecrets(codeRoot)[name] || {};
       const user = env[names.user] || local.user;
       const password = env[names.password] || local.password;
@@ -731,8 +719,8 @@ var require_roles = __commonJS({
           return { role: r.name, via: "storage_state", file: r.storage_state, ready: fs.existsSync(f), missing: fs.existsSync(f) ? [] : [`file ${r.storage_state}`] };
         }
         if (c.via === "login_command") return { role: r.name, via: "login_command", ready: true, missing: [] };
-        if (r.headers_env) {
-          const miss = parseHeaders(r.headers_env).list.filter((h) => !env[h.env]).map((h) => `env ${h.env}`);
+        if (r.headers && r.headers.length) {
+          const miss = r.headers.filter((h) => !env[h.env]).map((h) => `env ${h.env}`);
           if (c.via === "headers" || miss.length) return { role: r.name, via: c.via === "headers" ? "headers" : "login+headers", ready: !miss.length, missing: miss };
         }
         return { role: r.name, via: "login", login: r.login, ready: !c.missing.length, source: c.source, missing: c.missing.map((n) => `env ${n} (or ${LOCAL_FILE})`) };
@@ -743,7 +731,7 @@ var require_roles = __commonJS({
     async function login(browser, name, role, o) {
       const env = process.env;
       const c = credentials(name, role, o.codeRoot);
-      const hdr = role.headers_env ? parseHeaders(role.headers_env).list : [];
+      const hdr = role.headers || [];
       const missingH = hdr.filter((h) => !env[h.env]).map((h) => h.env);
       if (missingH.length) return { ok: false, code: "role:no-credentials", error: `role ${name}: set the env var${missingH.length > 1 ? "s" : ""} ${missingH.join(", ")} (header values come from the environment). Nothing gated by this role was verified.` };
       const headers = Object.fromEntries(hdr.map((h) => [h.name, env[h.env]]));
@@ -835,12 +823,6 @@ var require_visual_check = __commonJS({
     var https = __require("https");
     var { spawn } = __require("child_process");
     var IGNORE_HTTP_CODES = ["runtime:http-error", "runtime:request-failed", "runtime:console-error", "content:broken-image"];
-    var slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "scenario";
-    function resolveReferences(s, changeDir, root) {
-      const bases = [changeDir, root, process.env.WINGMAN_CODE_ROOT, path.dirname(s.file)].filter(Boolean);
-      const abs = (ref) => ref && bases.map((b) => path.resolve(b, ref)).find((p) => fs.existsSync(p)) || null;
-      return (s.references || []).filter((r) => !r.error).map((r) => ({ ...r, abs: abs(r.path) }));
-    }
     function resolveFrom(name, codeRoot) {
       for (const p of [codeRoot, __dirname]) {
         try {
@@ -942,9 +924,20 @@ var require_visual_check = __commonJS({
         throw err;
       }
     }
+    var axeMemo = null;
     function axeSource(codeRoot, pwFrom) {
-      const p = resolveFrom("axe-core/axe.min.js", codeRoot) || pwFrom && resolveFrom("axe-core/axe.min.js", path.dirname(pwFrom));
-      return p ? fs.readFileSync(p, "utf8") : null;
+      const key = `${codeRoot}\0${pwFrom || ""}`;
+      if (axeMemo && axeMemo.key === key) return axeMemo.text;
+      const file = resolveFrom("axe-core/axe.min.js", codeRoot) || pwFrom && resolveFrom("axe-core/axe.min.js", path.dirname(pwFrom)) || "";
+      const text = file ? fs.readFileSync(file, "utf8") : null;
+      axeMemo = { key, file, text };
+      return text;
+    }
+    function axeInit() {
+      if (!axeMemo || !axeMemo.text) return null;
+      const tmp = __require("os").tmpdir();
+      if (axeMemo.file === tmp || axeMemo.file.startsWith(tmp + path.sep)) return { content: axeMemo.text };
+      return { path: axeMemo.file };
     }
     function probe(url, timeoutMs = 1500, ignoreHttps = true) {
       return new Promise((resolve) => {
@@ -1120,6 +1113,79 @@ var require_visual_check = __commonJS({
       }
       return res;
     }
+    var serverKey = (c, codeRoot, tree) => [c.command || "", c.url || "", String(c.port || ""), codeRoot || "", tree || ""].join("\0");
+    function warmHeldPids(port, codeRoot) {
+      let text = "";
+      try {
+        text = __require("child_process").execSync(`lsof -nP -iTCP:${port} -sTCP:LISTEN -t`, { encoding: "utf8" });
+      } catch (e) {
+        return [];
+      }
+      const out = [];
+      for (const pid of [...new Set(text.split(/\s+/).map((s) => +s).filter(Boolean))]) {
+        let p = pid;
+        const seen = /* @__PURE__ */ new Set();
+        let held = false;
+        while (p > 1 && !seen.has(p)) {
+          seen.add(p);
+          let args = "";
+          let ppid = 0;
+          try {
+            args = __require("child_process").execSync(`ps -o args= -p ${p}`, { encoding: "utf8" });
+          } catch (e) {
+            break;
+          }
+          if (/wingman-visual-warm/.test(args) && args.includes(codeRoot)) {
+            held = true;
+            break;
+          }
+          try {
+            ppid = +__require("child_process").execSync(`ps -o ppid= -p ${p}`, { encoding: "utf8" });
+          } catch (e) {
+            break;
+          }
+          p = ppid;
+        }
+        if (held) out.push(pid);
+      }
+      return out;
+    }
+    async function releaseWarmHeld(c, codeRoot) {
+      let port = +c.port;
+      if (!port) {
+        try {
+          port = +new URL(c.url).port;
+        } catch (e) {
+          port = 0;
+        }
+      }
+      if (!port || !codeRoot) return false;
+      const pids = warmHeldPids(port, codeRoot);
+      if (!pids.length) return false;
+      for (const pid of pids) {
+        try {
+          process.kill(-pid, "SIGTERM");
+        } catch (e) {
+          try {
+            process.kill(pid, "SIGTERM");
+          } catch (e2) {
+          }
+        }
+      }
+      for (let i = 0; i < 50 && await probe(c.url, 300, c.ignore_https_errors) !== null; i++) await sleep(20);
+      for (const pid of pids) {
+        try {
+          process.kill(-pid, "SIGKILL");
+        } catch (e) {
+          try {
+            process.kill(pid, "SIGKILL");
+          } catch (e2) {
+          }
+        }
+      }
+      for (let i = 0; i < 50 && await probe(c.url, 300, c.ignore_https_errors) !== null; i++) await sleep(20);
+      return await probe(c.url, 300, c.ignore_https_errors) === null;
+    }
     async function run(o) {
       const t0 = Date.now();
       const c = o.config;
@@ -1141,30 +1207,54 @@ var require_visual_check = __commonJS({
       fs.mkdirSync(o.outDir, { recursive: true });
       let server = null;
       let browser = null;
+      let release = true;
       const tBoot = Date.now();
+      const key = serverKey(c, o.codeRoot, o.appTree);
+      const hold = o.shared && o.shared.warm && o.codeRoot === o.shared.codeRoot;
+      const held = o.shared && o.shared.server;
+      if (held && held.key !== key) {
+        await held.handle.stop();
+        o.shared.server = null;
+      }
       try {
+        const same = hold && o.shared.server && o.shared.server.key === key && !o.shared.server.handle.exited;
         const pre = await probe(c.url, 1500, c.ignore_https_errors);
-        if (pre !== null && !c.reuse_server) {
-          rep.defects.push(defect("server:port-in-use", null, null, null, `something already answers at ${c.url} (HTTP ${pre}) before the check started its own server. Stop it (the check starts and stops the app itself), or set visual.reuse_server: true if that server always serves the current code.`));
-          return done();
-        }
-        if (pre === null) {
-          server = startServer(c, o.codeRoot, path.join(o.outDir, "server.log"));
-          const until = Date.now() + c.ready_timeout * 1e3;
-          let up = null;
-          while (Date.now() < until && !server.exited) {
-            up = await probe(c.url, 1e3, c.ignore_https_errors);
-            if (up !== null) break;
-            await sleep(50);
+        if (same && pre !== null) {
+          release = false;
+          rep.timings.server_s = 0;
+        } else {
+          if (same) {
+            await o.shared.server.handle.stop();
+            o.shared.server = null;
           }
-          if (up === null) {
-            const why = server.exited ? `the command exited (code ${server.exited.code})` : `nothing answered within ${c.ready_timeout}s`;
-            rep.defects.push(defect("server:not-ready", null, null, null, `the app did not start: \`${c.command}\` -> ${c.url}: ${why}. Last output:
-${server.tail()}`));
+          let busy = pre !== null;
+          if (busy && !c.reuse_server && await releaseWarmHeld(c, o.codeRoot)) busy = false;
+          if (busy && !c.reuse_server) {
+            rep.defects.push(defect("server:port-in-use", null, null, null, `something already answers at ${c.url} (HTTP ${pre}) before the check started its own server. Stop it (the check starts and stops the app itself), or set visual.reuse_server: true if that server always serves the current code.`));
             return done();
           }
+          if (!busy) {
+            server = startServer(c, o.codeRoot, path.join(o.outDir, "server.log"));
+            const until = Date.now() + c.ready_timeout * 1e3;
+            let up = null;
+            while (Date.now() < until && !server.exited) {
+              up = await probe(c.url, 1e3, c.ignore_https_errors);
+              if (up !== null) break;
+              await sleep(50);
+            }
+            if (up === null) {
+              const why = server.exited ? `the command exited (code ${server.exited.code})` : `nothing answered within ${c.ready_timeout}s`;
+              rep.defects.push(defect("server:not-ready", null, null, null, `the app did not start: \`${c.command}\` -> ${c.url}: ${why}. Last output:
+${server.tail()}`));
+              return done();
+            }
+            if (hold) {
+              o.shared.server = { key, handle: server };
+              release = false;
+            }
+          }
+          rep.timings.server_s = (Date.now() - tBoot) / 1e3;
         }
-        rep.timings.server_s = (Date.now() - tBoot) / 1e3;
         if (o.shared && o.shared.browser) {
           browser = o.shared.browser;
           rep.browsers = o.shared.dir || null;
@@ -1211,7 +1301,7 @@ ${server.tail()}`));
       } finally {
         if (browser && !(o.shared && o.shared.browser === browser)) await browser.close().catch(() => {
         });
-        if (server) await server.stop();
+        if (server && release) await server.stop();
       }
       return done();
     }
@@ -1317,9 +1407,9 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
         for (const e of await page.evaluate(DC.pageExpect, { expects: list })) if (!e.ok) add("design:expect", `expect "${e.raw}" failed${note || ""}: ${e.message}`, { selector: e.raw });
       };
       const loadedPage = async (page, vw, add, note) => {
-        const vex = scope.block.filter((x) => DC.vpMatch(x.vps, vw));
+        const vex = scope.block.filter((x) => DC.widthsOk(x, vw));
         if (!vex.length) return;
-        const pres = await present(page, vex.map((x) => DC.expectSelectors(x)));
+        const pres = await present(page, vex.map((x) => DC.selsOf(x)));
         await runExpects(page, vex.filter((x, i) => pres[i]), add, note);
         if (!deferred.has(vw)) deferred.set(vw, new Map(vex.filter((x, i) => !pres[i]).map((x) => [x.raw, { x, matched: false }])));
       };
@@ -1339,7 +1429,7 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
           }
           const ctx = await browser.newContext({ viewport: { width: vw, height: 900 }, reducedMotion: "reduce", deviceScaleFactor: 1, ignoreHTTPSErrors: o.ignoreHttps !== false, ...sess && sess.state ? { storageState: sess.state } : {}, ...sess && sess.headers && Object.keys(sess.headers).length ? { extraHTTPHeaders: sess.headers } : {} });
           ctx.setDefaultTimeout(pageMs);
-          if (axe) await ctx.addInitScript({ content: axe });
+          if (axe) await ctx.addInitScript(axeInit());
           if (reqMs) await ctx.route((u) => /^https?:$/.test(u.protocol), async (route) => {
             if (["document", "websocket", "eventsource"].includes(route.request().resourceType())) return route.fallback();
             try {
@@ -1440,17 +1530,17 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
               if (scope.stepFree.has(st.name)) await loadedPage(page, vw, add);
               else if (deferred.has(vw) && deferred.get(vw).size) {
                 const dl = [...deferred.get(vw).values()];
-                const pres = await present(page, dl.map((d) => DC.expectSelectors(d.x)));
+                const pres = await present(page, dl.map((d) => DC.selsOf(d.x)));
                 const here = dl.filter((d, i) => pres[i]);
                 here.forEach((d) => {
                   d.matched = true;
                 });
                 await runExpects(page, here.map((d) => d.x), add);
               }
-              await runExpects(page, (st.expects || []).filter((x) => !x.error && DC.vpMatch(x.vps, vw)), add);
+              await runExpects(page, (st.expects || []).filter((x) => !x.error && DC.widthsOk(x, vw)), add);
               cap.aria = await ariaOf(page, keys(st));
               if (it.shots && r.area) {
-                const file = path.join(o.outDir, "areas", s.capability, slug(s.scenario || s.id), `${st.name}@${vw}.png`);
+                const file = path.join(o.outDir, "areas", s.capability, s.slug || "scenario", `${st.name}@${vw}.png`);
                 fs.mkdirSync(path.dirname(file), { recursive: true });
                 await page.screenshot({ path: file, fullPage: true, clip: r.area, animations: "disabled", caret: "hide" }).then(() => {
                   cap.shot = file;
@@ -1515,7 +1605,7 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
         if (d.matched) continue;
         const cap = rep.captures[capKey(s.id, scope.probe, vw)];
         if (cap && cap.skipped) continue;
-        const dd = defect("design:expect-unmatched", s.id, scope.probe, vw, `${s.id} [${scope.probe} @ ${vw}px]: expect "${d.x.raw}" checked nothing: its elements (${DC.expectSelectors(d.x).join(", ")}) are on neither the loaded page nor any state of the scenario. Fix the selector, or put the expect under the \`state:\` that shows them`, { role: it.role, selector: d.x.raw });
+        const dd = defect("design:expect-unmatched", s.id, scope.probe, vw, `${s.id} [${scope.probe} @ ${vw}px]: expect "${d.x.raw}" checked nothing: its elements (${DC.selsOf(d.x).join(", ")}) are on neither the loaded page nor any state of the scenario. Fix the selector, or put the expect under the \`state:\` that shows them`, { role: it.role, selector: d.x.raw });
         rep.defects.push(dd);
         if (cap) cap.defects.push(defectKey(dd));
       }
@@ -1576,13 +1666,15 @@ ${[...g].map(([k, n]) => `  ${k}${n > 1 ? ` x${n}` : ""}`).join("\n")}`;
     }
     var QUIET_MS = Math.max(20, Number(process.env.WINGMAN_SPEC_VISUAL_QUIET_MS) || 100);
     async function settle(page, ms, pending) {
-      const t0 = Date.now();
-      let quietSince = pending.size ? 0 : Date.now();
-      while (Date.now() - t0 < ms) {
-        await sleep(20);
-        if (pending.size) quietSince = 0;
-        else if (!quietSince) quietSince = Date.now();
-        else if (Date.now() - quietSince >= QUIET_MS) break;
+      if (pending.size) {
+        const t0 = Date.now();
+        let quietSince = 0;
+        while (Date.now() - t0 < ms) {
+          await sleep(20);
+          if (pending.size) quietSince = 0;
+          else if (!quietSince) quietSince = Date.now();
+          else if (Date.now() - quietSince >= QUIET_MS) break;
+        }
       }
       if (await page.evaluate(settled, MOTION_OFF).then(() => true, () => false)) return;
       await page.evaluate(() => document.fonts ? document.fonts.ready : null).catch(() => {
@@ -1698,7 +1790,6 @@ ${diff.map((x) => "      " + x).join("\n")}
       AXE_TAGS,
       launchChromium,
       launchOptions,
-      resolveReferences,
       loadPlaywright,
       axeSource,
       run,
@@ -1722,15 +1813,7 @@ var require_wingman_visual = __commonJS({
     var DC = require_design_contract();
     var RL = require_roles();
     function cfgOf(c) {
-      const x = { ...c || {} };
-      for (const k of ["ignore", "ignore_http"]) x[k] = x[k] || [];
-      x.roles = x.roles || {};
-      x.ui_files = x.ui_files && x.ui_files.length ? x.ui_files : null;
-      x.command = x.command || null;
-      x.url = x.url || null;
-      x.port = x.port || null;
-      x.browsers_path = x.browsers_path || null;
-      return x;
+      return { ...c || {} };
     }
     function loadReport(f) {
       try {
@@ -1756,7 +1839,7 @@ var require_wingman_visual = __commonJS({
         if (add.status !== 0) return { rep: null, note: `no git worktree of HEAD (${(add.stderr || "").trim().split("\n")[0] || "not a git repository"})` };
         const nm = path.join(codeRoot, "node_modules");
         if (fs.existsSync(nm) && !fs.existsSync(path.join(wt, "node_modules"))) fs.symlinkSync(fs.realpathSync(nm), path.join(wt, "node_modules"));
-        const rep = await VC.run({ codeRoot: wt, outDir, config: cfg, items, before: true, shared });
+        const rep = await VC.run({ codeRoot: wt, outDir, config: cfg, items, before: true, shared, appTree: "head" });
         return { rep, note: "temporary git worktree of HEAD (uncommitted work of earlier tasks counts as changed)" };
       } finally {
         dropBefore(tmp, codeRoot);
@@ -1780,7 +1863,7 @@ var require_wingman_visual = __commonJS({
       for (const [tmp, root] of BEFORES) dropBefore(tmp, root);
     });
     async function capture(j, warm) {
-      const rep = await VC.run({ codeRoot: j.code_root, outDir: j.out_dir, config: cfgOf(j.config), items: j.items, before: true, shared: warm });
+      const rep = await VC.run({ codeRoot: j.code_root, outDir: j.out_dir, config: cfgOf(j.config), items: j.items, before: true, shared: warm, appTree: j.app_tree });
       return { dir: j.out_dir, report: path.join(j.out_dir, "report.json"), source: "pre-task tree (next)", seconds: rep.seconds, ok: rep.ran, skipped: rep.skipped, server: rep.defects.filter((d) => d.code.startsWith("server:")).map((d) => d.code) };
     }
     async function runNow(j, warm) {
@@ -1809,8 +1892,7 @@ var require_wingman_visual = __commonJS({
           visualBefore = { dir: r.rep.out_dir, report: path.join(r.rep.out_dir, "report.json"), source: r.note, seconds: r.rep.seconds, ok: true };
         } else beforeNote = `none: ${r.note || r.rep && (r.rep.skipped || "the app did not start at HEAD")}`;
       }
-      for (const it of items) it.refs = VC.resolveReferences(it.scenario, j.change_dir, j.root);
-      const after = await VC.run({ codeRoot: j.code_root, outDir: j.out_dir, config: cfg, items, shared });
+      const after = await VC.run({ codeRoot: j.code_root, outDir: j.out_dir, config: cfg, items, shared, appTree: j.app_tree });
       const cmp = after.ran ? VC.compare(after, before, { baseline: !!cfg.baseline }) : { defects: after.defects, preexisting: 0, aria_changes: [], pairs: [], baseline: [] };
       if (cmp.baseline && cmp.baseline.length) after.warnings.push(VC.baselineReport(cmp.baseline));
       else if (cfg.baseline && after.ran && !before) after.warnings.push("visual.baseline is on, but there is no capture from before the task: every defect counts");
@@ -1825,21 +1907,41 @@ var require_wingman_visual = __commonJS({
       }
       if (after.ignored && after.ignored.length) after.warnings.push(VC.ignoredReport(after.ignored));
       if (after.notes && after.notes.length) after.warnings.push(VC.skippedStepsReport(after.notes));
-      const out = { ...after, defects: cmp.defects, all_defects: after.defects.length, preexisting: cmp.preexisting, baseline_defects: (cmp.baseline || []).length, aria_changes: cmp.aria_changes, pairs: cmp.pairs, before: beforeNote, before_seconds: beforeSeconds };
-      fs.writeFileSync(path.join(j.out_dir, "report.json"), JSON.stringify(out, null, 2) + "\n");
+      const out = { ...after, defects: cmp.defects, preexisting: cmp.preexisting, baseline_defects: (cmp.baseline || []).length, aria_changes: cmp.aria_changes, pairs: cmp.pairs, before: beforeNote, before_seconds: beforeSeconds };
       out.summary = VC.summarize(out.defects);
       if (out.ignored && out.ignored.length) out.ignored_report = VC.ignoredReport(out.ignored).split("\n").slice(1).map((x) => x.trim());
       if (out.notes && out.notes.length) out.skipped_steps = VC.skippedStepsReport(out.notes).split("\n").slice(1).map((x) => x.trim());
-      delete out.captures;
-      return { report: out, visual_before: visualBefore };
+      fs.writeFileSync(path.join(j.out_dir, "report.json"), JSON.stringify(out, null, 2) + "\n");
+      const aria = (out.aria_changes || []).map(({ in_scope, ...rest }) => rest);
+      const report = {
+        ran: out.ran,
+        skipped: out.skipped,
+        warnings: out.warnings,
+        defect_count: out.defects.length,
+        shots: out.shots,
+        seconds: out.seconds,
+        ignored: out.ignored,
+        preexisting: out.preexisting,
+        aria_changes: aria,
+        pairs: out.pairs,
+        before: out.before,
+        before_seconds: out.before_seconds,
+        summary: out.summary,
+        ignored_report: out.ignored_report,
+        skipped_steps: out.skipped_steps
+      };
+      return { report, visual_before: visualBefore };
     }
-    function tokenLint(j) {
-      const ui = (j.files || []).filter((f) => fs.existsSync(path.join(j.code_root, f)));
-      if (!ui.length) return null;
-      const map = DC.readDesignMap(j.change_dir);
+    function designScan(j) {
       const ds = DC.discover(j.code_root);
-      if (!map && !ds.tokens.length) return null;
-      return { files: ui.length, ...DC.tokenLint(j.code_root, ui, ds, map) };
+      const problems = j.scenarios && j.scenarios.length ? DC.lintDesign(j.scenarios, j.change_dir, j.root, j.code_root, ds) : [];
+      const ui = (j.files || []).filter((f) => fs.existsSync(path.join(j.code_root, f)));
+      let tokens = null;
+      if (ui.length) {
+        const map = DC.readDesignMap(j.change_dir);
+        if (map || ds.tokens.length) tokens = { files: ui.length, ...DC.tokenLint(j.code_root, ui, ds, map) };
+      }
+      return { problems, tokens };
     }
     async function doctor(j) {
       const cfg = cfgOf(j.config);
@@ -1868,10 +1970,11 @@ var require_wingman_visual = __commonJS({
       return { env, problems, warnings, roles: RL.describe(cfg.roles, j.code_root) };
     }
     var OPS = {
-      "design-lint": (j) => ({ problems: DC.lintDesign(j.scenarios, j.change_dir, j.root, j.code_root) }),
+      "design-scan": designScan,
+      "design-lint": (j) => ({ problems: designScan(j).problems }),
       capture,
       run: runNow,
-      "token-lint": tokenLint,
+      "token-lint": (j) => designScan(j).tokens,
       "design-system": (j) => {
         const ds = DC.discover(j.code_root);
         return { system: ds, text: DC.formatDesignSystem(ds) };
@@ -1994,7 +2097,7 @@ var require_wingman_visual = __commonJS({
           return;
         }
       }
-      const warm = {};
+      const warm = { warm: true, codeRoot };
       let busy = false;
       let idle = null;
       let pwStamp = null;
@@ -2016,7 +2119,9 @@ var require_wingman_visual = __commonJS({
       const stop = () => {
         unlink();
         setTimeout(() => process.exit(0), 5e3);
-        Promise.resolve(warm.browser && warm.browser.close()).catch(() => {
+        const app = warm.server ? warm.server.handle.stop() : Promise.resolve();
+        app.catch(() => {
+        }).then(() => warm.browser && warm.browser.close()).catch(() => {
         }).finally(() => process.exit(0));
       };
       const idleMs = (Number(process.env.WINGMAN_SPEC_VISUAL_WARM) || 300) * 1e3;
@@ -2091,6 +2196,7 @@ var require_wingman_visual = __commonJS({
             return;
           }
           c.write('{"taken":true}\n');
+          if (m.job && (m.job.op === "capture" || m.job.op === "run")) m.job.config = { ...m.job.config || {}, reuse_server: true };
           for (const k of Object.keys(process.env)) if (!(k in m.env)) delete process.env[k];
           Object.assign(process.env, m.env);
           try {

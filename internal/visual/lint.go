@@ -52,6 +52,25 @@ func ResolveReference(s *Scenario, ref, changeDir, root, codeRoot string) string
 	return ""
 }
 
+// Bind resolves each item's reference images and annotates the scenarios for the helper.
+func Bind(items []Item, changeDir, root, codeRoot string) {
+	for i := range items {
+		s := items[i].Scenario
+		if s == nil {
+			continue
+		}
+		Annotate(s)
+		refs := []BoundRef{}
+		for _, r := range s.References {
+			if r.Error != "" {
+				continue
+			}
+			refs = append(refs, BoundRef{Path: r.Path, Abs: ResolveReference(s, r.Path, changeDir, root, codeRoot), Crop: r.Crop, Vps: r.Vps, Widths: r.Widths})
+		}
+		items[i].Refs = refs
+	}
+}
+
 var passwordRE = regexp.MustCompile(`(?i)type\s*=\s*["']?password|name\s*=\s*["']?(password|passwd|pass)\b|#(password|passwd)\b`)
 
 // LintScenarios returns the problems a spec author must fix (block syntax, a missing reference image, an unknown role, a password

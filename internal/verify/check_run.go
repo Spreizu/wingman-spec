@@ -220,7 +220,7 @@ func (e *Env) checkVisual(changeDir, run string, st *State, o *outcome) (vis *Ob
 		scen = append(scen, fmt.Sprintf("%s (%s)", it.Scenario.ID, it.Role))
 	}
 	vis = O("dir", outDir, "report", filepath.Join(outDir, "report.json"), "scenarios", scen, "before", rep.Before, "area_images", len(rep.Shots), "aria_changes", len(rep.ARIAChanges),
-		"defects", len(rep.Defects), "preexisting_elsewhere", rep.Preexisting, "seconds", rep.Seconds, "before_seconds", rep.BeforeSeconds, "skipped", If(rep.skipped() != "", rep.skipped()), "warnings", list(rep.Warnings))
+		"defects", rep.nDefects(), "preexisting_elsewhere", rep.Preexisting, "seconds", rep.Seconds, "before_seconds", rep.BeforeSeconds, "skipped", If(rep.skipped() != "", rep.skipped()), "warnings", list(rep.Warnings))
 	o.warn(rep.Warnings...)
 	if rep.skipped() != "" {
 		o.check(O("check", "visual", "ok", !p.cfg.RequirePlaywright, "skipped", rep.skipped(), "seconds", rep.Seconds))
@@ -234,9 +234,9 @@ func (e *Env) checkVisual(changeDir, run string, st *State, o *outcome) (vis *Ob
 		}
 		return vis, "", nil, false
 	}
-	o.check(O("check", "visual", "ok", len(rep.Defects) == 0, "defects", len(rep.Defects), "area_images", len(rep.Shots), "seconds", rep.Seconds, "before_seconds", rep.BeforeSeconds))
-	if len(rep.Defects) > 0 {
-		o.fail(fmt.Sprintf("visual check failed: %d defect(s). Fix each one (report: %s):\n%s", len(rep.Defects), filepath.Join(outDir, "report.json"), strings.Join(rep.Summary, "\n")))
+	o.check(O("check", "visual", "ok", rep.nDefects() == 0, "defects", rep.nDefects(), "area_images", len(rep.Shots), "seconds", rep.Seconds, "before_seconds", rep.BeforeSeconds))
+	if rep.nDefects() > 0 {
+		o.fail(fmt.Sprintf("visual check failed: %d defect(s). Fix each one (report: %s):\n%s", rep.nDefects(), filepath.Join(outDir, "report.json"), strings.Join(rep.Summary, "\n")))
 		return vis, "", nil, true
 	}
 	if len(p.mine) > 0 && p.cfg.Review != "off" && p.cfg.Screenshots != "off" && len(rep.Shots) > 0 {

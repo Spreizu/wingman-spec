@@ -7,15 +7,17 @@
  *   job    { op, ...arguments }                 (config = the CLI's resolved `visual:` section)
  *   answer { ok: true, result } | { ok: false, error }
  * capture and run go to a warm helper (below) when one is up. Progress lines go to stderr. Ops:
- *   design-lint {scenarios, change_dir, root, code_root}    design-map and token findings of a change's scenarios
- *   capture {code_root, out_dir, config, items}             the "before" capture of a task (pre-task tree)
- *   run {code_root, change_dir, root, out_dir, config, items, before, label, run_dir}   capture, compare with before, write report.json
- *   token-lint {code_root, change_dir, files}, design-system {code_root}, doctor {code_root, config}
+ *   design-scan {scenarios, change_dir, root, code_root, files}  design-map findings and the token lint, one walk
+ *   design-lint, token-lint                                   the same lists, one each (wrappers)
+ *   capture {code_root, out_dir, config, items, app_tree}     the "before" capture of a task (pre-task tree)
+ *   run {code_root, change_dir, root, out_dir, config, items, before, label, run_dir, app_tree}   capture, compare, write report.json
+ *   design-system {code_root}, doctor {code_root, config}
  * The CLI parses and lints the ```visual blocks and writes the review prompt itself; this helper drives the browser.
  *
  * Warm helper: after a capture or run, this helper starts `node wingman-visual.cjs --warm` for the code root, detached. It keeps
- * Playwright loaded and one headless Chromium running, listens on a socket in a private temp folder, and takes the next capture
- * or run (with the caller's environment and directory), one at a time, each state still in a fresh browser context. It exits
+ * Playwright loaded, one headless Chromium, and the app server when the next job has the same command, url, port and app tree.
+ * It listens on a socket in a private temp folder and takes the next capture or run (with the caller's environment and directory),
+ * one at a time, each state still in a fresh browser context. A one-shot run still starts and stops its own server. It exits
  * after WINGMAN_SPEC_VISUAL_WARM seconds idle (default 300; `off`: none is started), within 10 s of its code root being deleted
  * (a job running there then fails, and its app server and Chromium stop with the helper), when this file or
  * Playwright changed, or a third code root needs the room. Busy, missing, stale or stopped mid-job: the job runs here as
@@ -32,15 +34,8 @@ const VC = require('./lib/visual-check.cjs');
 const DC = require('./lib/design-contract.cjs');
 const RL = require('./lib/roles.cjs');
 
-/** The CLI's `visual:` section in the shape visual-check.cjs reads (the CLI has already derived url and port from each other). */
-function cfgOf(c) {
-  const x = { ...(c || {}) };
-  for (const k of ['ignore', 'ignore_http']) x[k] = x[k] || [];
-  x.roles = x.roles || {};
-  x.ui_files = x.ui_files && x.ui_files.length ? x.ui_files : null;
-  x.command = x.command || null; x.url = x.url || null; x.port = x.port || null; x.browsers_path = x.browsers_path || null;
-  return x;
-}
+/** The CLI's `visual:` section. Zeros stay zeros: Go already applied the defaults (internal/config/visual.go). */
+function cfgOf(c) { return { ...(c || {}) }; }
 
 function loadReport(f) { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return null; } }
 
@@ -57,7 +52,7 @@ async function captureAtHead(codeRoot, items, cfg, outDir, shared) {
     const add = spawnSync('git', ['worktree', 'add', '--detach', '--quiet', wt, 'HEAD'], { cwd: codeRoot, encoding: 'utf8' });
     if (add.status !== 0) return { rep: null, note: `no git worktree of HEAD (${(add.stderr || '').trim().split('\n')[0] || 'not a git repository'})` };
     const nm = path.join(codeRoot, 'node_modules'); if (fs.existsSync(nm) && !fs.existsSync(path.join(wt, 'node_modules'))) fs.symlinkSync(fs.realpathSync(nm), path.join(wt, 'node_modules'));
-    const rep = await VC.run({ codeRoot: wt, outDir, config: cfg, items, before: true, shared });
+    const rep = await VC.run({ codeRoot: wt, outDir, config: cfg, items, before: true, shared, appTree: 'head' });
     return { rep, note: 'temporary git worktree of HEAD (uncommitted work of earlier tasks counts as changed)' };
   } finally { dropBefore(tmp, codeRoot); }
 }
@@ -72,7 +67,7 @@ for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { try { if 
 process.on('exit', () => { for (const [tmp, root] of BEFORES) dropBefore(tmp, root); });  // (visual-check's 'exit' stops a running app server)
 
 async function capture(j, warm) {
-  const rep = await VC.run({ codeRoot: j.code_root, outDir: j.out_dir, config: cfgOf(j.config), items: j.items, before: true, shared: warm });
+  const rep = await VC.run({ codeRoot: j.code_root, outDir: j.out_dir, config: cfgOf(j.config), items: j.items, before: true, shared: warm, appTree: j.app_tree });
   return { dir: j.out_dir, report: path.join(j.out_dir, 'report.json'), source: 'pre-task tree (next)', seconds: rep.seconds, ok: rep.ran, skipped: rep.skipped, server: rep.defects.filter((d) => d.code.startsWith('server:')).map((d) => d.code) };
 }
 
@@ -90,8 +85,8 @@ async function runWith(j, shared) {
     beforeSeconds = (Date.now() - t) / 1000;
     if (r.rep && r.rep.ran) { before = r.rep; beforeNote = r.note; visualBefore = { dir: r.rep.out_dir, report: path.join(r.rep.out_dir, 'report.json'), source: r.note, seconds: r.rep.seconds, ok: true }; } else beforeNote = `none: ${r.note || (r.rep && (r.rep.skipped || 'the app did not start at HEAD'))}`;
   }
-  for (const it of items) it.refs = VC.resolveReferences(it.scenario, j.change_dir, j.root);
-  const after = await VC.run({ codeRoot: j.code_root, outDir: j.out_dir, config: cfg, items, shared });
+  // refs are visual.ResolveReference in Go (internal/visual/lint.go), already on each item.
+  const after = await VC.run({ codeRoot: j.code_root, outDir: j.out_dir, config: cfg, items, shared, appTree: j.app_tree });
   const cmp = after.ran ? VC.compare(after, before, { baseline: !!cfg.baseline }) : { defects: after.defects, preexisting: 0, aria_changes: [], pairs: [], baseline: [] };
   if (cmp.baseline && cmp.baseline.length) after.warnings.push(VC.baselineReport(cmp.baseline));
   else if (cfg.baseline && after.ran && !before) after.warnings.push('visual.baseline is on, but there is no capture from before the task: every defect counts');
@@ -102,21 +97,30 @@ async function runWith(j, shared) {
   }
   if (after.ignored && after.ignored.length) after.warnings.push(VC.ignoredReport(after.ignored));
   if (after.notes && after.notes.length) after.warnings.push(VC.skippedStepsReport(after.notes));
-  const out = { ...after, defects: cmp.defects, all_defects: after.defects.length, preexisting: cmp.preexisting, baseline_defects: (cmp.baseline || []).length, aria_changes: cmp.aria_changes, pairs: cmp.pairs, before: beforeNote, before_seconds: beforeSeconds };
-  fs.writeFileSync(path.join(j.out_dir, 'report.json'), JSON.stringify(out, null, 2) + '\n');
+  const out = { ...after, defects: cmp.defects, preexisting: cmp.preexisting, baseline_defects: (cmp.baseline || []).length, aria_changes: cmp.aria_changes, pairs: cmp.pairs, before: beforeNote, before_seconds: beforeSeconds };
   out.summary = VC.summarize(out.defects);
   if (out.ignored && out.ignored.length) out.ignored_report = VC.ignoredReport(out.ignored).split('\n').slice(1).map((x) => x.trim());
   if (out.notes && out.notes.length) out.skipped_steps = VC.skippedStepsReport(out.notes).split('\n').slice(1).map((x) => x.trim());
-  delete out.captures;
-  return { report: out, visual_before: visualBefore };
+  fs.writeFileSync(path.join(j.out_dir, 'report.json'), JSON.stringify(out, null, 2) + '\n');
+  const aria = (out.aria_changes || []).map(({ in_scope, ...rest }) => rest);
+  const report = {
+    ran: out.ran, skipped: out.skipped, warnings: out.warnings, defect_count: out.defects.length, shots: out.shots,
+    seconds: out.seconds, ignored: out.ignored, preexisting: out.preexisting, aria_changes: aria, pairs: out.pairs,
+    before: out.before, before_seconds: out.before_seconds, summary: out.summary, ignored_report: out.ignored_report, skipped_steps: out.skipped_steps,
+  };
+  return { report, visual_before: visualBefore };
 }
 
-function tokenLint(j) {
+function designScan(j) {
+  const ds = DC.discover(j.code_root);
+  const problems = (j.scenarios && j.scenarios.length) ? DC.lintDesign(j.scenarios, j.change_dir, j.root, j.code_root, ds) : [];
   const ui = (j.files || []).filter((f) => fs.existsSync(path.join(j.code_root, f)));
-  if (!ui.length) return null;
-  const map = DC.readDesignMap(j.change_dir); const ds = DC.discover(j.code_root);
-  if (!map && !ds.tokens.length) return null;
-  return { files: ui.length, ...DC.tokenLint(j.code_root, ui, ds, map) };
+  let tokens = null;
+  if (ui.length) {
+    const map = DC.readDesignMap(j.change_dir);
+    if (map || ds.tokens.length) tokens = { files: ui.length, ...DC.tokenLint(j.code_root, ui, ds, map) };
+  }
+  return { problems, tokens };
 }
 
 async function doctor(j) {
@@ -141,10 +145,11 @@ async function doctor(j) {
 }
 
 const OPS = {
-  'design-lint': (j) => ({ problems: DC.lintDesign(j.scenarios, j.change_dir, j.root, j.code_root) }),
+  'design-scan': designScan,
+  'design-lint': (j) => ({ problems: designScan(j).problems }),
   capture,
   run: runNow,
-  'token-lint': tokenLint,
+  'token-lint': (j) => designScan(j).tokens,
   'design-system': (j) => { const ds = DC.discover(j.code_root); return { system: ds, text: DC.formatDesignSystem(ds) }; },
   doctor,
 };
@@ -215,12 +220,13 @@ async function serveWarm(sock, codeRoot, browsersPath) {
     if (e.code !== 'EADDRINUSE' || (await new Promise((r) => { const c = net.connect(sock, () => { c.destroy(); r(true); }); c.on('error', () => r(false)); }))) return;
     try { fs.unlinkSync(sock); await listen(); } catch (e2) { return; }
   }
-  const warm = {}; let busy = false; let idle = null; let pwStamp = null; let caller = null;
+  const warm = { warm: true, codeRoot }; let busy = false; let idle = null; let pwStamp = null; let caller = null;
   const stamp = (f) => { try { return fs.statSync(f).mtimeMs; } catch (e) { return null; } };
   const unlink = () => { srv.close(); try { fs.unlinkSync(sock); } catch (e) { /* gone */ } };
-  const stop = () => {  // a browser that does not close in 5 s is killed by Playwright's exit hook, as are app servers ('exit')
+  const stop = () => {  // a browser that does not close in 5 s is killed by Playwright's exit hook
     unlink(); setTimeout(() => process.exit(0), 5000);
-    Promise.resolve(warm.browser && warm.browser.close()).catch(() => {}).finally(() => process.exit(0));
+    const app = warm.server ? warm.server.handle.stop() : Promise.resolve();
+    app.catch(() => {}).then(() => warm.browser && warm.browser.close()).catch(() => {}).finally(() => process.exit(0));
   };
   const idleMs = (Number(process.env.WINGMAN_SPEC_VISUAL_WARM) || 300) * 1000;
   const arm = () => { clearTimeout(idle); idle = setTimeout(stop, idleMs); };
@@ -254,6 +260,7 @@ async function serveWarm(sock, codeRoot, browsersPath) {
       const pw = await ready;
       if (!pw || warm.gone || stamp(pw.from) !== pwStamp) { busy = false; c.end('{}\n'); stop(); return; }  // no browser, or Playwright was reinstalled: a new helper
       c.write('{"taken":true}\n');
+      if (m.job && (m.job.op === 'capture' || m.job.op === 'run')) m.job.config = { ...(m.job.config || {}), reuse_server: true };
       for (const k of Object.keys(process.env)) if (!(k in m.env)) delete process.env[k];
       Object.assign(process.env, m.env);
       try { process.chdir(m.cwd); } catch (e) { /* stays */ }

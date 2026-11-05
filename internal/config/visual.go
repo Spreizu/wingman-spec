@@ -434,7 +434,10 @@ func parseRoles(n *yaml.Node) (map[string]Role, []string) {
 }
 
 // Header is one request header of a role: its name and the env var that holds the value.
-type Header struct{ Name, Env string }
+type Header struct {
+	Name string `json:"name"`
+	Env  string `json:"env"`
+}
 
 var headerRE = regexp.MustCompile(`^([A-Za-z0-9-]+)\s*=\s*([A-Za-z_][A-Za-z0-9_]*)$`)
 

@@ -55,18 +55,20 @@ func (f *Vps) Match(vw int) bool {
 
 // Expect is one expect: line (a style fact or a relation between two elements).
 type Expect struct {
-	Raw   string  `json:"raw"`
-	Vps   *Vps    `json:"vps"`
-	Kind  string  `json:"kind,omitempty"`
-	Sel   string  `json:"sel,omitempty"`
-	Prop  string  `json:"prop,omitempty"`
-	Op    string  `json:"op,omitempty"`
-	Value string  `json:"value,omitempty"`
-	Rel   string  `json:"rel,omitempty"`
-	Other string  `json:"other,omitempty"`
-	Line  int     `json:"line,omitempty"`
-	State *string `json:"state"`
-	Error string  `json:"error,omitempty"`
+	Raw    string   `json:"raw"`
+	Vps    *Vps     `json:"vps"`
+	Kind   string   `json:"kind,omitempty"`
+	Sel    string   `json:"sel,omitempty"`
+	Prop   string   `json:"prop,omitempty"`
+	Op     string   `json:"op,omitempty"`
+	Value  string   `json:"value,omitempty"`
+	Rel    string   `json:"rel,omitempty"`
+	Other  string   `json:"other,omitempty"`
+	Line   int      `json:"line,omitempty"`
+	State  *string  `json:"state"`
+	Error  string   `json:"error,omitempty"`
+	Sels   []string `json:"selectors,omitempty"` // Expect.Selectors, for the helper
+	Widths []int    `json:"widths,omitempty"`    // viewports Vps.Match keeps; empty means the filter matches none
 }
 
 // Selectors are the elements an expect names.
@@ -80,6 +82,46 @@ func (x Expect) Selectors() []string {
 	return []string{x.Sel}
 }
 
+// widthsFor is the scenario viewports Vps.Match keeps. Nil when there is no filter.
+func widthsFor(vps *Vps, viewports []int) []int {
+	if vps == nil || vps.Error != "" {
+		return nil
+	}
+	out := []int{}
+	for _, w := range viewports {
+		if vps.Match(w) {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+func annotateExpects(xs []Expect, viewports []int) {
+	for i := range xs {
+		xs[i].Sels = xs[i].Selectors()
+		xs[i].Widths = widthsFor(xs[i].Vps, viewports)
+	}
+}
+
+// Annotate fills the fields the helper used to compute itself: slug, selectors and viewport filters.
+func Annotate(s *Scenario) {
+	if s == nil {
+		return
+	}
+	name := s.Scenario
+	if name == "" {
+		name = s.ID
+	}
+	s.Slug = spec.Slug(name)
+	annotateExpects(s.Expects, s.Viewports)
+	for i := range s.States {
+		annotateExpects(s.States[i].Expects, s.Viewports)
+	}
+	for i := range s.References {
+		s.References[i].Widths = widthsFor(s.References[i].Vps, s.Viewports)
+	}
+}
+
 // Crop is the part of a reference image to compare with.
 type Crop struct {
 	X int `json:"x"`
@@ -90,10 +132,11 @@ type Crop struct {
 
 // Reference is one reference: line (a design image, optionally cropped and per viewport).
 type Reference struct {
-	Path  string `json:"path"`
-	Crop  *Crop  `json:"crop"`
-	Vps   *Vps   `json:"vps"`
-	Error string `json:"error,omitempty"`
+	Path   string `json:"path"`
+	Crop   *Crop  `json:"crop"`
+	Vps    *Vps   `json:"vps"`
+	Error  string `json:"error,omitempty"`
+	Widths []int  `json:"widths,omitempty"` // set when Vps is set; Vps.Match against the scenario viewports
 }
 
 // Step is one do: line of a state.
@@ -138,6 +181,7 @@ type Scenario struct {
 	IgnoreHTTP   []string    `json:"ignore_http"`
 	States       []State     `json:"states"`
 	Errors       []string    `json:"errors"`
+	Slug         string      `json:"slug,omitempty"` // spec.Slug of the scenario name; the helper's screenshot folder
 }
 
 // AllKeys are the key selectors of the block and of its states.

@@ -31,11 +31,21 @@ var ErrNoHelper = errors.New("the visual helper needs Node.js (node on PATH)")
 // Item is one scenario to check, with why it is checked: "task" (named by the task), "change" (another scenario of the
 // change) or "guard" (a scenario of the specs that shares its page, checked for regressions); InScope when its component
 // is in the task's Files:.
+// BoundRef is a reference image with the path ResolveReference found.
+type BoundRef struct {
+	Path   string `json:"path"`
+	Abs    string `json:"abs"`
+	Crop   *Crop  `json:"crop"`
+	Vps    *Vps   `json:"vps,omitempty"`
+	Widths []int  `json:"widths,omitempty"`
+}
+
 type Item struct {
-	Scenario *Scenario `json:"scenario"`
-	Role     string    `json:"role"`
-	InScope  bool      `json:"inScope"`
-	Shots    bool      `json:"shots,omitempty"`
+	Scenario *Scenario  `json:"scenario"`
+	Role     string     `json:"role"`
+	InScope  bool       `json:"inScope"`
+	Shots    bool       `json:"shots,omitempty"`
+	Refs     []BoundRef `json:"refs,omitempty"`
 }
 
 var fence = regexp.MustCompile("(?m)^\\s*(```|~~~)\\s*visual\\b")

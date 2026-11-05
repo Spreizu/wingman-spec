@@ -30,13 +30,9 @@ const path = require('path');
 
 const SOURCES = ['token', 'component', 'framework', 'arbitrary'];
 
-// ---------- expect: parsing ----------
-function vpMatch(f, vw) {
-  if (!f) return true;
-  const n = f.nums[0];
-  switch (f.op) { case '<': return vw < n; case '<=': return vw <= n; case '>': return vw > n; case '>=': return vw >= n; default: return f.nums.includes(vw); }
-}
-const expectSelectors = (x) => (x.error ? [] : x.kind === 'rel' ? [x.sel, x.other] : [x.sel]);
+// Viewport filters and expect selectors are resolved in Go (Vps.Match, Expect.Selectors in internal/visual/scenario.go).
+function widthsOk(x, vw) { return !x.vps || (x.widths || []).includes(vw); }
+const selsOf = (x) => x.selectors || [];
 const tokenRefs = (x) => [x.value].filter((v) => v && /^token:/.test(v)).map((v) => v.slice(6));
 
 // ---------- in-page evaluation (serialised into the browser by Playwright) ----------
@@ -201,9 +197,20 @@ function utilitiesFor(name) {
 function discover(codeRoot) {
   const ds = { tokens: [], components: [], sources: [], tailwind: null, ui_library: [] };
   const rel = (f) => path.relative(codeRoot, f);
-  const add = (name, value, file, kind) => { if (!ds.tokens.some((t) => t.name === name && t.file === file)) ds.tokens.push({ name, value: String(value).trim(), norm: normValue(value), file, kind, utilities: kind === 'tailwind-theme' ? utilitiesFor(name) : [] }); };
+  const seen = new Set();
+  const add = (name, value, file, kind) => { const id = `${name}\0${file}`; if (seen.has(id)) return; seen.add(id); ds.tokens.push({ name, value: String(value).trim(), norm: normValue(value), file, kind, utilities: kind === 'tailwind-theme' ? utilitiesFor(name) : [] }); };
+  // One walk, then the same buckets the five walks used to collect, in that order.
+  const css = [], jsons = [], tws = [], uis = [], comps = [];
+  for (const f of walk(codeRoot, () => true, 1000000)) {
+    const relp = path.relative(codeRoot, f);
+    if (/\.(css|scss|sass|less|pcss)$/.test(f) && !/\.min\.css$/.test(f)) css.push(f);
+    if (/(^|[\\/])(tokens?|design-tokens)([\\/].*)?\.json$|\.tokens\.json$/.test(f) && !/package(-lock)?\.json$/.test(f)) jsons.push(f);
+    if (/(^|[\\/])tailwind\.config\.(js|cjs|mjs|ts)$/.test(f)) tws.push(f);
+    if (/(^|[\\/])(app\.config\.(ts|js|mjs)|components\.json)$/.test(f)) uis.push(f);
+    if (/\.(vue|tsx|jsx|svelte)$/.test(f) && /(^|[\\/])(components|ui|design-system|lib[\\/]components)([\\/]|$)/.test(relp) && !/\.(test|spec|stories)\./.test(f)) comps.push(f);
+  }
   // CSS custom properties (Tailwind v4 @theme blocks become utilities; :root vars are used via var(--x) or shadcn-style mappings)
-  for (const f of walk(codeRoot, (p) => /\.(css|scss|sass|less|pcss)$/.test(p) && !/\.(min)\.css$/.test(p))) {
+  for (const f of css) {
     const text = fs.readFileSync(f, 'utf8'); let any = false;
     const theme = [...text.matchAll(/@theme(?:\s+[a-z]+)?\s*\{([^}]*)\}/g)].map((m) => [m.index, m.index + m[0].length]);
     for (const m of text.matchAll(/(^|[;{\s])--([a-zA-Z0-9_-]+)\s*:\s*([^;{}]+);/g)) {
@@ -214,13 +221,13 @@ function discover(codeRoot) {
     if (any) ds.sources.push({ kind: theme.length ? 'tailwind @theme / css variables' : 'css variables', file: rel(f) });
   }
   // design token JSON (tokens.json, *.tokens.json, style-dictionary sources)
-  for (const f of walk(codeRoot, (p) => /(^|[\\/])(tokens?|design-tokens)([\\/].*)?\.json$|\.tokens\.json$/.test(p) && !/package(-lock)?\.json$/.test(p))) {
+  for (const f of jsons) {
     let j; try { j = JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { continue; }
     const visit = (o, pre) => { if (!o || typeof o !== 'object') return; const v = o.$value !== undefined ? o.$value : o.value; if (v !== undefined && typeof v !== 'object') { add(pre.join('-'), v, rel(f), 'design-token'); return; } for (const [k, x] of Object.entries(o)) if (!k.startsWith('$')) visit(x, [...pre, k]); };
     visit(j, []); ds.sources.push({ kind: 'design tokens (json)', file: rel(f) });
   }
   // Tailwind v3 config: theme / theme.extend literal values (not evaluated)
-  for (const f of walk(codeRoot, (p) => /(^|[\\/])tailwind\.config\.(js|cjs|mjs|ts)$/.test(p))) {
+  for (const f of tws) {
     const text = fs.readFileSync(f, 'utf8');
     ds.tailwind = ds.tailwind || { version: 3, entry: rel(f) };
     for (const m of text.matchAll(/['"]?([a-zA-Z][\w-]*)['"]?\s*:\s*['"](#[0-9a-fA-F]{3,8}|-?[\d.]+(?:px|rem))['"]/g)) add(`tw-${m[1]}`, m[2], rel(f), 'tailwind-config');
@@ -228,14 +235,13 @@ function discover(codeRoot) {
     ds.sources.push({ kind: 'tailwind config', file: rel(f) });
   }
   // UI library theme config (Nuxt UI app.config, shadcn components.json)
-  for (const f of walk(codeRoot, (p) => /(^|[\\/])(app\.config\.(ts|js|mjs)|components\.json)$/.test(p))) {
+  for (const f of uis) {
     const text = fs.readFileSync(f, 'utf8');
     if (/app\.config/.test(f)) { for (const m of text.matchAll(/(primary|secondary|neutral|success|info|warning|error)\s*:\s*['"]([\w-]+)['"]/g)) add(`ui-${m[1]}`, m[2], rel(f), 'ui-library'); ds.ui_library.push({ name: 'nuxt-ui (app.config)', file: rel(f) }); }
     else if (/"aliases"|"tailwind"/.test(text)) ds.ui_library.push({ name: 'shadcn (components.json)', file: rel(f) });
   }
   // shared components and their variant-like props
-  const compDir = /(^|[\\/])(components|ui|design-system|lib[\\/]components)([\\/]|$)/;
-  for (const f of walk(codeRoot, (p) => /\.(vue|tsx|jsx|svelte)$/.test(p) && compDir.test(path.relative(codeRoot, p)) && !/\.(test|spec|stories)\./.test(p))) {
+  for (const f of comps) {
     const text = fs.readFileSync(f, 'utf8'); const props = {};
     const set = (k, typ) => { const opts = [...typ.matchAll(/['"]([\w-]+)['"]/g)].map((x) => x[1]); const v = opts.length ? [...new Set(opts)] : typ.trim().replace(/\s+/g, ' ').slice(0, 40); if (!props[k] || (Array.isArray(v) && (!Array.isArray(props[k]) || v.length > props[k].length))) props[k] = v; };
     const typed = text.match(/defineProps<\s*\{([\s\S]*?)\}\s*>|interface\s+\w*Props\s*\{([\s\S]*?)\n\}|type\s+\w*Props\s*=\s*\{([\s\S]*?)\}/);
@@ -312,7 +318,7 @@ function lintDesign(scens, changeDir, root, codeRoot, ds) {
   for (const s of withExpect) for (const x of s.expects) {
     const at = `${rel(s.file)}:${x.line || s.line}`;
     if (x.error) { P(s, 'error', `${at}: ${x.error}`); continue; }
-    if (x.vps && !s.viewports.some((v) => vpMatch(x.vps, v))) P(s, 'error', `${at}: expect "${x.raw}" matches none of the scenario's viewports (${s.viewports.join(', ')})`);
+    if (x.vps && !(x.widths && x.widths.length)) P(s, 'error', `${at}: expect "${x.raw}" matches none of the scenario's viewports (${s.viewports.join(', ')})`);
     for (const t of tokenRefs(x)) if (!tokenNames.has(t.replace(/^--/, ''))) P(s, 'error', `${at}: expect "${x.raw}" names token:${t}, but the project defines no --${t.replace(/^--/, '')} (known: ${[...tokenNames].slice(0, 12).join(', ')}${tokenNames.size > 12 ? ', ...' : ''}); run \`wingman-spec design-system\``);
     if (x.value && !/^token:/.test(x.value)) { const n = normValue(x.value); const t = ds.tokens.find((k) => k.norm === n && (/^#/.test(n) || /px$/.test(n))); if (t) P(s, 'info', `${at}: expect "${x.raw}" uses a raw value equal to --${t.name}; prefer token:${t.name}`); }
   }
@@ -322,7 +328,7 @@ function lintDesign(scens, changeDir, root, codeRoot, ds) {
   if (!map.rows.length) P(null, 'error', `${mf}: no map rows (a table with Region/element | Selector | Implemented with | Source columns)`);
   const mapped = new Set(map.rows.map((r) => normSel(r.selector)));
   for (const s of referenced) {
-    const sels = [...new Set([...s.keys, ...s.states.flatMap((x) => x.keys), ...(s.expects || []).flatMap(expectSelectors)].map(normSel))];
+    const sels = [...new Set([...s.keys, ...s.states.flatMap((x) => x.keys), ...(s.expects || []).flatMap(selsOf)].map(normSel))];
     for (const sel of sels) if (!mapped.has(sel)) P(s, 'error', `${rel(s.file)}:${s.line}: ${sel} (scenario ${s.id} has a design reference) has no row in ${mf}: add the region with what implements it and its source`);
   }
   const gapText = map.gaps.join('\n').toLowerCase();
@@ -345,7 +351,7 @@ function lintDesign(scens, changeDir, root, codeRoot, ds) {
       const miss = TYPO.filter((p) => !props.has(p));
       if (miss.length) P(null, 'error', `${mf}:${r.line}: text element "${name}" has no ${miss.join(', ')} in its Expect column; read ${miss.length > 1 ? 'them' : 'it'} from the design and write e.g. "${miss.map((p) => `${p} ~ ${TYPO_EX[p]}`).join('; ')}" (a token when the project has one, else the literal design value)`);
     }
-    const mine = specExp.filter((x) => expectSelectors(x).map(normSel).includes(sel));
+    const mine = specExp.filter((x) => selsOf(x).map(normSel).includes(sel));
     if (!mine.length) { P(null, 'error', `${mf}:${r.line}: "${name}" (${sel}) has no expect: line in the specs; turn its Expect column into expect: lines of the visual scenario that shows it${facts.length ? '' : ' (and give the row Expect facts: typography, colour, spacing or a relation)'}`); continue; }
     for (const f of facts) if (!mine.some((x) => x.kind === 'style' && x.prop === f.prop)) P(null, 'error', `${mf}:${r.line}: the map says "${name}" ${f.prop} ${f.op} ${f.value}, but no expect: line checks ${sel} ${f.prop}; add \`expect: ${sel} ${f.prop} ${f.op} ${f.value}\` to its visual scenario`);
   }
@@ -397,7 +403,7 @@ function tokenLint(codeRoot, files, ds, map) {
 /** The reference for one viewport: an explicit @filter match, else the one whose file name carries the width, else an unfiltered one. */
 function pickReference(refs, vw) {
   if (!refs || !refs.length) return null;
-  return refs.find((r) => r.vps && vpMatch(r.vps, vw)) || refs.find((r) => !r.vps && new RegExp(`(^|[^0-9])${vw}([^0-9]|$)`).test(path.basename(r.path))) || refs.find((r) => !r.vps) || null;
+  return refs.find((r) => r.widths && r.widths.includes(vw)) || refs.find((r) => !r.vps && new RegExp(`(^|[^0-9])${vw}([^0-9]|$)`).test(path.basename(r.path))) || refs.find((r) => !r.vps) || null;
 }
 async function sideBySide(browser, o) {
   const b64 = (f) => `data:image/png;base64,${fs.readFileSync(f).toString('base64')}`;
@@ -414,4 +420,4 @@ async function sideBySide(browser, o) {
     return o.out;
   } finally { await ctx.close(); }
 }
-module.exports = { expectSelectors, vpMatch, pageExpect, discover, formatDesignSystem, readDesignMap, lintDesign, tokenLint, pickReference, sideBySide };
+module.exports = { widthsOk, selsOf, pageExpect, discover, formatDesignSystem, readDesignMap, lintDesign, tokenLint, pickReference, sideBySide };

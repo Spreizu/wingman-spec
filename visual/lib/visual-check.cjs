@@ -29,14 +29,7 @@ const { spawn } = require('child_process');
 
 // Defects an `ignore-http:` text can skip.
 const IGNORE_HTTP_CODES = ['runtime:http-error', 'runtime:request-failed', 'runtime:console-error', 'content:broken-image'];
-const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'scenario';
-
-/** Every reference of a scenario with its resolved path (`abs`, null when missing): for the side-by-side images. */
-function resolveReferences(s, changeDir, root) {
-  const bases = [changeDir, root, process.env.WINGMAN_CODE_ROOT, path.dirname(s.file)].filter(Boolean);
-  const abs = (ref) => (ref && bases.map((b) => path.resolve(b, ref)).find((p) => fs.existsSync(p))) || null;
-  return (s.references || []).filter((r) => !r.error).map((r) => ({ ...r, abs: abs(r.path) }));
-}
+// Screenshot folder names are scenario.slug from spec.Slug (internal/spec/spec.go).
 
 // ---------- environment ----------
 function resolveFrom(name, codeRoot) {
@@ -112,9 +105,21 @@ async function launchChromium(pw, codeRoot, cfg) {
   try { return { browser: await pw.chromium.launch(launchOptions(f.executablePath)), found: f }; }
   catch (e) { const why = String(e.message).split('\n')[0]; const err = new Error(f.mismatch ? `${why} (a different Chromium build is in ${f.mismatch}; this Playwright needs ${f.expected})` : why); err.found = f; throw err; }
 }
+let axeMemo = null; // { key, file, text }: one read per code root in this process
 function axeSource(codeRoot, pwFrom) {
-  const p = resolveFrom('axe-core/axe.min.js', codeRoot) || (pwFrom && resolveFrom('axe-core/axe.min.js', path.dirname(pwFrom)));
-  return p ? fs.readFileSync(p, 'utf8') : null;
+  const key = `${codeRoot}\0${pwFrom || ''}`;
+  if (axeMemo && axeMemo.key === key) return axeMemo.text;
+  const file = resolveFrom('axe-core/axe.min.js', codeRoot) || (pwFrom && resolveFrom('axe-core/axe.min.js', path.dirname(pwFrom))) || '';
+  const text = file ? fs.readFileSync(file, 'utf8') : null;
+  axeMemo = { key, file, text };
+  return text;
+}
+/** addInitScript args. A path under the temp dir can move with the extracted bundle, so that case sends the text. */
+function axeInit() {
+  if (!axeMemo || !axeMemo.text) return null;
+  const tmp = require('os').tmpdir();
+  if (axeMemo.file === tmp || axeMemo.file.startsWith(tmp + path.sep)) return { content: axeMemo.text };
+  return { path: axeMemo.file };
 }
 
 /** HTTP status of url, or null. Fresh connection each time (no keep-alive reuse) and a hard deadline, so a
@@ -226,6 +231,42 @@ function pageChecks(arg) {
  * Returns { ran, skipped, warnings[], defects[], captures{}, shots[], seconds, timings }. Never throws for page
  * problems: they become defects. Environment problems (no Playwright/browser) set skipped + a warning.
  */
+const serverKey = (c, codeRoot, tree) => [c.command || '', c.url || '', String(c.port || ''), codeRoot || '', tree || ''].join('\0');
+/** A one-shot run must bind the port itself. A warm helper from an earlier run may still be serving it; that listener is stopped here. A stranger stays a port-in-use defect. */
+function warmHeldPids(port, codeRoot) {
+  let text = '';
+  try { text = require('child_process').execSync(`lsof -nP -iTCP:${port} -sTCP:LISTEN -t`, { encoding: 'utf8' }); } catch (e) { return []; }
+  const out = [];
+  for (const pid of [...new Set(text.split(/\s+/).map((s) => +s).filter(Boolean))]) {
+    let p = pid; const seen = new Set(); let held = false;
+    while (p > 1 && !seen.has(p)) {
+      seen.add(p);
+      let args = ''; let ppid = 0;
+      try { args = require('child_process').execSync(`ps -o args= -p ${p}`, { encoding: 'utf8' }); } catch (e) { break; }
+      if (/wingman-visual-warm/.test(args) && args.includes(codeRoot)) { held = true; break; }
+      try { ppid = +require('child_process').execSync(`ps -o ppid= -p ${p}`, { encoding: 'utf8' }); } catch (e) { break; }
+      p = ppid;
+    }
+    if (held) out.push(pid);
+  }
+  return out;
+}
+async function releaseWarmHeld(c, codeRoot) {
+  let port = +c.port;
+  if (!port) { try { port = +new URL(c.url).port; } catch (e) { port = 0; } }
+  if (!port || !codeRoot) return false;
+  const pids = warmHeldPids(port, codeRoot);
+  if (!pids.length) return false;
+  for (const pid of pids) {
+    try { process.kill(-pid, 'SIGTERM'); } catch (e) { try { process.kill(pid, 'SIGTERM'); } catch (e2) { /* gone */ } }
+  }
+  for (let i = 0; i < 50 && (await probe(c.url, 300, c.ignore_https_errors)) !== null; i++) await sleep(20);
+  for (const pid of pids) {
+    try { process.kill(-pid, 'SIGKILL'); } catch (e) { try { process.kill(pid, 'SIGKILL'); } catch (e2) { /* gone */ } }
+  }
+  for (let i = 0; i < 50 && (await probe(c.url, 300, c.ignore_https_errors)) !== null; i++) await sleep(20);
+  return (await probe(c.url, 300, c.ignore_https_errors)) === null;
+}
 async function run(o) {
   const t0 = Date.now(); const c = o.config;
   const rep = { ran: false, skipped: null, warnings: [], defects: [], ignored: [], notes: [], captures: {}, shots: [], scenarios: o.items.map((x) => ({ id: x.scenario.id, role: x.role, ...(x.scenario.role ? { auth: x.scenario.role } : {}), in_scope: !!x.inScope, states: x.scenario.states.map((s) => s.name), viewports: x.scenario.viewports })), out_dir: o.outDir, axe_tags: AXE_TAGS, browsers: null, seconds: 0, timings: {} };
@@ -235,25 +276,37 @@ async function run(o) {
   const axe = axeSource(o.codeRoot, pw.from);
   if (!axe) rep.warnings.push('accessibility checks skipped: axe-core is not installed (npm i -D axe-core)');
   fs.mkdirSync(o.outDir, { recursive: true });
-  let server = null; let browser = null;
+  let server = null; let browser = null; let release = true;
   const tBoot = Date.now();
+  const key = serverKey(c, o.codeRoot, o.appTree);
+  const hold = o.shared && o.shared.warm && o.codeRoot === o.shared.codeRoot;
+  const held = o.shared && o.shared.server;
+  if (held && held.key !== key) { await held.handle.stop(); o.shared.server = null; }
   try {
+    const same = hold && o.shared.server && o.shared.server.key === key && !o.shared.server.handle.exited;
     const pre = await probe(c.url, 1500, c.ignore_https_errors);
-    if (pre !== null && !c.reuse_server) {
-      rep.defects.push(defect('server:port-in-use', null, null, null, `something already answers at ${c.url} (HTTP ${pre}) before the check started its own server. Stop it (the check starts and stops the app itself), or set visual.reuse_server: true if that server always serves the current code.`));
-      return done();
-    }
-    if (pre === null) {
-      server = startServer(c, o.codeRoot, path.join(o.outDir, 'server.log'));
-      const until = Date.now() + c.ready_timeout * 1000; let up = null;
-      while (Date.now() < until && !server.exited) { up = await probe(c.url, 1000, c.ignore_https_errors); if (up !== null) break; await sleep(50); }
-      if (up === null) {
-        const why = server.exited ? `the command exited (code ${server.exited.code})` : `nothing answered within ${c.ready_timeout}s`;
-        rep.defects.push(defect('server:not-ready', null, null, null, `the app did not start: \`${c.command}\` -> ${c.url}: ${why}. Last output:\n${server.tail()}`));
+    if (same && pre !== null) { release = false; rep.timings.server_s = 0; }
+    else {
+      if (same) { await o.shared.server.handle.stop(); o.shared.server = null; }
+      let busy = pre !== null;
+      if (busy && !c.reuse_server && await releaseWarmHeld(c, o.codeRoot)) busy = false;
+      if (busy && !c.reuse_server) {
+        rep.defects.push(defect('server:port-in-use', null, null, null, `something already answers at ${c.url} (HTTP ${pre}) before the check started its own server. Stop it (the check starts and stops the app itself), or set visual.reuse_server: true if that server always serves the current code.`));
         return done();
       }
+      if (!busy) {
+        server = startServer(c, o.codeRoot, path.join(o.outDir, 'server.log'));
+        const until = Date.now() + c.ready_timeout * 1000; let up = null;
+        while (Date.now() < until && !server.exited) { up = await probe(c.url, 1000, c.ignore_https_errors); if (up !== null) break; await sleep(50); }
+        if (up === null) {
+          const why = server.exited ? `the command exited (code ${server.exited.code})` : `nothing answered within ${c.ready_timeout}s`;
+          rep.defects.push(defect('server:not-ready', null, null, null, `the app did not start: \`${c.command}\` -> ${c.url}: ${why}. Last output:\n${server.tail()}`));
+          return done();
+        }
+        if (hold) { o.shared.server = { key, handle: server }; release = false; }
+      }
+      rep.timings.server_s = (Date.now() - tBoot) / 1000;
     }
-    rep.timings.server_s = (Date.now() - tBoot) / 1000;
     // o.shared: one browser for every run of one job (the before at HEAD and the after of a check); its owner closes it
     if (o.shared && o.shared.browser) { browser = o.shared.browser; rep.browsers = o.shared.dir || null; } else try { const l = await launchChromium(pw, o.codeRoot, c); browser = l.browser; if (l.found.executablePath) rep.browsers = l.found.dir; if (o.shared) { o.shared.browser = browser; o.shared.dir = rep.browsers; } } catch (e) {
       rep.skipped = 'browser-missing';
@@ -287,7 +340,7 @@ async function run(o) {
     rep.timings.pages_s = (Date.now() - tPages) / 1000;
   } finally {
     if (browser && !(o.shared && o.shared.browser === browser)) await browser.close().catch(() => {});
-    if (server) await server.stop();
+    if (server && release) await server.stop(); // a warm helper keeps its server; stop() is the SIGKILL and port probe
   }
   return done();
 }
@@ -386,8 +439,8 @@ async function runScenario(it, o, browser, axe, rep) {
   };
   /** The loaded page (before steps): check the block expects present there, defer the rest to the states. */
   const loadedPage = async (page, vw, add, note) => {
-    const vex = scope.block.filter((x) => DC.vpMatch(x.vps, vw)); if (!vex.length) return;
-    const pres = await present(page, vex.map((x) => DC.expectSelectors(x)));
+    const vex = scope.block.filter((x) => DC.widthsOk(x, vw)); if (!vex.length) return;
+    const pres = await present(page, vex.map((x) => DC.selsOf(x)));
     await runExpects(page, vex.filter((x, i) => pres[i]), add, note);
     if (!deferred.has(vw)) deferred.set(vw, new Map(vex.filter((x, i) => !pres[i]).map((x) => [x.raw, { x, matched: false }])));
   };
@@ -404,7 +457,7 @@ async function runScenario(it, o, browser, axe, rep) {
       if (o.before && unreachable && it.role === 'task') { cap.skipped = 'state not reachable before the task'; continue; }
       const ctx = await browser.newContext({ viewport: { width: vw, height: 900 }, reducedMotion: 'reduce', deviceScaleFactor: 1, ignoreHTTPSErrors: o.ignoreHttps !== false, ...(sess && sess.state ? { storageState: sess.state } : {}), ...(sess && sess.headers && Object.keys(sess.headers).length ? { extraHTTPHeaders: sess.headers } : {}) });
       ctx.setDefaultTimeout(pageMs);
-      if (axe) await ctx.addInitScript({ content: axe });  // axe once per context, in every document it opens (no per-state injection)
+      if (axe) await ctx.addInitScript(axeInit());  // one script per context; Chromium caches a stable path
       // visual.request_timeout (default 3 s, 0 = none): a subresource that has not answered in time is aborted and reported as a failed request
       if (reqMs) await ctx.route((u) => /^https?:$/.test(u.protocol), async (route) => {
         if (['document', 'websocket', 'eventsource'].includes(route.request().resourceType())) return route.fallback();
@@ -458,14 +511,14 @@ async function runScenario(it, o, browser, axe, rep) {
           if (scope.stepFree.has(st.name)) await loadedPage(page, vw, add);
           else if (deferred.has(vw) && deferred.get(vw).size) {
             const dl = [...deferred.get(vw).values()];
-            const pres = await present(page, dl.map((d) => DC.expectSelectors(d.x)));
+            const pres = await present(page, dl.map((d) => DC.selsOf(d.x)));
             const here = dl.filter((d, i) => pres[i]); here.forEach((d) => { d.matched = true; });
             await runExpects(page, here.map((d) => d.x), add);
           }
-          await runExpects(page, (st.expects || []).filter((x) => !x.error && DC.vpMatch(x.vps, vw)), add);
+          await runExpects(page, (st.expects || []).filter((x) => !x.error && DC.widthsOk(x, vw)), add);
           cap.aria = await ariaOf(page, keys(st));
           if (it.shots && r.area) {
-            const file = path.join(o.outDir, 'areas', s.capability, slug(s.scenario || s.id), `${st.name}@${vw}.png`);
+            const file = path.join(o.outDir, 'areas', s.capability, s.slug || 'scenario', `${st.name}@${vw}.png`);
             fs.mkdirSync(path.dirname(file), { recursive: true });
             await page.screenshot({ path: file, fullPage: true, clip: r.area, animations: 'disabled', caret: 'hide' }).then(() => { cap.shot = file; rep.shots.push({ scenario: s.id, role: it.role, state: st.name, viewport: vw, file, area: r.area }); }).catch((e) => rep.warnings.push(`${where}: area screenshot failed: ${String(e.message).split('\n')[0]}`));
             // after the task, next to the design: the rendered area beside the reference picked for this width (temporary)
@@ -511,7 +564,7 @@ async function runScenario(it, o, browser, axe, rep) {
     if (d.matched) continue;
     const cap = rep.captures[capKey(s.id, scope.probe, vw)];
     if (cap && cap.skipped) continue;
-    const dd = defect('design:expect-unmatched', s.id, scope.probe, vw, `${s.id} [${scope.probe} @ ${vw}px]: expect "${d.x.raw}" checked nothing: its elements (${DC.expectSelectors(d.x).join(', ')}) are on neither the loaded page nor any state of the scenario. Fix the selector, or put the expect under the \`state:\` that shows them`, { role: it.role, selector: d.x.raw });
+    const dd = defect('design:expect-unmatched', s.id, scope.probe, vw, `${s.id} [${scope.probe} @ ${vw}px]: expect "${d.x.raw}" checked nothing: its elements (${DC.selsOf(d.x).join(', ')}) are on neither the loaded page nor any state of the scenario. Fix the selector, or put the expect under the \`state:\` that shows them`, { role: it.role, selector: d.x.raw });
     rep.defects.push(dd); if (cap) cap.defects.push(defectKey(dd));
   }
 }
@@ -561,10 +614,12 @@ const QUIET_MS = Math.max(20, Number(process.env.WINGMAN_SPEC_VISUAL_QUIET_MS) |
  * read from the page's own in-flight map; capped at ms), fonts ready, motion off, two animation frames.
  */
 async function settle(page, ms, pending) {
-  const t0 = Date.now(); let quietSince = pending.size ? 0 : Date.now();
-  while (Date.now() - t0 < ms) {
-    await sleep(20);
-    if (pending.size) quietSince = 0; else if (!quietSince) quietSince = Date.now(); else if (Date.now() - quietSince >= QUIET_MS) break;
+  if (pending.size) {
+    const t0 = Date.now(); let quietSince = 0;
+    while (Date.now() - t0 < ms) {
+      await sleep(20);
+      if (pending.size) quietSince = 0; else if (!quietSince) quietSince = Date.now(); else if (Date.now() - quietSince >= QUIET_MS) break;
+    }
   }
   // one round trip; if the page navigates under it, the three steps again one by one, each on its own
   if (await page.evaluate(settled, MOTION_OFF).then(() => true, () => false)) return;
@@ -650,4 +705,4 @@ function summarize(defects) {
 }
 
 module.exports = {
-  baselineReport, consoleErrorSkipped, ignoreRules, ignoredReport, skippedStepsReport, AXE_TAGS, launchChromium, launchOptions, resolveReferences, loadPlaywright, axeSource, run, compare, summarize };
+  baselineReport, consoleErrorSkipped, ignoreRules, ignoredReport, skippedStepsReport, AXE_TAGS, launchChromium, launchOptions, loadPlaywright, axeSource, run, compare, summarize };

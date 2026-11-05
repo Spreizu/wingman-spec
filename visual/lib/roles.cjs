@@ -47,18 +47,7 @@ function authFile(codeRoot, name) {
   return path.join(dir, `${name}.json`);
 }
 const LOGIN_MS = 15000;
-const envBase = (name) => `WINGMAN_ROLE_${name.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}`;
-const envNames = (name, role) => ({ user: (role && role.user_env) || `${envBase(name)}_USER`, password: (role && role.password_env) || `${envBase(name)}_PASSWORD` });
-
-/** `Name=ENV_VAR, Name2=ENV_VAR2` -> [{ name, env }]. The header values live in the environment, never in the config. */
-function parseHeaders(v) {
-  const list = []; for (const part of String(v).split(',').map((x) => x.trim()).filter(Boolean)) {
-    const m = part.match(/^([A-Za-z0-9-]+)\s*=\s*([A-Za-z_][A-Za-z0-9_]*)$/);
-    if (!m) return { error: `expected "Header-Name=ENV_VAR", got "${part.replace(/=.*/, '=...')}"` };
-    list.push({ name: m[1], env: m[2] });
-  }
-  return { list };
-}
+// user_env, password_env and headers are config.RoleEnv and config.ParseHeaders in Go.
 
 /** The gitignored local credentials file: `<role>:` then indented `user:` and `password:`. Values are never logged. */
 function readLocalSecrets(codeRoot) {
@@ -80,8 +69,8 @@ function credentials(name, role, codeRoot) {
   const env = process.env;
   if (role.storage_state) return { via: 'storage_state', missing: [] };
   if (role.login_command) return { via: 'login_command', missing: [] };
-  if (!role.login && role.headers_env) return { via: 'headers', missing: [] };
-  const names = envNames(name, role); const local = readLocalSecrets(codeRoot)[name] || {};
+  if (!role.login && role.headers && role.headers.length) return { via: 'headers', missing: [] };
+  const names = { user: role.user_env, password: role.password_env }; const local = readLocalSecrets(codeRoot)[name] || {};
   const user = env[names.user] || local.user; const password = env[names.password] || local.password;
   const missing = [];
   if (!user) missing.push(names.user); if (!password) missing.push(names.password);
@@ -96,7 +85,7 @@ function describe(roles, codeRoot) {
     const c = credentials(r.name, r, codeRoot);
     if (c.via === 'storage_state') { const f = path.resolve(codeRoot, r.storage_state); return { role: r.name, via: 'storage_state', file: r.storage_state, ready: fs.existsSync(f), missing: fs.existsSync(f) ? [] : [`file ${r.storage_state}`] }; }
     if (c.via === 'login_command') return { role: r.name, via: 'login_command', ready: true, missing: [] };
-    if (r.headers_env) { const miss = parseHeaders(r.headers_env).list.filter((h) => !env[h.env]).map((h) => `env ${h.env}`); if (c.via === 'headers' || miss.length) return { role: r.name, via: c.via === 'headers' ? 'headers' : 'login+headers', ready: !miss.length, missing: miss }; }
+    if (r.headers && r.headers.length) { const miss = r.headers.filter((h) => !env[h.env]).map((h) => `env ${h.env}`); if (c.via === 'headers' || miss.length) return { role: r.name, via: c.via === 'headers' ? 'headers' : 'login+headers', ready: !miss.length, missing: miss }; }
     return { role: r.name, via: 'login', login: r.login, ready: !c.missing.length, source: c.source, missing: c.missing.map((n) => `env ${n} (or ${LOCAL_FILE})`) };
   });
 }
@@ -111,7 +100,7 @@ const firstLine = (e) => String(e && e.message || e).split('\n')[0];
 async function login(browser, name, role, o) {
   const env = process.env;
   const c = credentials(name, role, o.codeRoot);
-  const hdr = role.headers_env ? parseHeaders(role.headers_env).list : [];
+  const hdr = role.headers || [];
   const missingH = hdr.filter((h) => !env[h.env]).map((h) => h.env);
   if (missingH.length) return { ok: false, code: 'role:no-credentials', error: `role ${name}: set the env var${missingH.length > 1 ? 's' : ''} ${missingH.join(', ')} (header values come from the environment). Nothing gated by this role was verified.` };
   const headers = Object.fromEntries(hdr.map((h) => [h.name, env[h.env]]));

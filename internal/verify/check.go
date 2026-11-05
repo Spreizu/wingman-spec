@@ -456,12 +456,14 @@ func (e *Env) tokenLint(changeDir string, files []string) *tokenResult {
 	if len(ui) == 0 || !visual.Available(e.code) {
 		return nil
 	}
-	var r *tokenResult
-	if err := visual.Call(e.Ctx, e.code, "token-lint", map[string]any{"code_root": e.code, "change_dir": changeDir, "files": ui}, &r, nil); err != nil {
+	var wrap struct {
+		Tokens *tokenResult `json:"tokens"`
+	}
+	if err := visual.Call(e.Ctx, e.code, "design-scan", map[string]any{"code_root": e.code, "change_dir": changeDir, "root": e.R.Specs, "files": ui}, &wrap, nil); err != nil {
 		e.say("WARNING: design token lint skipped: %v", err)
 		return nil
 	}
-	return r
+	return wrap.Tokens
 }
 
 type tokenResult struct {

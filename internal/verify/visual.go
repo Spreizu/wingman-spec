@@ -250,9 +250,42 @@ func ids(xs []*visual.Scenario) []string {
 	return out
 }
 
+func stringsOr(xs []string) []string {
+	if xs == nil {
+		return []string{}
+	}
+	return xs
+}
+
+// nodeConfig is the visual config the helper reads. Other keys stay in Go.
+func nodeConfig(v config.Visual) map[string]any {
+	roles := map[string]any{}
+	for name, r := range v.Roles {
+		user, pass := config.RoleEnv(r)
+		headers := []config.Header{}
+		if r.HeadersEnv != "" {
+			if h, err := config.ParseHeaders(r.HeadersEnv); err == nil && h != nil {
+				headers = h
+			}
+		}
+		roles[name] = map[string]any{
+			"name": name, "login": r.Login, "success": r.Success, "user_field": r.UserField,
+			"password_field": r.PasswordField, "submit": r.Submit, "user_env": user, "password_env": pass,
+			"storage_state": r.StorageState, "login_command": r.LoginCommand, "headers": headers,
+		}
+	}
+	return map[string]any{
+		"url": v.URL, "port": v.Port, "command": v.Command,
+		"ready_timeout": v.ReadyTimeout, "page_timeout": v.PageTimeout, "request_timeout": v.RequestTimeout,
+		"contexts": v.Contexts, "baseline": v.Baseline, "ignore": stringsOr(v.Ignore), "ignore_http": stringsOr(v.IgnoreHTTP),
+		"roles": roles, "ignore_https_errors": v.IgnoreHTTPSErrors, "reuse_server": v.ReuseServer,
+		"browsers_path": v.BrowsersPath, "require_playwright": v.RequirePlaywright,
+	}
+}
+
 // visualConfigJSON is the visual config the helper reads.
 func (e *Env) visualJob(extra map[string]any) map[string]any {
-	j := map[string]any{"code_root": e.code, "root": e.R.Specs, "config": e.Cfg.Visual}
+	j := map[string]any{"code_root": e.code, "root": e.R.Specs, "config": nodeConfig(e.Cfg.Visual)}
 	maps.Copy(j, extra)
 	return j
 }
@@ -265,7 +298,8 @@ func (e *Env) captureBefore(run, changeDir string, st *State) json.RawMessage {
 	}
 	var out json.RawMessage
 	dir := filepath.Join(run, "visual", st.Task.Label, "before")
-	if err := visual.Call(e.Ctx, e.code, "capture", e.visualJob(map[string]any{"out_dir": dir, "items": p.items}), &out, e.Err); err != nil {
+	visual.Bind(p.items, changeDir, e.R.Specs, e.code)
+	if err := visual.Call(e.Ctx, e.code, "capture", e.visualJob(map[string]any{"out_dir": dir, "items": p.items, "app_tree": runstate.AppTree(e.code)}), &out, e.Err); err != nil {
 		b, _ := json.Marshal(map[string]any{"dir": dir, "ok": false, "skipped": err.Error(), "server": []string{}, "source": "pre-task tree (next)"})
 		return b
 	}
@@ -309,7 +343,8 @@ func (e *Env) captureWaveBefore(run, changeDir string, st *State) {
 	}
 	var out json.RawMessage
 	dir := filepath.Join(run, "visual", fmt.Sprintf("wave-%d", st.Wave.N), "before")
-	if err := visual.Call(e.Ctx, e.code, "capture", e.visualJob(map[string]any{"out_dir": dir, "items": items}), &out, e.Err); err != nil {
+	visual.Bind(items, changeDir, e.R.Specs, e.code)
+	if err := visual.Call(e.Ctx, e.code, "capture", e.visualJob(map[string]any{"out_dir": dir, "items": items, "app_tree": runstate.AppTree(e.code)}), &out, e.Err); err != nil {
 		out, _ = json.Marshal(map[string]any{"dir": dir, "ok": false, "skipped": err.Error(), "server": []string{}, "source": "pre-task tree (next)"})
 	}
 	var b struct {
@@ -341,8 +376,15 @@ type vreport struct {
 	Ignored       []any    `json:"ignored"`
 	IgnoredReport []string `json:"ignored_report"`
 	SkippedSteps  []string `json:"skipped_steps"`
-	AllDefects    int      `json:"all_defects"`
+	DefectCount   int      `json:"defect_count"`
 	Cached        bool     `json:"cached,omitempty"`
+}
+
+func (r *vreport) nDefects() int {
+	if n := len(r.Defects); n > 0 {
+		return n
+	}
+	return r.DefectCount
 }
 
 func (r *vreport) skipped() string {
@@ -366,16 +408,70 @@ func (e *Env) visualCacheFile(p vplan, st *State) string {
 	if tree == "" {
 		return ""
 	}
-	var before any
-	if st != nil && len(st.VisualBefore) > 0 {
-		var vb struct{ Source, Report string }
-		_ = json.Unmarshal(st.VisualBefore, &vb)
-		before = []string{vb.Source, vb.Report}
-	}
-	cfg := p.cfg
-	key, _ := json.Marshal([]any{tree, e.headSHA(), before, p.items, cfg})
+	before := beforeHash(st)
+	key, _ := json.Marshal([]any{tree, e.headSHA(), before, cacheItems(p.items), cacheCfg(p.cfg)})
 	s := sha1.Sum(key)
 	return filepath.Join(e.runsDir(), "cache", "visual-"+hex.EncodeToString(s[:])+".json")
+}
+
+func beforeHash(st *State) string {
+	if st == nil || len(st.VisualBefore) == 0 {
+		return ""
+	}
+	var vb struct {
+		Report string `json:"report"`
+	}
+	if json.Unmarshal(st.VisualBefore, &vb) != nil || vb.Report == "" {
+		return ""
+	}
+	b, err := os.ReadFile(vb.Report)
+	if err != nil {
+		return ""
+	}
+	sum := sha1.Sum(b)
+	return hex.EncodeToString(sum[:])
+}
+
+func rawExpects(xs []visual.Expect) []string {
+	out := make([]string, 0, len(xs))
+	for _, x := range xs {
+		out = append(out, x.Raw)
+	}
+	return out
+}
+
+func cacheStates(xs []visual.State) []any {
+	out := make([]any, 0, len(xs))
+	for _, st := range xs {
+		out = append(out, map[string]any{
+			"name": st.Name, "steps": st.Steps, "keys": st.Keys, "absents": st.Absents, "expects": rawExpects(st.Expects),
+		})
+	}
+	return out
+}
+
+func cacheItems(items []visual.Item) []any {
+	out := make([]any, 0, len(items))
+	for _, it := range items {
+		s := it.Scenario
+		if s == nil {
+			continue
+		}
+		out = append(out, map[string]any{
+			"id": s.ID, "route": s.Route, "viewports": s.Viewports, "role": s.Role, "item_role": it.Role,
+			"keys": s.Keys, "overlays": s.Overlays, "absents": s.Absents, "redirects": s.RedirectsTo,
+			"ignores": s.Ignores, "ignore_http": s.IgnoreHTTP, "expects": rawExpects(s.Expects), "states": cacheStates(s.States),
+		})
+	}
+	return out
+}
+
+func cacheCfg(cfg config.Visual) map[string]any {
+	return map[string]any{
+		"url": cfg.URL, "command": cfg.Command, "port": cfg.Port,
+		"ignore": cfg.Ignore, "ignore_http": cfg.IgnoreHTTP, "baseline": cfg.Baseline,
+		"page_timeout": cfg.PageTimeout, "request_timeout": cfg.RequestTimeout, "ready_timeout": cfg.ReadyTimeout,
+	}
 }
 
 // runVisual runs the visual check of a plan and compares it with the before capture (cached while nothing changed).
@@ -401,7 +497,8 @@ func (e *Env) runVisual(changeDir string, p vplan, st *State, run, outDir string
 		Report       vreport         `json:"report"`
 		VisualBefore json.RawMessage `json:"visual_before"`
 	}
-	job := e.visualJob(map[string]any{"change_dir": changeDir, "out_dir": outDir, "items": p.items, "label": label, "run_dir": run})
+	visual.Bind(p.items, changeDir, e.R.Specs, e.code)
+	job := e.visualJob(map[string]any{"change_dir": changeDir, "out_dir": outDir, "items": p.items, "label": label, "run_dir": run, "app_tree": runstate.AppTree(e.code)})
 	if len(before) > 0 {
 		job["before"] = before
 	}
@@ -414,7 +511,7 @@ func (e *Env) runVisual(changeDir string, p vplan, st *State, run, outDir string
 	}
 	r := res.Report
 	r.Defects, r.Shots, r.ARIAChanges, r.Pairs = list(r.Defects), list(r.Shots), list(r.ARIAChanges), list(r.Pairs)
-	if vc != "" && r.Ran && r.skipped() == "" && len(r.Defects) == 0 {
+	if vc != "" && r.Ran && r.skipped() == "" && r.nDefects() == 0 {
 		_ = os.MkdirAll(filepath.Dir(vc), 0o755)
 		_ = runstate.WriteJSON(vc, map[string]any{"at": runstate.Now(), "seconds": r.Seconds})
 	}

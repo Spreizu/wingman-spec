@@ -71,10 +71,13 @@ func (e *Env) visualLint(changeDir string) vlint {
 	probs = append(probs, e.visualLineLint(changeDir, scens)...)
 	if visual.NeedsDesignLint(scens) {
 		// The design lint (design-map.md rows, token names) reads the project's design system: the helper does it.
+		for _, s := range scens {
+			visual.Annotate(s)
+		}
 		var res struct {
 			Problems []VProblem `json:"problems"`
 		}
-		if err := visual.Call(e.Ctx, e.code, "design-lint", map[string]any{"scenarios": scens, "change_dir": changeDir, "root": e.R.Specs, "code_root": e.code}, &res, nil); err != nil {
+		if err := visual.Call(e.Ctx, e.code, "design-scan", map[string]any{"scenarios": scens, "change_dir": changeDir, "root": e.R.Specs, "code_root": e.code}, &res, nil); err != nil {
 			e.say("WARNING: the design map was not linted: %v", err)
 			probs = append(probs, VProblem{"kind": "visual-helper", "severity": "warning", "text": "the design map was not linted: " + err.Error()})
 		} else {

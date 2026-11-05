@@ -91,7 +91,7 @@ func (e *Env) Visual() error {
 	switch {
 	case rep.skipped() != "":
 		result = "skipped"
-	case len(rep.Defects) > 0:
+	case rep.nDefects() > 0:
 		result = "defects"
 	}
 	var labels []string
@@ -110,7 +110,7 @@ func (e *Env) Visual() error {
 		return quit(Fail)
 	case rep.skipped() != "":
 		return quit(Usage)
-	case len(rep.Defects) > 0:
+	case rep.nDefects() > 0:
 		return quit(Fail)
 	}
 	return nil

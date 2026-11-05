@@ -415,9 +415,9 @@ func (e *Env) finishVisual(changeDir, run string, o *outcome) {
 		}
 		return
 	}
-	o.check(O("check", "visual", "ok", len(rep.Defects) == 0, "defects", len(rep.Defects), "seconds", rep.Seconds))
-	if len(rep.Defects) > 0 {
-		o.fail(fmt.Sprintf("visual check: %d defect(s) (report: %s):\n%s", len(rep.Defects), filepath.Join(outDir, "report.json"), strings.Join(rep.Summary, "\n")))
+	o.check(O("check", "visual", "ok", rep.nDefects() == 0, "defects", rep.nDefects(), "seconds", rep.Seconds))
+	if rep.nDefects() > 0 {
+		o.fail(fmt.Sprintf("visual check: %d defect(s) (report: %s):\n%s", rep.nDefects(), filepath.Join(outDir, "report.json"), strings.Join(rep.Summary, "\n")))
 	}
 }
 
