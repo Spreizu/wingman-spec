@@ -20,5 +20,5 @@ Symptom fixes fail `check` again. Find the cause, then change one thing.
 ## Stop
 
 - After three failed fixes on the same fault, do not try a fourth. Report.
-- Do not edit `tasks.md`, specs or ADRs to make the failure go away.
+- Do not edit specs or ADRs to make the failure go away.
 - Deep traces (when the fault crosses packages): `references/root-cause-tracing.md`.

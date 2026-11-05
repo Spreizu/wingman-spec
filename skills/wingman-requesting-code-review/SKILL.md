@@ -12,7 +12,7 @@ The prompt gives `review_range`: `BASE_SHA` and `HEAD_SHA`. They cover the whole
 ## Do
 
 1. `git diff BASE_SHA HEAD_SHA` (and the files the prompt lists).
-2. Also apply `wingman-ponytail-review`: Must fix is Critical, Should fix is Important.
+2. Also apply `wingman-ponytail-review`.
 3. Fix Critical and Important before you reply. First add a test that fails without the fix (`[review:<slug>]` in the name).
 4. Record each fix: `.wingman-spec/bin/wingman-spec progress <change> --task <id> --review-fix <slug> --note "<finding>"`. Use `--untestable "<reason>"` when no test can show it.
 5. Stay inside files this change's `Files:` lines name. Put anything outside in your reply as a follow-up.

@@ -13,6 +13,7 @@ import (
 	"github.com/Spreizu/wingman-spec/internal/runstate"
 	"github.com/Spreizu/wingman-spec/internal/spec"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
+	"github.com/Spreizu/wingman-spec/internal/testpaths"
 	"github.com/Spreizu/wingman-spec/internal/trace"
 	"github.com/Spreizu/wingman-spec/internal/visual"
 )
@@ -216,7 +217,6 @@ func (e *Env) Next() error {
 				e.savePre(&l.Task)
 			}
 			st = &State{Change: e.O.Change, Started: runstate.Now(), PreTasks: pre, Snapshots: snaps, Wave: w, Waves: w.N}
-			logMetric(r, O("event", "dispatch", "wave", w.N, "tasks", w.labels(), "remaining", prog.Remaining))
 			e.recordBase()
 			writeState(r, st)
 			return e.emitWave(changeDir, r, st, vl, tinfo, prog, true)
@@ -235,7 +235,6 @@ func (e *Env) Next() error {
 			}
 		}
 		st = &State{Change: e.O.Change, Started: runstate.Now(), Task: task, PreTasks: pre, Snapshots: snaps, Waves: waves}
-		logMetric(r, O("event", "dispatch", "task", task.Label, "remaining", prog.Remaining))
 		e.recordBase()
 		e.savePre(task)
 	}
@@ -244,6 +243,9 @@ func (e *Env) Next() error {
 	packet, prompt, err := e.packetFor(changeDir, r, st, vl, tinfo, prog, fresh)
 	if err != nil {
 		return err
+	}
+	if fresh {
+		logMetric(r, O("event", "dispatch", "task", st.Task.Label, "remaining", prog.Remaining, "prompt_chars", len(prompt)))
 	}
 	if e.O.Format == "prompt" {
 		e.timelineOf(packet)
@@ -284,6 +286,13 @@ func (e *Env) emitWave(changeDir, r string, st *State, vl vlint, tinfo CmdInfo, 
 		packets = append(packets, obj)
 		prompts = append(prompts, prompt)
 		labels = append(labels, l.Task.Label)
+	}
+	if fresh {
+		n := 0
+		for _, p := range prompts {
+			n += len(p)
+		}
+		logMetric(r, O("event", "dispatch", "wave", w.N, "tasks", w.labels(), "remaining", prog.Remaining, "prompt_chars", n))
 	}
 	e.lane = 0
 	if len(packets) == 0 && len(reviews) > 0 {
@@ -379,12 +388,7 @@ func (e *Env) packetFor(changeDir, r string, st *State, vl vlint, tinfo CmdInfo,
 			}
 		}
 	}
-	var read []string
-	for _, f := range []string{"proposal.md", "specs", "design.md", "design-map.md", "adrs", "tasks.md", "progress.md"} {
-		if p := filepath.Join(changeDir, f); exists(p) {
-			read = append(read, p)
-		}
-	}
+	read := readFiles(changeDir, st, scens)
 	earlier := []string{}
 	for _, t := range e.plan(changeDir).All() {
 		if t.Done && !t.Review {
@@ -436,17 +440,84 @@ func (e *Env) packetFor(changeDir, r string, st *State, vl vlint, tinfo CmdInfo,
 	for _, w := range warnings {
 		e.say("WARNING: %s", w)
 	}
-	prompt := e.packetPrompt(changeDir, st, batch, read, earlier, warnings, ids(vt), vports, refs, vcfg.Scope == "all", tagIDs(tr.Explicit), tagIDs(tr.Implicit), anchorKeys, rr)
+	prompt := e.packetPrompt(changeDir, st, batch, read, warnings, ids(vt), vports, refs, vcfg.Scope == "all", tagIDs(tr.Explicit), tagIDs(tr.Implicit), anchorKeys, rr)
 	if st.lane != nil {
 		packet.Set("wave", st.parent.Wave.N).Set("files", filesOf(st.Task.Details)).Set("check", fmt.Sprintf("check %s --task %s --reported <status>", e.O.Change, st.Task.Label))
 	}
 	return packet, prompt, nil
 }
 
-var designMapRE = regexp.MustCompile(`(^|/)design-map\.md$`)
+var (
+	designMapRE = regexp.MustCompile(`(^|/)design-map\.md$`)
+	decisionRE  = regexp.MustCompile(`(?i)\b(?:adrs?|decision)\b`)
+)
+
+// readFiles is what the implementer opens: the proposal, the spec files this task's Spec lines name,
+// the design, and tasks.md. adrs/ is included only when the task text mentions a decision.
+func readFiles(changeDir string, st *State, scens []*quality.Scenario) []string {
+	var read []string
+	add := func(p string) {
+		if p != "" && exists(p) && !slices.Contains(read, p) {
+			read = append(read, p)
+		}
+	}
+	add(filepath.Join(changeDir, "proposal.md"))
+	refs := specRefsOf(st, scens)
+	for _, s := range slices.Concat(refs.Explicit, refs.Implicit) {
+		if s != nil {
+			add(s.File)
+		}
+	}
+	add(filepath.Join(changeDir, "design.md"))
+	add(filepath.Join(changeDir, "design-map.md"))
+	if mentionsDecision(st) {
+		add(filepath.Join(changeDir, "adrs"))
+	}
+	add(filepath.Join(changeDir, "tasks.md"))
+	add(filepath.Join(changeDir, "progress.md"))
+	return read
+}
+
+func mentionsDecision(st *State) bool {
+	for _, m := range st.members() {
+		if decisionRE.MatchString(m.Title) {
+			return true
+		}
+		for _, d := range m.Details {
+			if decisionRE.MatchString(d) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// taskHasTests reports whether the dispatch names a test to write or a test file to edit.
+func taskHasTests(st *State) bool {
+	for _, m := range st.members() {
+		for _, d := range m.Details {
+			low := strings.ToLower(strings.TrimSpace(d))
+			if strings.HasPrefix(low, "test first:") {
+				return true
+			}
+			rest, ok := strings.CutPrefix(low, "files:")
+			if !ok {
+				continue
+			}
+			for _, f := range strings.FieldsFunc(rest, func(r rune) bool {
+				return r == ',' || r == ';' || r == ' ' || r == '\t'
+			}) {
+				if testpaths.IsTestFile(f) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
 
 // packetPrompt is the packet as a ready prompt for one implementer subagent.
-func (e *Env) packetPrompt(changeDir string, st *State, batch []PacketTask, read, earlier, warnings, vscen []string, vports []int, refs []string, guards bool, tags, reqTags, anchorKeys []string, rr any) string {
+func (e *Env) packetPrompt(changeDir string, st *State, batch []PacketTask, read, warnings, vscen []string, vports []int, refs []string, guards bool, tags, reqTags, anchorKeys []string, rr any) string {
 	rel := func(f string) string {
 		if e.R.Specs == e.code {
 			if r, err := filepath.Rel(e.code, f); err == nil {
@@ -479,9 +550,6 @@ func (e *Env) packetPrompt(changeDir string, st *State, batch []PacketTask, read
 		rd = append(rd, rel(f))
 	}
 	add("Read first: " + strings.Join(rd, ", ") + ".")
-	if len(earlier) > 0 {
-		add("Already done in this change: " + strings.Join(earlier, "; ") + ".")
-	}
 	if st.Attempts > 0 {
 		lf := ""
 		if st.LastFailure != nil {
@@ -532,7 +600,7 @@ func (e *Env) packetPrompt(changeDir string, st *State, batch []PacketTask, read
 			s += " (those of " + bracket(reqTags) + " that this task implements)"
 		}
 		add(s + ". The verifier fails the task when a scenario it names has no tagged test. " + behaviour)
-	} else {
+	} else if taskHasTests(st) {
 		add(behaviour)
 	}
 	if len(anchorKeys) > 0 {

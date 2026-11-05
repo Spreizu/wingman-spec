@@ -161,6 +161,49 @@ func writeState(run string, s *State) {
 	_ = runstate.WriteJSON(filepath.Join(run, "state.json"), s)
 }
 
+// logCheck writes a check or review metric. A check event also records seconds since the last dispatch.
+func logCheck(run string, rec *Obj) {
+	if rec.Get("event") == "check" {
+		if sec, ok := sinceDispatch(run); ok {
+			rec.Set("since_dispatch_s", sec)
+		}
+	}
+	logMetric(run, rec)
+}
+
+// sinceDispatch is the seconds from the last dispatch event in this run to now.
+func sinceDispatch(run string) (float64, bool) {
+	b, err := os.ReadFile(filepath.Join(run, "metrics.jsonl"))
+	if err != nil {
+		return 0, false
+	}
+	var at string
+	for line := range strings.SplitSeq(strings.TrimRight(string(b), "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		var rec struct {
+			Event string `json:"event"`
+			At    string `json:"at"`
+		}
+		if json.Unmarshal([]byte(line), &rec) == nil && rec.Event == "dispatch" && rec.At != "" {
+			at = rec.At
+		}
+	}
+	if at == "" {
+		return 0, false
+	}
+	t, err := time.Parse(time.RFC3339Nano, at)
+	if err != nil {
+		return 0, false
+	}
+	sec := time.Since(t).Seconds()
+	if sec < 0 {
+		sec = 0
+	}
+	return sec, true
+}
+
 func logMetric(run string, rec *Obj) {
 	x := O("at", runstate.Now()).Merge(rec)
 	b, err := marshal(x)

@@ -41,7 +41,7 @@ This command is the approved path to edit specs after apply. `/spec-apply` and i
 
 5. **Implement only new work.** If `tasks.md` has unchecked `- [ ]` items this command added, you are the **orchestrator**, exactly as in `/spec-apply`. Earlier tasks are already ticked, so `next` starts at the first new one. The loop ends with `finish`, as in `/spec-apply`. If an earlier finish ran out of attempts, delete the file its `exhausted` message names first.
 
-{{> apply-loop}}
+Follow `apply-loop` from `/spec-apply`.
 
    If there are no new unchecked tasks (spec-only correction), skip this step.
 

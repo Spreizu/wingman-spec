@@ -56,7 +56,7 @@ change M none src/greet.js
 rc=0; $V app-map demo --apply > "$T/am.json" 2>&1 || rc=$?
 expect "app-map refuses a Size M change (the full map is written by the analyst)" '[ $rc = 2 ] && [ ! -f $C/app-map.md ]'
 
-echo "== the next packet lists earlier tasks (replaces the agent-written progress file)"
+echo "== the next packet does not repeat ticked tasks"
 change S none src/greet.js
 git add -A >/dev/null; git commit -qm change
 $V next demo --per-task --format prompt > "$T/p1.txt" 2>&1
@@ -64,7 +64,7 @@ expect "first task: no 'Already done' line" '! grep -q "Already done in this cha
 sed -i.b 's/^- \[ \] 1.1/- [x] 1.1/' "$C/tasks.md"; rm -f "$C/tasks.md.b"
 $V check demo --reported done >/dev/null 2>&1
 $V next demo --per-task --format prompt > "$T/p2.txt" 2>&1
-expect "second task: names 1.1 and its files" 'grep -q "Already done in this change: 1.1 one (src/greet.js)" "$T/p2.txt"'
+expect "second task: no Already done line; the ticks stay in tasks.md" '! grep -q "Already done in this change" "$T/p2.txt" && grep -q "tasks.md" "$T/p2.txt"'
 
 echo "== scope upgrade of a fast change"
 upgrade_case() { # <label> <stub that edits code> <grep for the reason>

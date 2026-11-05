@@ -842,14 +842,14 @@ func (e *Env) Check() error {
 		dir, _ := vis.Get("dir").(string)
 		st.Review = &ReviewState{Prompt: review, Dir: dir, Checks: checks, Seconds: secs, Started: runstate.Now(), Rubric: rubric}
 		writeState(run, st)
-		logMetric(run, O("event", "check", "task", st.Task.Label, "attempt", st.Attempts+1, "ok", true, "review_pending", true, "seconds", secs, "checks", checks))
+		logCheck(run, O("event", "check", "task", st.Task.Label, "attempt", st.Attempts+1, "ok", true, "review_pending", true, "seconds", secs, "checks", checks))
 		e.emit(O("result", "review-pending", "task", st.Task.Label, "review_prompt", review, "area_images", filepath.Join(dir, "areas"),
 			"next", fmt.Sprintf("dispatch an independent spec-visual-reviewer subagent with the review prompt, save its reply, then: review %s --reply <file>. Never review your own screenshots; if no subagent can run, record it as skipped: review %s --reviewer none", e.O.Change, e.O.Change),
 			"checks", checks, "visual", vis, "warnings", warnings))
 		return quit(Review)
 	}
 	if len(o.failures) == 0 {
-		logMetric(run, O("event", "check", "task", st.Task.Label, "attempt", st.Attempts+1, "ok", true, "seconds", secs, "checks", checks))
+		logCheck(run, O("event", "check", "task", st.Task.Label, "attempt", st.Attempts+1, "ok", true, "seconds", secs, "checks", checks))
 		return e.pass(run, st, checks, vis, warnings, changeDir)
 	}
 	return e.reject(run, st, o.failures, rejectInfo{blocked: blocked, seconds: secs, checks: checks, visual: vis, warnings: warnings})

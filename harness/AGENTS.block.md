@@ -50,18 +50,14 @@ In Codex they are skills: `$spec-apply <change>` instead of `/spec-apply <change
 - `wingman-ponytail` (full): name skipped extras, do not question the spec.
 - `wingman-systematic-debugging` on an unexpected failure or after two failed fixes.
 - `wingman-verification-before-completion`: run `Done when:` and read its output.
-- A `Request code review` task: reviewer subagent (`wingman-requesting-code-review`), then `wingman-ponytail-review`. **Must fix** is Critical, **Should fix** Important; fix both before ticking.
+- A `Request code review` task: reviewer subagent (`wingman-requesting-code-review`), then `wingman-ponytail-review`. Fix the findings that review lists before you reply.
 
 `spec-implementer` has the detail.
 
 ### Apply loop (`/spec-apply <change>`): orchestrator, subagent, CLI
 
-The main agent orchestrates; the CLI decides whether a task is done. Per dispatch: `wingman-spec next <change> --format prompt`,
-ONE fresh `spec-implementer` subagent per prompt (a `WAVE` gives one prompt per packet, dispatched together; none available: do it
-yourself), then `check <change> --reported <done|failed|blocked>` (3 attempts per dispatch). `finish <change>` closes out.
-Exit 5 (visual review pending) and 10 (all done) are results, so never chain calls with `&&`. Exit 5: ONE `spec-visual-reviewer`
-subagent, then `review <change> --reply <file>` (none available: `--reviewer none`); never review your own screenshots.
-`/spec-apply` has the full loop and the other exit codes.
+The main agent orchestrates. The CLI decides whether a task is done.
+Follow `/spec-apply` for the steps, the exit codes and the visual review.
 
 UI work: scenarios carry a ```` ```visual ```` block and tasks a `Visual:` line; run `wingman-spec visual <change>` before ticking.
 Browsers run headless only, so the owner's screen stays free: never `--headed`, `--debug`, `PWDEBUG`, `open <url>`, or a browser tool

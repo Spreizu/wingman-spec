@@ -188,7 +188,7 @@ func (e *Env) Finish() error {
 		o.fail("validate failed: " + verr.Error())
 	case len(vrep) > 0:
 		o.check(O("check", "validate", "ok", false, "rc", 1, "seconds", vsecs))
-		o.fail(fmt.Sprintf("validate failed (exit 1): wingman-spec validate %s\n%s", e.O.Change, strings.Join(vrep, "\n")))
+		o.fail(e.validateFailure(vrep))
 	default:
 		o.check(O("check", "validate", "ok", true, "rc", 0, "seconds", vsecs))
 	}

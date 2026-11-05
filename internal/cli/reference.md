@@ -46,7 +46,7 @@ CHECKS AND ARCHIVE
                                    --fix writes ID: lines, a missing Why: placeholder and a new capability's ## Purpose; overlap:
                                    another active change changes the same requirement (the one archived later wins)
   trace [<change>] [--text]        scenarios without a [cap/slug] test tag; tags that name no scenario (test_files: extra globs)
-  run-checks [<change>] [--only lint,typecheck,test,visual] [--text]   logs in runs/<change>/checks/, parsed failures
+  run-checks [<change>] [--only lint,typecheck,test,visual] [--store] [--text]   logs in runs/<change>/checks/, parsed failures; --store keeps a pass for check
                                    (TAP, JUnit via commands.junit, node --test, vitest, jest, pytest, go, eslint, tsc), a checks timeline event
   archive <change>                 gate: blocked, tasks, findings, finish (the tree finish recorded), lint, a clean merge; then
                                    merge specs and ADRs atomically and move the change. No override. Refusal: exit 1, nothing written.

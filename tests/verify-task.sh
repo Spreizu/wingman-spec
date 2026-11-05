@@ -169,6 +169,23 @@ expect "openspec validate --strict failure rejects the task" '[ $rc = 1 ] && pri
 out="$($V check demo 2>&1)"; rc=$?
 expect "a repeated check after a failed check runs again without next (and fails the same way)" '[ $rc = 1 ] && printf "%s" "$out" | grep -q "opened by this check" && printf "%s" "$out" | grep -q "validate failed"'
 
+echo "== validate findings are capped"
+reset_change '- [ ] 1.1 a
+  - Done when: `true`'
+{
+  printf '## ADDED\n\n'
+  i=1
+  while [ "$i" -le 20 ]; do
+    printf '### Requirement: Item %s\nThe system does item %s.\n\n' "$i" "$i"
+    i=$((i + 1))
+  done
+} > "$C/specs/demo.md"
+orch "$TICK1" "done"
+expect "more than 15 validate findings: the message clips them and names the log" '[ $rc = 1 ] && printf "%s" "$out" | grep -q "\\.\\.\\. and " && printf "%s" "$out" | grep -q "full output:"'
+log=$(printf "%s" "$out" | sed -n 's/.*full output: //p' | head -1 | tr -d '"' | awk '{print $1}')
+shown=$(printf "%s" "$out" | grep -o "has no" | wc -l | tr -d ' ')
+expect "the check message lists at most 15 findings and the log has the rest" '[ "$shown" -gt 0 ] && [ "$shown" -le 15 ] && [ -n "$log" ] && [ -f "$log" ] && [ "$(grep -c "has no" "$log")" -gt 15 ]'
+
 echo "== re-ticked tasks are verified, never skipped"
 reset_change '- [ ] 1.1 a
   - Done when: `test -f ok.flag`

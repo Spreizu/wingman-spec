@@ -56,7 +56,7 @@ expect "attempt 1 is rejected and not yet a repeat" '[ $rc = 1 ] && ! printf "%s
 fp1="$(find .wingman-spec/runs -name metrics.jsonl -exec cat {} + | node -e 'let l=require("fs").readFileSync(0,"utf8").trim().split("\n").map(JSON.parse).filter(r=>r.event==="check");console.log(l.at(-1).fingerprint)' )"
 expect "the fingerprint is the check, the test id and the first error line" 'printf "%s" "$fp1" | grep -q "sum adds" && printf "%s" "$fp1" | grep -q "AssertionError: expected 3, got -1" && ! printf "%s" "$fp1" | grep -qE "[0-9]ms"'
 $V next demo --format prompt > "$T/p2.txt"
-expect "attempt 2 prompt: the failure and the previous note" 'grep -q "attempt 2 of 3" "$T/p2.txt" && grep -q "rejected by the verifier" "$T/p2.txt" && grep -q "Tried a - b" "$T/p2.txt"'
+expect "attempt 2 prompt: the failure and the previous note, and no Already done list" 'grep -q "attempt 2 of 3" "$T/p2.txt" && grep -q "rejected by the verifier" "$T/p2.txt" && grep -q "Tried a - b" "$T/p2.txt" && ! grep -q "Already done" "$T/p2.txt"'
 printf 'export const sum = (a, b) => a - b; // attempt 2\n' > sum.mjs
 printf 'export const h = 1;\n' > helper.mjs
 printf 'Tried a - b again with a comment.\n' > "$NOTE"
@@ -103,6 +103,20 @@ $V next demo --format prompt > "$T/p5.txt"
 expect "no status and no note: the prompt says so" 'grep -q "It left no attempt note" "$T/p5.txt"'
 rc=0; $V check demo --reported maybe > /dev/null 2>&1 || rc=$?
 expect "an unknown --reported value is a usage error" '[ $rc = 2 ]'
+
+echo "== Read first names the spec file, not the specs directory"
+reset_change
+printf '## ADDED\n\n### Requirement: Other\nThe system SHALL stay listed apart.\n\n#### Scenario: other\n- **WHEN** x\n- **THEN** y\n' > "$C/specs/other.md"
+mkdir -p "$C/adrs"
+printf -- '---\nstatus: none\n---\nNone.\n' > "$C/adrs/none.md"
+printf -- '- [ ] 1.1 sum\n  - Spec: demo > Sum (add)\n  - Files: sum.mjs\n  - Done when: `true`\n' > "$C/tasks.md"
+$V next demo --format prompt > "$T/spec.txt"; rc=$?
+rf() { grep "^Read first:" "$1"; }
+expect "Read first names specs/demo.md, not the other delta, the specs directory or adrs" '[ $rc = 0 ] && rf "$T/spec.txt" | grep -q "specs/demo.md" && ! rf "$T/spec.txt" | grep -q "other.md" && ! rf "$T/spec.txt" | grep -Eq "specs(,|\\.|$)" && ! rf "$T/spec.txt" | grep -q "adrs"'
+printf -- '- [ ] 1.1 sum\n  - Spec: demo > Sum (add)\n  - Files: sum.mjs\n  - Done when: `true`\n  - Note: read the decision record\n' > "$C/tasks.md"
+rm -rf .wingman-spec/runs
+$V next demo --format prompt > "$T/dec.txt"; rc=$?
+expect "a task that mentions a decision lists adrs in Read first" '[ $rc = 0 ] && rf "$T/dec.txt" | grep -q "adrs"'
 
 echo; echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" = 0 ]

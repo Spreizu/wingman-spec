@@ -21,6 +21,9 @@ export WINGMAN_SPEC_TEST_CMD="echo x >> $COUNT" WINGMAN_SPEC_TYPECHECK_CMD="echo
 git add -A && git commit -qm init
 V="$WS"; C=.wingman-spec/changes/demo
 lines() { if [ -f "$1" ]; then wc -l < "$1" | tr -d ' '; else echo 0; fi; }
+metric() { # metric <event> <field>: the last metrics.jsonl value of that field
+  node -e 'const fs=require("fs"),path=require("path"); const dir=".wingman-spec/runs/demo"; const id=fs.readFileSync(path.join(dir,"current"),"utf8").trim(); const rows=fs.readFileSync(path.join(dir,id,"metrics.jsonl"),"utf8").trim().split("\n").map(JSON.parse).filter(r=>r.event===process.argv[1]); const v=rows.length?rows[rows.length-1][process.argv[2]]:""; process.stdout.write(v==null?"":String(v));' "$1" "$2"
+}
 runs() { lines "$COUNT"; }
 unlock() { rm -f .wingman-spec/runs/demo/finish.json; }
 plan() {
@@ -38,6 +41,7 @@ plan
 $V next demo > /dev/null 2>&1; echo 'module.exports = 2;' > src/a.js
 $V check demo --reported done > "$T/c.json" 2>&1; rc=$?
 expect "check runs the project tests (1 run)" '[ $rc = 0 ] && [ "$(runs)" = 1 ] && ! grep -q "\"cached\"" "$T/c.json"'
+expect "json dispatch records prompt_chars and check records seconds since it" '[ "$(metric dispatch prompt_chars)" -gt 0 ] && [ -n "$(metric check since_dispatch_s)" ]'
 git add -A; git commit -qm task
 $V finish demo > "$T/f.json" 2>&1; rc=$?
 expect "finish passes without running the tests again; the check says cached" '[ $rc = 0 ] && [ "$(runs)" = 1 ] && grep -A5 "\"check\": \"tests\"" "$T/f.json" | grep -q "\"cached\": true"'
@@ -109,6 +113,39 @@ expect "WINGMAN_SPEC_TIMEOUT_TESTS=1 kills the 4-second tests and says which lim
 $V check demo --reported done --timing > "$T/c.json" 2> "$T/c.err"; rc=$?
 expect "a command running for 3 seconds is announced on stderr, with its elapsed time" '[ $rc = 0 ] && grep -q "tests: still running after 3s" "$T/c.err" && grep -q "tests: finished in 4s" "$T/c.err"'
 expect "--timing prints the steps, most expensive first, and records them in metrics.jsonl" 'grep -q "wingman-spec: timing (check): tests 4" "$T/c.err" && grep -q "\"event\":\"profile\"" .wingman-spec/runs/demo/*/metrics.jsonl'
+
+echo "== prompt_chars is the printed prompt"
+plan
+$V next demo --format prompt > "$T/pp.txt"; rc=$?
+expect "prompt format: prompt_chars is the printed prompt, without the trailing newline" '[ $rc = 0 ] && [ "$(metric dispatch prompt_chars)" = "$(( $(wc -c < "$T/pp.txt" | tr -d " ") - 1 ))" ]'
+
+echo "== run-checks --store is what check reuses (process count, not a claim)"
+plan
+export WINGMAN_SPEC_TEST_CMD="echo x >> $COUNT" WINGMAN_SPEC_TYPECHECK_CMD="echo t >> $TCOUNT"
+$V next demo > /dev/null 2>&1
+echo 'module.exports = 2;' > src/a.js
+$V run-checks demo --store --only test > "$T/rc.json" 2>&1; rc=$?
+expect "run-checks --store runs the tests once" '[ $rc = 0 ] && [ "$(runs)" = 1 ]'
+$V check demo --reported done > "$T/c.json" 2>&1; rc=$?
+expect "check does not start the tests command after a stored pass" '[ $rc = 0 ] && [ "$(runs)" = 1 ] && grep -A8 "\"check\": \"tests\"" "$T/c.json" | grep -q "\"cached\": true"'
+
+echo "== a failing run-checks --store is not reused"
+plan
+export WINGMAN_SPEC_TEST_CMD="echo x >> $COUNT; false"
+$V next demo > /dev/null 2>&1
+echo 'module.exports = 2;' > src/a.js
+$V run-checks demo --store --only test > /dev/null 2>&1
+$V check demo --reported done > /dev/null 2>&1
+expect "a failed store does not stop check from starting the tests" '[ "$(runs)" = 2 ]'
+
+echo "== run-checks without --store does not fill the cache"
+plan
+export WINGMAN_SPEC_TEST_CMD="echo x >> $COUNT"
+$V next demo > /dev/null 2>&1
+echo 'module.exports = 2;' > src/a.js
+$V run-checks demo --only test > /dev/null 2>&1
+$V check demo --reported done > /dev/null 2>&1
+expect "without --store, check starts the tests again" '[ "$(runs)" = 2 ]'
 
 # the blame cache (stale anchors, drift): go test ./internal/anchors -run TestBlameCache
 

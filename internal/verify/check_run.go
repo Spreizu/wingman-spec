@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Spreizu/wingman-spec/internal/checkparse"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
 	"github.com/Spreizu/wingman-spec/internal/visual"
 )
@@ -180,11 +181,34 @@ func (e *Env) validateCheck(o *outcome) bool {
 	}
 	if len(rep) > 0 {
 		o.check(O("check", "validate", "ok", false, "rc", 1, "seconds", secs))
-		o.fail(fmt.Sprintf("validate failed (exit 1): wingman-spec validate %s\n%s", e.O.Change, strings.Join(rep, "\n")))
+		o.fail(e.validateFailure(rep))
 		return false
 	}
 	o.check(O("check", "validate", "ok", true, "rc", 0, "seconds", secs))
 	return true
+}
+
+// validateFailure is the agent-facing validate list: at most checkparse.MaxFailures lines.
+// The full list is written next to the other check logs, and the clipped message names that path.
+func (e *Env) validateFailure(issues []string) string {
+	head := fmt.Sprintf("validate failed (exit 1): wingman-spec validate %s", e.O.Change)
+	shown, more := issues, 0
+	if len(issues) > checkparse.MaxFailures {
+		shown = issues[:checkparse.MaxFailures]
+		more = len(issues) - checkparse.MaxFailures
+	}
+	msg := head + "\n" + strings.Join(shown, "\n")
+	if more > 0 {
+		msg += fmt.Sprintf("\n... and %d more", more)
+	}
+	if run := e.currentRun(false); run != "" {
+		full := strings.Join(issues, "\n")
+		log := e.writeLog(run, "validate", Result{Cmd: "wingman-spec validate " + e.O.Change, RC: 1, Full: full})
+		if log != "" && more > 0 {
+			msg += "\nfull output: " + log
+		}
+	}
+	return msg
 }
 
 // checkVisual runs the dispatch's visual check; stop is true on a failure.
@@ -313,7 +337,7 @@ func (e *Env) reject(run string, st *State, failures []string, x rejectInfo) err
 	for _, f := range failures {
 		firsts = append(firsts, firstLine(f))
 	}
-	logMetric(run, O("event", ev, "task", st.Task.Label, "attempt", n, "fingerprint", fp, "repeat", repeat != "", "ok", false, "blocked", x.blocked, "exhausted", exhausted, "seconds", x.seconds, "checks", x.checks, "failures", firsts).Merge(x.metric))
+	logCheck(run, O("event", ev, "task", st.Task.Label, "attempt", n, "fingerprint", fp, "repeat", repeat != "", "ok", false, "blocked", x.blocked, "exhausted", exhausted, "seconds", x.seconds, "checks", x.checks, "failures", firsts).Merge(x.metric))
 	result, code := "failed", Fail
 	switch {
 	case x.blocked:

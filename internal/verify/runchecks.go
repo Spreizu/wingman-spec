@@ -121,8 +121,9 @@ type checkRun struct {
 var checkNames = []string{"lint", "typecheck", "test", "visual"}
 
 // RunChecks runs the project's lint, typecheck and test commands (and, for a change, its visual check, headless),
-// each in full and uncached, writes each output to a log file and prints a short parsed summary. With a change the
-// result goes to its timeline.
+// each in full, writes each output to a log file and prints a short parsed summary. With --store a passing lint,
+// typecheck or test is written to the same cache check reads. A failure is not stored. Visual is not stored there.
+// With a change the result goes to its timeline.
 func (e *Env) RunChecks() error {
 	only := e.O.Select
 	for _, n := range only {
@@ -145,6 +146,10 @@ func (e *Env) RunChecks() error {
 	cmds[2].Name = "test"
 	var runs []checkRun
 	seen := map[string]string{}
+	tree := ""
+	if e.O.Store {
+		tree = e.phaseTree()
+	}
 	for _, c := range cmds {
 		if !want(c.Name) {
 			continue
@@ -160,7 +165,7 @@ func (e *Env) RunChecks() error {
 			cr.Skipped = "same command as " + seen[norm(c.cmd())]
 		default:
 			seen[norm(c.cmd())] = c.Name
-			r := e.runCmd(c.cmd(), e.code, e.timeoutFor(c.Name), c.Name)
+			r := e.storedCmd(c, tree)
 			cr.OK, cr.RC, cr.TimedOut, cr.Seconds = r.RC == 0, r.RC, r.TimedOut, r.Seconds
 			cr.Log = e.writeLog(e.checksDir(), c.Name, r)
 			if s := e.parsed(c.Name, r); s.Read() {
@@ -235,6 +240,18 @@ func (e *Env) RunChecks() error {
 		return quit(Fail)
 	}
 	return nil
+}
+
+// storedCmd runs one project command. With --store a pass is written the same way check writes it.
+func (e *Env) storedCmd(c CmdInfo, tree string) Result {
+	name := c.Name
+	if name == "test" {
+		name = "tests"
+	}
+	if e.O.Store && projectCmds[name] {
+		return e.runNamed(name, c.cmd(), tree)
+	}
+	return e.runCmd(c.cmd(), e.code, e.timeoutFor(c.Name), c.Name)
 }
 
 func checkLine(r checkRun) string {

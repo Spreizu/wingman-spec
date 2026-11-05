@@ -199,6 +199,7 @@ func (a *app) verifyCmds() []*command {
 		return e.RunChecks()
 	}, func(f *flagSet, o *verify.Options) {
 		f.BoolVar(&o.Text, "text", false, "the summary as text instead of JSON")
+		f.BoolVar(&o.Store, "store", false, "store a passing lint, typecheck or test so check can reuse it")
 		f.StringVar(&only, "only", "", "only these checks: lint,typecheck,test,visual")
 	})
 	return []*command{
