@@ -54,7 +54,7 @@ func (e *Env) visualLint(changeDir string) vlint {
 	if !visual.HasBlocks(filepath.Join(changeDir, "specs")) {
 		var out vlint
 		// Visual: lines that name scenarios when the change has none.
-		for _, t := range tasks.Parse(readText(tasksFile(changeDir))).All() {
+		for _, t := range e.plan(changeDir).All() {
 			r := visualRefs(t.Detail)
 			for _, u := range r.ids {
 				out.problems = append(out.problems, VProblem{"file": e.findingFile(changeDir, tasksFile(changeDir)), "line": t.Line, "kind": "visual-ref", "severity": "error",
@@ -119,7 +119,7 @@ func (e *Env) visualLineLint(changeDir string, scens []*visual.Scenario) []VProb
 	used := map[string]bool{}
 	anyAll := false
 	known := ids(scens)
-	for _, t := range tasks.Parse(readText(f)).All() {
+	for _, t := range e.planFile(f).All() {
 		r := visualRefs(t.Detail)
 		anyAll = anyAll || r.all
 		found, unknown := resolveRefs(r, scens)
@@ -440,6 +440,7 @@ func (e *Env) Lint() error {
 	}
 	if e.O.Fix {
 		n, err := quality.Fix(changeDir, e.R.LivingSpecs())
+		e.forgetPlans()
 		if err == nil {
 			var k int
 			k, err = e.tr().AssignIDs(changeDir)

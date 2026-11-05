@@ -120,18 +120,170 @@ func Profile() []Step {
 	return out
 }
 
+// ---------- file lists and reads ----------
+
+// RepoFiles is one `git ls-files -z -co --exclude-standard` (tracked and untracked, ignored left out).
+type RepoFiles struct {
+	All, Tracked, Untracked []string
+	OK                      bool
+}
+
+type repoFiles struct {
+	index string
+	list  RepoFiles
+}
+
+var (
+	filesMu   sync.Mutex
+	fileCache = map[string]repoFiles{}
+	readMu    sync.Mutex
+	reads     = map[string]struct {
+		size, mtime int64
+		text        string
+	}{}
+	busts = map[string]uint64{}
+)
+
+func indexStat(dir string) string {
+	st, err := os.Stat(filepath.Join(dir, ".git", "index"))
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%d:%d", st.Size(), st.ModTime().UnixNano())
+}
+
+// Files is the tracked and untracked files of dir, taken once until the git index changes or ForgetTrees runs.
+// The slices must not be modified.
+func Files(dir string) RepoFiles {
+	id := indexStat(dir)
+	filesMu.Lock()
+	if c, ok := fileCache[dir]; ok && id != "" && c.index == id {
+		filesMu.Unlock()
+		return c.list
+	}
+	filesMu.Unlock()
+	recs, ok := gitx.Z(dir, nil, "-c", "core.quotepath=off", "ls-files", "-z", "-t", "-co", "--exclude-standard")
+	if !ok {
+		return RepoFiles{}
+	}
+	list := RepoFiles{OK: true}
+	for _, rec := range recs {
+		if len(rec) < 2 || rec[1] != ' ' {
+			list.All = append(list.All, rec)
+			continue
+		}
+		path := rec[2:]
+		list.All = append(list.All, path)
+		if rec[0] == '?' {
+			list.Untracked = append(list.Untracked, path)
+		} else {
+			list.Tracked = append(list.Tracked, path)
+		}
+	}
+	if id != "" {
+		filesMu.Lock()
+		fileCache[dir] = repoFiles{index: id, list: list}
+		filesMu.Unlock()
+	}
+	return list
+}
+
+// Ignored is the tracked files a .gitignore matches (`git ls-files -ci`), memoised with Files.
+func Ignored(dir string) map[string]bool {
+	id := indexStat(dir)
+	filesMu.Lock()
+	if c, ok := fileCache[dir+"\x00ignored"]; ok && id != "" && c.index == id {
+		filesMu.Unlock()
+		out := map[string]bool{}
+		for _, f := range c.list.All {
+			out[f] = true
+		}
+		return out
+	}
+	filesMu.Unlock()
+	xs, ok := gitx.Z(dir, nil, "-c", "core.quotepath=off", "ls-files", "-z", "-ci", "--exclude-standard")
+	if !ok {
+		return map[string]bool{}
+	}
+	if id != "" {
+		filesMu.Lock()
+		fileCache[dir+"\x00ignored"] = repoFiles{index: id, list: RepoFiles{All: xs, OK: true}}
+		filesMu.Unlock()
+	}
+	out := map[string]bool{}
+	for _, f := range xs {
+		out[f] = true
+	}
+	return out
+}
+
+// ReadCached reads path once per size and mtime. The bool is false when the file is missing.
+func ReadCached(path string) (string, bool) {
+	st, err := os.Stat(path)
+	if err != nil {
+		return "", false
+	}
+	readMu.Lock()
+	if c, ok := reads[path]; ok && c.size == st.Size() && c.mtime == st.ModTime().UnixNano() {
+		readMu.Unlock()
+		return c.text, true
+	}
+	readMu.Unlock()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", false
+	}
+	text := string(b)
+	readMu.Lock()
+	reads[path] = struct {
+		size, mtime int64
+		text        string
+	}{st.Size(), st.ModTime().UnixNano(), text}
+	readMu.Unlock()
+	return text, true
+}
+
+// ForgetRead drops one cached file so the next read sees a rewrite in the same second.
+func ForgetRead(path string) {
+	readMu.Lock()
+	delete(reads, path)
+	busts[path]++
+	readMu.Unlock()
+}
+
+// Bust is how many times path was dropped. A parser cache stores it next to the mtime.
+func Bust(path string) uint64 {
+	readMu.Lock()
+	defer readMu.Unlock()
+	return busts[path]
+}
+
 // ---------- working-tree hashes ----------
+
+type blob struct{ mode, path, oid string }
+
+// snap is one write-tree of the tracked files. Filters are applied to blobs in Go.
+type snap struct {
+	tree, stamp, index string
+	blobs              []blob
+}
 
 var (
 	treesMu sync.Mutex
 	trees   = map[string]string{}
+	tracked = map[string]*snap{}
 )
 
-// ForgetTrees drops the memoised tree hashes (a command may have edited files).
+// ForgetTrees drops the memoised tree hashes and file lists (a command may have edited files).
 func ForgetTrees() {
 	treesMu.Lock()
 	trees = map[string]string{}
+	tracked = map[string]*snap{}
 	treesMu.Unlock()
+	filesMu.Lock()
+	fileCache = map[string]repoFiles{}
+	filesMu.Unlock()
+	gitx.ForgetHead()
 }
 
 // NotCode is run state and the plan's ticks: they change between check and finish without touching code.
@@ -145,10 +297,13 @@ var NotBase = regexp.MustCompile(`(^|/)changes/[^/]+/spec-base\.json$`)
 // change's spec-base.json): the archive gate compares the rest with what finish saw.
 var NotGate = regexp.MustCompile(NotCode.String() + `|(^|/)\.wingman-spec/(specs|adrs|archive)/`)
 
-// GateTree is the working-tree hash the archive gate compares with the one finish recorded ("" outside git). Untracked
-// files are hashed by content (WorkTree uses stat data), so committing after finish keeps the same hash. Tracked files
-// the project's .gitignore matches (a committed runtime log the app appends to) are left out: they are not code.
-func GateTree(dir string) string { return indexTree(dir, NotGate, true, "add", "-A") }
+// GateTree is the working-tree hash the archive gate compares with the one finish recorded ("" outside git). It is a
+// real tree object: untracked files are hashed by content (WorkTree uses stat data), so committing after finish keeps
+// the same hash, and a later process can diff it. Tracked files the project's .gitignore matches (a committed runtime
+// log the app appends to) are left out: they are not code.
+func GateTree(dir string) string {
+	return indexTree(dir, NotGate, true, "add", "-A")
+}
 
 // GateChanges lists the paths that differ between two GateTree hashes (nil when either tree is gone).
 func GateChanges(dir, was, now string) []string {
@@ -172,7 +327,7 @@ func WorkTree(dir string, drop *regexp.Regexp) string {
 	if ok {
 		return v
 	}
-	v = Timed("git: working-tree hash", func() string { return workTree(dir, drop) })
+	v = workTree(dir, drop)
 	treesMu.Lock()
 	trees[k] = v
 	treesMu.Unlock()
@@ -180,14 +335,23 @@ func WorkTree(dir string, drop *regexp.Regexp) string {
 }
 
 func workTree(dir string, drop *regexp.Regexp) string {
-	tree := IndexTree(dir, drop, "add", "-u")
-	if tree == "" {
+	s := ensureSnap(dir)
+	if s == nil || s.tree == "" {
 		return ""
 	}
-	extra, ok := gitx.Z(dir, nil, "ls-files", "-o", "--exclude-standard", "-z")
-	if !ok {
+	kept := s.blobs
+	if drop != nil {
+		kept = slices.DeleteFunc(append([]blob{}, s.blobs...), func(b blob) bool { return drop.MatchString(b.path) })
+	}
+	tree := s.tree
+	if len(kept) != len(s.blobs) {
+		tree = hashBlobs(kept)
+	}
+	lf := Files(dir)
+	if !lf.OK {
 		return ""
 	}
+	extra := append([]string{}, lf.Untracked...)
 	extra = slices.DeleteFunc(extra, func(f string) bool { return drop != nil && drop.MatchString(f) })
 	if len(extra) == 0 {
 		return tree
@@ -203,6 +367,74 @@ func workTree(dir string, drop *regexp.Regexp) string {
 		fmt.Fprintf(h, "%s\x00%d:%d\x00", f, st.Size(), st.ModTime().UnixNano())
 	}
 	return tree + "+" + hex.EncodeToString(h.Sum(nil))
+}
+
+func ensureSnap(dir string) *snap {
+	lf := Files(dir)
+	if !lf.OK {
+		return nil
+	}
+	stamp := fileStamp(dir, lf.Tracked)
+	id := indexStat(dir)
+	treesMu.Lock()
+	if s := tracked[dir]; s != nil && s.stamp == stamp && s.index == id {
+		treesMu.Unlock()
+		return s
+	}
+	treesMu.Unlock()
+	tree := Timed("git: working-tree hash", func() string { return indexTree(dir, nil, false, "add", "-u") })
+	if tree == "" {
+		return nil
+	}
+	s := &snap{tree: tree, blobs: lsTree(dir, tree), stamp: stamp, index: id}
+	treesMu.Lock()
+	tracked[dir] = s
+	treesMu.Unlock()
+	return s
+}
+
+func fileStamp(dir string, paths []string) string {
+	h := sha1.New()
+	for _, f := range paths {
+		st, err := os.Stat(filepath.Join(dir, filepath.FromSlash(f)))
+		if err != nil {
+			fmt.Fprintf(h, "%s\x00-\n", f)
+			continue
+		}
+		fmt.Fprintf(h, "%s\x00%d:%d\n", f, st.Size(), st.ModTime().UnixNano())
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func hashBlobs(blobs []blob) string {
+	h := sha1.New()
+	for _, b := range blobs {
+		fmt.Fprintf(h, "%s %s\x00%s\n", b.mode, b.path, b.oid)
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func lsTree(dir, tree string) []blob {
+	out, ok := gitx.RunRaw(dir, nil, nil, "ls-tree", "-r", "-z", tree)
+	if !ok {
+		return nil
+	}
+	var blobs []blob
+	for rec := range strings.SplitSeq(out, "\x00") {
+		if rec == "" {
+			continue
+		}
+		tab := strings.IndexByte(rec, '\t')
+		if tab < 0 {
+			continue
+		}
+		meta := strings.Split(rec[:tab], " ")
+		if len(meta) < 3 {
+			continue
+		}
+		blobs = append(blobs, blob{meta[0], rec[tab+1:], meta[2]})
+	}
+	return blobs
 }
 
 // IndexTree is the tree object of a temporary copy of the index after stage (`add -u` or `add -A`), drop paths removed.
@@ -634,8 +866,7 @@ func ReviewRange(dir, base string) *Range {
 			from = base
 		}
 	}
-	runs := regexp.MustCompile(`(^|/)\.wingman-spec/(runs|bin|cache|local)/`)
-	tree := Timed("git: review snapshot", func() string { return IndexTree(dir, runs, "add", "-A") })
+	tree := Timed("git: review snapshot", func() string { return IndexTree(dir, NotCode, "add", "-A") })
 	if tree == "" {
 		return nil
 	}

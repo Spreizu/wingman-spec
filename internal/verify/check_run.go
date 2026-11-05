@@ -52,7 +52,8 @@ func (e *Env) runChecks(changeDir, run string, st *State, tinfo CmdInfo, o *outc
 	case tinfo.Cmd != nil && e.testRun() == "finish":
 		o.check(O("check", "tests", "ok", true, "skipped", "commands.test_run: finish (the project tests run once at finish)"))
 	case tinfo.Cmd != nil && e.checkLevel() == "targeted" && !isReview:
-		tg := e.targetedTests(changeDir, st, tinfo.cmd())
+		scens := e.scenariosOf(changeDir)
+		tg := e.targetedTests(changeDir, st, tinfo.cmd(), scens)
 		x := O("check", "targeted_tests", "ok", true, "files", len(tg.files))
 		if tg.counts != nil {
 			x.Set("from", tg.counts)
@@ -90,7 +91,7 @@ func (e *Env) runChecks(changeDir, run string, st *State, tinfo CmdInfo, o *outc
 		}
 	}
 	cmds = append(cmds, step{name: "visual"}, step{name: "validate"})
-	q := e.qualityChecks(changeDir, st)
+	q := e.qualityChecks(changeDir, st, e.scenariosOf(changeDir))
 	o.merge(q)
 	if len(q.failures) > 0 {
 		return nil, "", nil
@@ -125,7 +126,7 @@ func (e *Env) runChecks(changeDir, run string, st *State, tinfo CmdInfo, o *outc
 		}
 		r := e.runNamed(name, c.cmd, tree)
 		if !r.Cached {
-			e.memo = nil
+			e.dropIndex()
 		}
 		ranCmds[norm(c.cmd)] = c.name
 		x := O("check", c.name, "ok", r.RC == 0, "rc", r.RC, "timed_out", r.TimedOut, "seconds", r.Seconds)

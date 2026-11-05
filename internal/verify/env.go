@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Spreizu/wingman-spec/internal/quality"
@@ -132,22 +133,42 @@ func (o *Options) Check() error {
 
 // Env is one verify command run.
 type Env struct {
-	R      *layout.Root
-	Cfg    *config.Config
-	O      Options
-	Out    io.Writer
-	Err    io.Writer
-	Stdin  io.Reader
-	Ctx    context.Context
-	code   string // the code root (commands run here)
-	status string // run_status of this run
-	memo   *[]string
-	lock   *runstate.Lock
-	t0     time.Time
-	wave   int // the wave and lane (1-based) this command works on, for the timeline
-	lane   int
-	idx    *codeindex.Index
-	moved  []trace.Rewrite // markers `next` rewrote for the change's RENAMED entries
+	R         *layout.Root
+	Cfg       *config.Config
+	O         Options
+	Out       io.Writer
+	Err       io.Writer
+	Stdin     io.Reader
+	Ctx       context.Context
+	code      string // the code root (commands run here)
+	status    string // run_status of this run
+	memo      *[]string
+	lock      *runstate.Lock
+	t0        time.Time
+	wave      int // the wave and lane (1-based) this command works on, for the timeline
+	lane      int
+	idx       *codeindex.Index
+	moved     []trace.Rewrite // markers `next` rewrote for the change's RENAMED entries
+	mu        sync.Mutex
+	filesOnce sync.Once
+	files     []string // repo paths from one git ls-files
+	haveHead  bool
+	head      string // one rev-parse HEAD
+	plans     map[string]planHit
+	warmOnce  sync.Once
+	scenDir   string
+	scens     []*quality.Scenario
+	tags      map[string][]string
+	tagKey    string
+	diffAt    string
+	diffNames []string
+	testList  []string
+}
+
+type planHit struct {
+	size, mtime int64
+	bust        uint64
+	p           *tasks.Plan
 }
 
 // New prepares a command run.
@@ -158,22 +179,130 @@ func New(r *layout.Root, cfg *config.Config, o Options, out, errOut io.Writer) *
 func (e *Env) say(format string, a ...any) { fmt.Fprintf(e.Err, "wingman-spec: "+format+"\n", a...) }
 
 func (e *Env) index() *codeindex.Index {
-	if e.idx == nil {
-		c := trace.Ctx{R: e.R, Cfg: e.Cfg}
-		anchors.SetAliases(c.IDAliases())
-		e.idx = codeindex.Scan(e.code, c.IsScannable)
+	e.mu.Lock()
+	if e.idx != nil {
+		idx := e.idx
+		e.mu.Unlock()
+		return idx
 	}
-	return e.idx
+	e.mu.Unlock()
+	c := trace.Ctx{R: e.R, Cfg: e.Cfg}
+	anchors.SetAliases(c.IDAliases())
+	idx := codeindex.Scan(e.code, c.IsScannable, e.repoFiles())
+	e.mu.Lock()
+	if e.idx == nil {
+		e.idx = idx
+	}
+	idx = e.idx
+	e.mu.Unlock()
+	return idx
 }
 
-func (e *Env) tr() trace.Ctx { return trace.Ctx{R: e.R, Cfg: e.Cfg, Idx: e.index()} }
+// paths is the layout and config without a code index. IsSpecPath and IsScannable do not read file bodies.
+func (e *Env) paths() trace.Ctx {
+	return trace.Ctx{R: e.R, Cfg: e.Cfg, Ensure: e.index, Listed: e.repoFiles}
+}
+
+func (e *Env) tr() trace.Ctx { return e.paths() }
+
+func (e *Env) skippedList() []codeindex.Skip {
+	e.mu.Lock()
+	idx := e.idx
+	e.mu.Unlock()
+	if idx != nil {
+		return idx.Skipped
+	}
+	var sk []codeindex.Skip
+	c := trace.Ctx{R: e.R, Cfg: e.Cfg}
+	for _, f := range e.repoFiles() {
+		if !c.IsScannable(f) {
+			continue
+		}
+		p := filepath.Join(e.code, filepath.FromSlash(f))
+		st, err := os.Stat(p)
+		if err != nil {
+			sk = append(sk, codeindex.Skip{File: f, Why: err.Error()})
+			continue
+		}
+		if !st.Mode().IsRegular() {
+			continue
+		}
+		fh, err := os.Open(p)
+		if err != nil {
+			sk = append(sk, codeindex.Skip{File: f, Why: err.Error()})
+			continue
+		}
+		_ = fh.Close()
+	}
+	return sk
+}
 
 func (e *Env) skippedObj() any {
-	sk := e.index().Skipped
+	sk := e.skippedList()
 	if len(sk) == 0 {
 		return Skip
 	}
 	return sk
+}
+
+// repoFiles is one git ls-files for this command. A nil slice means git is not available.
+func (e *Env) repoFiles() []string {
+	e.filesOnce.Do(func() {
+		lf := runstate.Files(e.code)
+		if lf.OK {
+			e.files = lf.All
+			return
+		}
+		e.files = nil
+	})
+	return e.files
+}
+
+func (e *Env) testBody(rel string) string {
+	e.mu.Lock()
+	idx := e.idx
+	e.mu.Unlock()
+	if idx != nil {
+		if s := idx.Text(rel); s != "" {
+			return s
+		}
+	}
+	return readText(filepath.Join(e.code, rel))
+}
+
+func (e *Env) headSHA() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if !e.haveHead {
+		e.head = gitx.Head(e.code)
+		e.haveHead = true
+	}
+	return e.head
+}
+
+// forgetPlans drops parsed specs and plans after a writer rewrote them.
+func (e *Env) forgetPlans() {
+	e.mu.Lock()
+	e.warmOnce = sync.Once{}
+	e.plans = nil
+	e.scens = nil
+	e.scenDir = ""
+	e.mu.Unlock()
+}
+
+// dropIndex forgets file lists and the code index after a command that can write files.
+func (e *Env) dropIndex() {
+	e.mu.Lock()
+	e.filesOnce = sync.Once{}
+	e.files = nil
+	e.idx = nil
+	e.tags = nil
+	e.tagKey = ""
+	e.testList = nil
+	e.diffNames = nil
+	e.diffAt = ""
+	e.memo = nil
+	e.mu.Unlock()
 }
 
 // print writes v as indented JSON (keys in order for *Obj).
@@ -269,24 +398,90 @@ func tasksFile(changeDir string) string { return filepath.Join(changeDir, "tasks
 
 func describe(t *tasks.Task) string { return strings.TrimSpace(t.Label + " " + t.Title) }
 
-// loadTasks reads tasks.md: the tasks in file order and the progress.
-func loadTasks(changeDir string) ([]taskRef, Progress, error) {
-	f := tasksFile(changeDir)
-	b, err := os.ReadFile(f)
+// warm parses tasks.md, the living specs and the change's deltas once for this command.
+func (e *Env) warm(changeDir string) {
+	e.warmOnce.Do(func() {
+		runstate.Timed("parse: specs", func() bool {
+			if changeDir != "" {
+				_ = e.plan(changeDir)
+				_ = trace.Deltas(changeDir)
+				dir := filepath.Join(changeDir, "specs")
+				sc := quality.SpecScenarios(dir)
+				e.mu.Lock()
+				e.scenDir, e.scens = dir, sc
+				e.mu.Unlock()
+			}
+			if e.R != nil {
+				_ = trace.Living(e.R.LivingSpecs())
+			}
+			return true
+		})
+	})
+}
+
+// plan reads tasks.md once and returns that Plan until the file changes.
+func (e *Env) plan(changeDir string) *tasks.Plan {
+	return e.planFile(tasksFile(changeDir))
+}
+
+func (e *Env) planFile(f string) *tasks.Plan {
+	st, err := os.Stat(f)
 	if err != nil {
-		return nil, Progress{}, die(Usage, "%s has no tasks.md (is the tasks artifact created?)", filepath.Base(changeDir))
+		return &tasks.Plan{}
 	}
-	var out []taskRef
-	p := Progress{}
-	for _, t := range tasks.Parse(string(b)).All() {
-		out = append(out, taskRef{Desc: describe(t), Done: t.Done, T: t, File: f})
-		p.Total++
-		if t.Done {
-			p.Complete++
+	bust := runstate.Bust(f)
+	e.mu.Lock()
+	if e.plans != nil {
+		if h, ok := e.plans[f]; ok && h.size == st.Size() && h.mtime == st.ModTime().UnixNano() && h.bust == bust {
+			e.mu.Unlock()
+			return h.p
 		}
 	}
-	p.Remaining = p.Total - p.Complete
-	return out, p, nil
+	e.mu.Unlock()
+	text, ok := runstate.ReadCached(f)
+	p := &tasks.Plan{}
+	if ok {
+		p = tasks.Parse(text)
+	}
+	e.mu.Lock()
+	if e.plans == nil {
+		e.plans = map[string]planHit{}
+	}
+	e.plans[f] = planHit{st.Size(), st.ModTime().UnixNano(), bust, p}
+	e.mu.Unlock()
+	return p
+}
+
+func (e *Env) scenariosOf(changeDir string) []*quality.Scenario {
+	e.warm(changeDir)
+	dir := filepath.Join(changeDir, "specs")
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.scenDir == dir && e.scens != nil {
+		return e.scens
+	}
+	return quality.SpecScenarios(dir)
+}
+
+// loadTasks reads tasks.md: the tasks in file order and the progress.
+func (e *Env) loadTasks(changeDir string) ([]taskRef, Progress, error) {
+	e.warm(changeDir)
+	f := tasksFile(changeDir)
+	if !exists(f) {
+		return nil, Progress{}, die(Usage, "%s has no tasks.md (is the tasks artifact created?)", filepath.Base(changeDir))
+	}
+	p := e.plan(changeDir)
+	var out []taskRef
+	prog := Progress{}
+	for _, t := range p.All() {
+		out = append(out, taskRef{Desc: describe(t), Done: t.Done, T: t, File: f})
+		prog.Total++
+		if t.Done {
+			prog.Complete++
+		}
+	}
+	prog.Remaining = prog.Total - prog.Complete
+	return out, prog, nil
 }
 
 func readText(f string) string {
@@ -432,14 +627,18 @@ func norm(s string) string { return strings.Join(strings.Fields(s), " ") }
 
 // changedFiles is `git status` minus the specs (memoised until a command runs); nil without git.
 func (e *Env) changedFiles() []string {
+	e.mu.Lock()
 	if e.memo != nil {
-		return *e.memo
+		out := *e.memo
+		e.mu.Unlock()
+		return out
 	}
+	e.mu.Unlock()
 	st := runstate.Timed("git status", func() []string { return gitx.Status(e.code) })
 	if st == nil {
 		return nil
 	}
-	tr := e.tr()
+	tr := e.paths()
 	out := []string{}
 	for _, f := range st {
 		if tr.IsSpecPath(f) || strings.HasPrefix(f, layout.Dir+"/") {
@@ -447,8 +646,13 @@ func (e *Env) changedFiles() []string {
 		}
 		out = append(out, f)
 	}
-	e.memo = &out
-	return out
+	e.mu.Lock()
+	if e.memo == nil {
+		e.memo = &out
+	}
+	got := *e.memo
+	e.mu.Unlock()
+	return got
 }
 
 // runsDir is the change's gitignored run directory (created).
@@ -473,7 +677,7 @@ func (e *Env) recordBase() {
 	if exists(f) {
 		return
 	}
-	if h := gitx.Head(e.code); h != "" {
+	if h := e.headSHA(); h != "" {
 		_ = os.WriteFile(f, []byte(h+"\n"), 0o644)
 	}
 }
@@ -537,4 +741,78 @@ func filesOf(details []string) []string {
 }
 
 // testFiles lists the code root's test files (the built-in forms plus the config's `test_files:`).
-func (e *Env) testFiles() []string { return quality.ListTestFiles(e.code, e.Cfg.TestFiles) }
+func (e *Env) testFiles() []string {
+	e.mu.Lock()
+	if e.testList != nil {
+		out := e.testList
+		e.mu.Unlock()
+		return out
+	}
+	e.mu.Unlock()
+	list := quality.FilterListed(e.repoFiles(), e.code, e.Cfg.TestFiles)
+	e.mu.Lock()
+	if e.testList == nil {
+		e.testList = list
+	}
+	out := e.testList
+	e.mu.Unlock()
+	return out
+}
+
+// namesSince is `git diff --name-only <base>`, once per base for this command.
+func (e *Env) namesSince(base string) []string {
+	if base == "" {
+		return nil
+	}
+	e.mu.Lock()
+	if e.diffAt == base && e.diffNames != nil {
+		out := e.diffNames
+		e.mu.Unlock()
+		return out
+	}
+	e.mu.Unlock()
+	ls := gitx.Lines(e.code, "diff", "--name-only", base, "--")
+	if ls == nil {
+		return nil
+	}
+	e.mu.Lock()
+	e.diffAt, e.diffNames = base, ls
+	e.mu.Unlock()
+	return ls
+}
+
+// traceTags reads each test file's scenario tags once. When the code index exists, it uses those bytes.
+func (e *Env) traceTags(files []string) map[string][]string {
+	key := strings.Join(files, "\x00")
+	e.mu.Lock()
+	if e.tagKey == key && e.tags != nil {
+		out := e.tags
+		e.mu.Unlock()
+		return out
+	}
+	idx := e.idx
+	e.mu.Unlock()
+	tags := runstate.Timed("scan: tags", func() map[string][]string {
+		if idx != nil {
+			return traceTagsFrom(idx, files, e.code)
+		}
+		return quality.TraceTags(files, e.code)
+	})
+	e.mu.Lock()
+	e.tags, e.tagKey = tags, key
+	e.mu.Unlock()
+	return tags
+}
+
+func traceTagsFrom(idx *codeindex.Index, files []string, root string) map[string][]string {
+	have := map[string]string{}
+	for _, f := range idx.Files {
+		have[f.Rel] = f.Text
+	}
+	return quality.TraceTagsRead(files, func(f string) ([]byte, error) {
+		if t, ok := have[f]; ok && t != "" {
+			return []byte(t), nil
+		}
+		return os.ReadFile(filepath.Join(root, f))
+	})
+}

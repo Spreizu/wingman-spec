@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/Spreizu/wingman-spec/internal/runstate"
 )
 
 var (
@@ -37,6 +39,7 @@ func Fix(changeDir, livingDir string) (int, error) {
 		if err := os.WriteFile(sf.File, []byte(next), 0o644); err != nil {
 			return n, err
 		}
+		runstate.ForgetRead(sf.File)
 		n += k
 	}
 	return n, nil
@@ -63,7 +66,6 @@ func fixSpec(text string, purpose bool) (string, int) {
 		ls = append(ls[:insert], append(block, ls[insert:]...)...)
 		n++
 	}
-	why := regexp.MustCompile(`(?i)^\s*Why:`)
 	out := make([]string, 0, len(ls)+8)
 	for i := 0; i < len(ls); i++ {
 		out = append(out, ls[i])
@@ -73,7 +75,7 @@ func fixSpec(text string, purpose bool) (string, int) {
 		j := i + 1
 		found := false
 		for j < len(ls) && !strings.HasPrefix(ls[j], "### ") && !strings.HasPrefix(ls[j], "## ") {
-			if why.MatchString(ls[j]) {
+			if whyLineFix.MatchString(ls[j]) {
 				found = true
 				break
 			}
@@ -90,7 +92,7 @@ func fixSpec(text string, purpose bool) (string, int) {
 			out = append(out, ls[k])
 			k++
 		}
-		if k < len(ls) && !strings.HasPrefix(ls[k], "#") && !why.MatchString(ls[k]) {
+		if k < len(ls) && !strings.HasPrefix(ls[k], "#") && !whyLineFix.MatchString(ls[k]) {
 			out = append(out, ls[k])
 			i = k
 		}
@@ -99,5 +101,3 @@ func fixSpec(text string, purpose bool) (string, int) {
 	}
 	return strings.Join(out, "\n"), n
 }
-
-func init() { _ = whyLineFix }

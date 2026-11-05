@@ -251,6 +251,7 @@ func (c Ctx) AssignIDs(changeDir string) (int, error) {
 		if err := os.WriteFile(d.File, []byte(strings.Join(ls, "\n")), 0o644); err != nil {
 			return n, err
 		}
+		ForgetSpec(d.File)
 		n += k
 	}
 	return n, nil

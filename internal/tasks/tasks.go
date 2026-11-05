@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Group is a `## N. Title` section.
@@ -73,8 +74,52 @@ func IsCloseoutGroup(title string) bool { return closeGrpRE.MatchString(title) }
 // IsCloseoutTitle reports whether a task title describes close-out work that `finish` does.
 func IsCloseoutTitle(title string) bool { return closeoutRE.MatchString(title) }
 
-// Parse parses tasks.md.
+var parsedPlans sync.Map
+
+// Parse parses tasks.md. The same text is parsed once; each call gets its own Plan, so a caller may change it.
 func Parse(text string) *Plan {
+	if v, ok := parsedPlans.Load(text); ok {
+		return clonePlan(v.(*Plan))
+	}
+	p := parsePlan(text)
+	actual, _ := parsedPlans.LoadOrStore(text, p)
+	return clonePlan(actual.(*Plan))
+}
+
+func clonePlan(p *Plan) *Plan {
+	if p == nil {
+		return nil
+	}
+	out := *p
+	out.Groups = make([]*Group, len(p.Groups))
+	for i, g := range p.Groups {
+		if g == nil {
+			continue
+		}
+		ng := *g
+		ng.Tasks = make([]*Task, len(g.Tasks))
+		for j, t := range g.Tasks {
+			if t == nil {
+				continue
+			}
+			nt := *t
+			if t.Details != nil {
+				nt.Details = make(map[string]string, len(t.Details))
+				for k, v := range t.Details {
+					nt.Details[k] = v
+				}
+			}
+			nt.Detail = append([]string(nil), t.Detail...)
+			nt.Files = append([]string(nil), t.Files...)
+			nt.Group = &ng
+			ng.Tasks[j] = &nt
+		}
+		out.Groups[i] = &ng
+	}
+	return &out
+}
+
+func parsePlan(text string) *Plan {
 	p := &Plan{}
 	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
 	var g *Group

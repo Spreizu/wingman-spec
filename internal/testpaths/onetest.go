@@ -4,6 +4,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 // Running only the tests of one review fix. A test belongs to fix <slug> when its name carries the tag
@@ -94,10 +95,27 @@ func (o OneTest) Command(slug string, files []string) (cmd, mode string) {
 	return "", ""
 }
 
+var (
+	reviewPats sync.Map
+	neverRE    = regexp.MustCompile(`$^`)
+)
+
+func reviewPat(slug string) *regexp.Regexp {
+	if v, ok := reviewPats.Load(slug); ok {
+		return v.(*regexp.Regexp)
+	}
+	id := "eview_" + strings.ReplaceAll(slug, "-", "_")
+	re, err := regexp.Compile(`[Rr]` + id + `(?:\b|_)`)
+	if err != nil {
+		re = neverRE
+	}
+	actual, _ := reviewPats.LoadOrStore(slug, re)
+	return actual.(*regexp.Regexp)
+}
+
 // Tagged says whether a test file carries a test of fix slug: the tag, the identifier, or an ExUnit `@tag review:`.
 func Tagged(text, slug string) bool {
-	id := "eview_" + strings.ReplaceAll(slug, "-", "_")
-	return strings.Contains(text, "[review:"+slug+"]") || regexp.MustCompile(`[Rr]`+id+`(?:\b|_)`).MatchString(text) ||
+	return strings.Contains(text, "[review:"+slug+"]") || reviewPat(slug).MatchString(text) ||
 		strings.Contains(text, `review: "`+slug+`"`)
 }
 

@@ -14,7 +14,6 @@ import (
 
 	"github.com/Spreizu/wingman-spec/internal/change"
 	"github.com/Spreizu/wingman-spec/internal/config"
-	"github.com/Spreizu/wingman-spec/internal/gitx"
 	"github.com/Spreizu/wingman-spec/internal/runstate"
 	"github.com/Spreizu/wingman-spec/internal/spec"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
@@ -133,7 +132,7 @@ func (e *Env) visualPlan(changeDir string, st *State) vplan {
 		}
 	}
 	var earlier []*visual.Scenario
-	p := tasks.Parse(readText(tasksFile(changeDir)))
+	p := e.plan(changeDir)
 	isTarget := func(line int) bool {
 		for _, m := range st.members() {
 			if m.Line == line {
@@ -374,7 +373,7 @@ func (e *Env) visualCacheFile(p vplan, st *State) string {
 		before = []string{vb.Source, vb.Report}
 	}
 	cfg := p.cfg
-	key, _ := json.Marshal([]any{tree, gitx.Head(e.code), before, p.items, cfg})
+	key, _ := json.Marshal([]any{tree, e.headSHA(), before, p.items, cfg})
 	s := sha1.Sum(key)
 	return filepath.Join(e.runsDir(), "cache", "visual-"+hex.EncodeToString(s[:])+".json")
 }

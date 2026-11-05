@@ -204,7 +204,10 @@ func (e *Env) waveTasks(changeDir string, ts []taskRef, pending int) []taskRef {
 			open[t.T.Label] = true
 		}
 	}
-	tree := gitx.Lines(e.code, "ls-files", "-co", "--exclude-standard")
+	tree := e.repoFiles()
+	if tree == nil {
+		tree = gitx.Lines(e.code, "ls-files", "-co", "--exclude-standard")
+	}
 	picked := []taskRef{first}
 	var used [][]string
 	used = append(used, filesOf(first.T.Detail))

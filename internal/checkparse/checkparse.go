@@ -264,16 +264,29 @@ func firstNonEmpty(xs ...string) string {
 	return ""
 }
 
-var anyLoc = regexp.MustCompile(`(?m)(?:^|[\s(])((?:[\w.@-]+/)*[\w.@-]+\.\w+):(\d+)`)
+var (
+	anyLoc    = regexp.MustCompile(`(?m)(?:^|[\s(])((?:[\w.@-]+/)*[\w.@-]+\.\w+):(\d+)`)
+	lineNumRE = regexp.MustCompile(`^:(\d+)`)
+)
 
 // lineIn finds "file:line" of file in a stack trace.
 func lineIn(text, file string) int {
-	re := regexp.MustCompile(regexp.QuoteMeta(file) + `:(\d+)`)
-	if m := re.FindStringSubmatch(text); m != nil {
-		n, _ := strconv.Atoi(m[1])
-		return n
+	if file == "" {
+		return 0
 	}
-	return 0
+	rest := text
+	for {
+		i := strings.Index(rest, file)
+		if i < 0 {
+			return 0
+		}
+		after := rest[i+len(file):]
+		if m := lineNumRE.FindStringSubmatch(after); m != nil {
+			n, _ := strconv.Atoi(m[1])
+			return n
+		}
+		rest = rest[i+len(file):]
+	}
 }
 
 // ---------- TAP (node --test, tap, prove) ----------

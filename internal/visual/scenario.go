@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Spreizu/wingman-spec/internal/config"
+	"github.com/Spreizu/wingman-spec/internal/runstate"
 	"github.com/Spreizu/wingman-spec/internal/spec"
 )
 
@@ -184,11 +185,11 @@ func ParseScenarios(dir string) []*Scenario {
 	sort.Strings(names)
 	var out []*Scenario
 	for _, n := range names {
-		b, err := os.ReadFile(filepath.Join(dir, n))
-		if err != nil {
+		text, ok := runstate.ReadCached(filepath.Join(dir, n))
+		if !ok {
 			continue
 		}
-		out = append(out, ParseSpec(string(b), filepath.Join(dir, n), strings.TrimSuffix(n, ".md"))...)
+		out = append(out, ParseSpec(text, filepath.Join(dir, n), strings.TrimSuffix(n, ".md"))...)
 	}
 	return out
 }

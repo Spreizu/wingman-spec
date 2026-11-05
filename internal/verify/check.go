@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Spreizu/wingman-spec/internal/anchors"
@@ -53,7 +54,7 @@ func specRefsOf(st *State, scens []*quality.Scenario) quality.Refs {
 }
 
 // tickTask ticks the dispatch's boxes (an agent that ticked them already changes nothing).
-func tickTask(st *State) {
+func (e *Env) tickTask(st *State) {
 	for _, m := range st.members() {
 		b, err := os.ReadFile(m.File)
 		if err != nil {
@@ -64,6 +65,10 @@ func tickTask(st *State) {
 		if i >= 0 && i < len(lines) && openBoxRE.MatchString(lines[i]) {
 			lines[i] = strings.Replace(lines[i], "[ ]", "[x]", 1)
 			_ = os.WriteFile(m.File, []byte(strings.Join(lines, "\n")), 0o644)
+			runstate.ForgetRead(m.File)
+			e.mu.Lock()
+			delete(e.plans, m.File)
+			e.mu.Unlock()
 		}
 	}
 }
@@ -72,6 +77,7 @@ func restore(st *State) {
 	for _, s := range st.Snapshots {
 		if b, err := os.ReadFile(s.Snap); err == nil {
 			_ = os.WriteFile(s.File, b, 0o644)
+			runstate.ForgetRead(s.File)
 		}
 	}
 }
@@ -167,7 +173,7 @@ func (e *Env) changedTestFiles(base string) []string {
 	}
 	var since []string
 	if base != "" {
-		since = gitx.Lines(e.code, "diff", "--name-only", base, "--")
+		since = e.namesSince(base)
 	}
 	out := []string{}
 	for _, f := range uniq(append(since, now...)) {
@@ -191,7 +197,7 @@ func uniq(xs []string) []string {
 }
 
 // targetedTests: the test files changed since the change began, tagged with the task's scenarios, named after its sources.
-func (e *Env) targetedTests(changeDir string, st *State, testCmd string) targeted {
+func (e *Env) targetedTests(changeDir string, st *State, testCmd string, scens []*quality.Scenario) targeted {
 	tpl, source, why := e.targetedTemplate(testCmd)
 	if tpl == "" {
 		return targeted{why: why}
@@ -202,14 +208,17 @@ func (e *Env) targetedTests(changeDir string, st *State, testCmd string) targete
 		mine := filesOf(st.Task.Details)
 		changed = slices.DeleteFunc(changed, func(f string) bool { return !ownsAny(mine, f) && len(testpaths.TestsFor(mine, []string{f})) == 0 })
 	}
-	refs := specRefsOf(st, quality.SpecScenarios(filepath.Join(changeDir, "specs")))
+	if scens == nil {
+		scens = e.scenariosOf(changeDir)
+	}
+	refs := specRefsOf(st, scens)
 	idset := map[string]bool{}
 	for _, s := range append(refs.Explicit, refs.Implicit...) {
 		idset[s.ID] = true
 	}
 	var tagged []string
 	if len(idset) > 0 {
-		tags := quality.TraceTags(all, e.code)
+		tags := e.traceTags(all)
 		for id := range idset {
 			tagged = append(tagged, tags[id]...)
 		}
@@ -239,7 +248,7 @@ func (e *Env) targetedTests(changeDir string, st *State, testCmd string) targete
 // ---------- check level ----------
 
 // endsGroup: no other task of the group(s) the dispatch belongs to is still open.
-func endsGroup(st *State) bool {
+func (e *Env) endsGroup(st *State) bool {
 	plans := map[string]*tasks.Plan{}
 	mem := st.members()
 	for _, m := range mem {
@@ -247,7 +256,7 @@ func endsGroup(st *State) bool {
 			return true
 		}
 		if plans[m.File] == nil {
-			plans[m.File] = tasks.Parse(readText(m.File))
+			plans[m.File] = e.planFile(m.File)
 		}
 		var g *tasks.Group
 		for _, x := range plans[m.File].Groups {
@@ -280,7 +289,7 @@ func (e *Env) deferReason(st *State) string {
 	if lvl == "finish" {
 		return "Check level: finish (runs once, at finish)"
 	}
-	if endsGroup(st) {
+	if e.endsGroup(st) {
 		return ""
 	}
 	return fmt.Sprintf("Check level: %s (runs when the last task of the group is checked)", lvl)
@@ -319,12 +328,12 @@ func (e *Env) scopeReasons() []string {
 	if base == "" || now == nil {
 		return nil
 	}
-	tr := e.tr()
+	tr := e.paths()
 	prod := func(f string) bool {
 		return !tr.IsSpecPath(f) && !testpaths.IsTestPath(f) && exists(filepath.Join(e.code, f))
 	}
 	var files []string
-	for _, f := range uniq(append(gitx.Lines(e.code, "diff", "--name-only", base, "--"), now...)) {
+	for _, f := range uniq(append(e.namesSince(base), now...)) {
 		if prod(f) {
 			files = append(files, f)
 		}
@@ -345,7 +354,7 @@ func (e *Env) scopeReasons() []string {
 		reasons = append(reasons, "changed UI files: "+strings.Join(ui, ", "))
 	}
 	tracked := map[string]bool{}
-	for _, f := range gitx.Lines(e.code, "ls-files") {
+	for _, f := range runstate.Files(e.code).Tracked {
 		tracked[f] = true
 	}
 	lines := 0
@@ -554,7 +563,7 @@ func (e *Env) existing(files []string) []string {
 
 // qualityChecks: source-text tests among the changed files, design tokens, accessible names, anchors, and trace tags for
 // the scenarios the Spec: lines name one by one.
-func (e *Env) qualityChecks(changeDir string, st *State) outcome {
+func (e *Env) qualityChecks(changeDir string, st *State, scens []*quality.Scenario) outcome {
 	var o outcome
 	changed := e.changedFiles()
 	var tests []string
@@ -563,7 +572,61 @@ func (e *Env) qualityChecks(changeDir string, st *State) outcome {
 			tests = append(tests, f)
 		}
 	}
-	bad, allowed := e.sourceTextCheck(tests)
+	mode := trace.Mode(e.Cfg)
+	if mode != "off" {
+		_ = e.index()
+	}
+	if scens == nil {
+		scens = e.scenariosOf(changeDir)
+	}
+	var (
+		bad, allowed []string
+		tl           *tokenResult
+		aria         []string
+		markers      []trace.MarkerProblem
+		place        []string
+		placeLvl     string
+		gr           *anchors.GuardResult
+		glvl         string
+		tagMap       map[string][]string
+		wg           sync.WaitGroup
+	)
+	wg.Go(func() { bad, allowed = e.sourceTextCheck(tests) })
+	wg.Go(func() { tl = e.tokenLint(changeDir, changed) })
+	wg.Go(func() {
+		for _, f := range changed {
+			if uiExtRE.MatchString(f) && !testpaths.IsTestPath(f) {
+				for _, a := range quality.AriaLabelFindings(filepath.Join(e.code, f), f) {
+					aria = append(aria, a.Text)
+				}
+			}
+		}
+	})
+	if mode != "off" {
+		tr := e.tr()
+		ex := e.existing(changed)
+		wg.Go(func() {
+			markers = runstate.Timed("scan: @spec markers in changed files", func() []trace.MarkerProblem { return tr.MarkerProblems(changeDir, ex) })
+		})
+		wg.Go(func() {
+			if lvl := trace.LevelsOf(e.Cfg).Placement; lvl != "off" {
+				placeLvl = lvl
+				for _, x := range tr.PlacementProblems(nil, ex) {
+					place = append(place, fmt.Sprintf("%s:%d: %s: %s", x.File, x.Line, x.Kind, x.Text))
+				}
+			}
+		})
+		var det []string
+		for _, m := range st.members() {
+			det = append(det, m.Details...)
+		}
+		wg.Go(func() { gr, glvl = e.guardReport(changeDir, "HEAD", "task", filesOf(det)) })
+	}
+	needTrace := slices.ContainsFunc(st.members(), func(m Member) bool { return specLineOf(m) != "" })
+	if needTrace {
+		wg.Go(func() { tagMap = e.traceTags(e.testFiles()) })
+	}
+	wg.Wait()
 	o.check(O("check", "source_text", "ok", len(bad) == 0, "files", len(tests), "findings", len(bad), "allowed", len(allowed)))
 	if len(bad) > 0 {
 		o.fail("tests read source files as text:\n" + bullets(bad) + "\n" + quality.SourceTextFix)
@@ -571,57 +634,39 @@ func (e *Env) qualityChecks(changeDir string, st *State) outcome {
 	for _, a := range allowed {
 		o.warn("allowed source-text test: " + a)
 	}
-	o.addTokenLint(e.tokenLint(changeDir, changed))
-	for _, f := range changed {
-		if uiExtRE.MatchString(f) && !testpaths.IsTestPath(f) {
-			for _, a := range quality.AriaLabelFindings(filepath.Join(e.code, f), f) {
-				o.warn("accessible name: " + a.Text)
-			}
-		}
+	o.addTokenLint(tl)
+	for _, a := range aria {
+		o.warn("accessible name: " + a)
 	}
-	mode := trace.Mode(e.Cfg)
 	if mode != "off" {
-		tr := e.tr()
-		ex := e.existing(changed)
-		bad := runstate.Timed("scan: @spec markers in changed files", func() []trace.MarkerProblem { return tr.MarkerProblems(changeDir, ex) })
-		o.check(O("check", "anchors", "ok", len(bad) == 0 || mode == "warn", "unresolved", len(bad)))
+		o.check(O("check", "anchors", "ok", len(markers) == 0 || mode == "warn", "unresolved", len(markers)))
 		var msg []string
-		for _, m := range bad {
+		for _, m := range markers {
 			s := fmt.Sprintf("%s:%d: `@spec %s` does not resolve to a requirement", m.File, m.Line, m.Key)
 			if m.Hint != "" {
 				s += fmt.Sprintf(" (did you mean %s?)", m.Hint)
 			}
 			msg = append(msg, s)
 		}
-		if len(bad) > 0 && mode == "on" {
+		if len(markers) > 0 && mode == "on" {
 			o.fail(fmt.Sprintf("code anchors that do not resolve (the slug is the requirement name lower-cased with dashes; `wingman-spec anchors %s` lists the valid ones):\n%s", e.O.Change, bullets(msg)))
 		} else {
 			o.warn(msg...)
 		}
-		if lvl := trace.LevelsOf(e.Cfg).Placement; lvl != "off" {
-			var pl []string
-			for _, x := range tr.PlacementProblems(nil, ex) {
-				pl = append(pl, fmt.Sprintf("%s:%d: %s: %s", x.File, x.Line, x.Kind, x.Text))
-			}
-			if len(pl) > 0 && lvl == "error" && mode == "on" {
-				o.check(O("check", "marker_placement", "ok", false, "findings", len(pl)))
-				o.fail("marker placement (anchor_placement: error; `wingman-spec help anchors` lists the rules):\n" + bullets(pl))
+		if placeLvl != "" {
+			if len(place) > 0 && placeLvl == "error" && mode == "on" {
+				o.check(O("check", "marker_placement", "ok", false, "findings", len(place)))
+				o.fail("marker placement (anchor_placement: error; `wingman-spec help anchors` lists the rules):\n" + bullets(place))
 			} else {
-				for _, x := range pl {
+				for _, x := range place {
 					o.warn("marker placement: " + x)
 				}
 			}
 		}
-		var det []string
-		for _, m := range st.members() {
-			det = append(det, m.Details...)
-		}
-		r, lvl := e.guardReport(changeDir, "HEAD", "task", filesOf(det))
-		o.addGuard(r, lvl, mode)
+		o.addGuard(gr, glvl, mode)
 	}
-	if slices.ContainsFunc(st.members(), func(m Member) bool { return specLineOf(m) != "" }) {
-		scens := quality.SpecScenarios(filepath.Join(changeDir, "specs"))
-		res := quality.Trace(scens, quality.TraceTags(e.testFiles(), e.code), !e.Cfg.Visual.Off)
+	if needTrace {
+		res := quality.Trace(scens, tagMap, !e.Cfg.Visual.Off)
 		refs := specRefsOf(st, scens)
 		missing := map[string]bool{}
 		for _, s := range res.Missing {
@@ -712,7 +757,7 @@ func (e *Env) Check() error {
 		return die(Usage, "REFUSED: %s", p)
 	}
 	// 1. tasks.md: exactly the target tick, nothing else.
-	ts, _, err := loadTasks(changeDir)
+	ts, _, err := e.loadTasks(changeDir)
 	if err != nil {
 		return err
 	}
@@ -828,15 +873,16 @@ func validateChange(r *layout.Root, name string) ([]string, error) {
 
 // pass ticks the dispatch, records it and prints `passed`.
 func (e *Env) pass(run string, st *State, checks []any, vis *Obj, warnings []string, changeDir string) error {
-	tickTask(st)
+	e.tickTask(st)
+	fp := runstate.Fingerprinted(e.code, true)
 	for _, m := range st.members() {
-		e.recordPass(run, m)
+		e.recordPass(run, m, fp)
 	}
 	done := st.Task.Label
 	e.dropNotes(done)
 	st.Task, st.Attempts, st.LastFailure, st.Review = nil, 0, nil, nil
 	writeState(run, st)
-	_, p, _ := loadTasks(changeDir)
+	_, p, _ := e.loadTasks(changeDir)
 	x := O("result", "passed", "task", done, "checks", checks)
 	if e.O.Cmd == "check" {
 		x.Set("visual", nilObj(vis)).Set("warnings", list(warnings)).Set("progress", p)

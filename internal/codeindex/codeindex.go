@@ -29,12 +29,19 @@ type Index struct {
 	Root    string
 	Files   []File
 	Skipped []Skip
+	byPath  map[string]int
 }
 
 // Scan lists the scannable files (git ls-files -z, else a walk) and reads them with a worker pool.
-func Scan(root string, scannable func(string) bool) *Index {
-	idx := &Index{Root: root}
-	rels := listFiles(root)
+// listed, when non-nil, is that file list: Scan does not run git again.
+func Scan(root string, scannable func(string) bool, listed ...[]string) *Index {
+	idx := &Index{Root: root, byPath: map[string]int{}}
+	var rels []string
+	if len(listed) > 0 && listed[0] != nil {
+		rels = listed[0]
+	} else {
+		rels = listFiles(root)
+	}
 	var jobs []string
 	for _, f := range rels {
 		if scannable != nil && !scannable(f) {
@@ -94,6 +101,7 @@ func Scan(root string, scannable func(string) bool) *Index {
 			continue
 		}
 		if r.ok {
+			idx.byPath[r.f.Rel] = len(idx.Files)
 			idx.Files = append(idx.Files, r.f)
 		}
 	}
@@ -115,6 +123,12 @@ func (idx *Index) RelPaths() []string {
 // Text of a relative path ("" when missing or unread).
 func (idx *Index) Text(rel string) string {
 	if idx == nil {
+		return ""
+	}
+	if idx.byPath != nil {
+		if i, ok := idx.byPath[rel]; ok {
+			return idx.Files[i].Text
+		}
 		return ""
 	}
 	for _, f := range idx.Files {

@@ -9,9 +9,11 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/Spreizu/wingman-spec/internal/config"
 	"github.com/Spreizu/wingman-spec/internal/quality"
+	"github.com/Spreizu/wingman-spec/internal/runstate"
 	"github.com/Spreizu/wingman-spec/internal/spec"
 )
 
@@ -226,12 +228,51 @@ func SpecFilesOf(dir string) []SpecFile {
 	return out
 }
 
+type specHit struct {
+	size, mtime int64
+	bust        uint64
+	p           Parsed
+}
+
+var (
+	specMu    sync.Mutex
+	specCache = map[string]specHit{}
+)
+
 func readIf(f string) string {
-	b, err := os.ReadFile(f)
-	if err != nil {
+	s, ok := runstate.ReadCached(f)
+	if !ok {
 		return ""
 	}
-	return string(b)
+	return s
+}
+
+// parseFile parses one spec, reusing the previous parse until the file's size or mtime changes.
+func parseFile(f string) Parsed {
+	st, err := os.Stat(f)
+	if err != nil {
+		return Parsed{}
+	}
+	b := runstate.Bust(f)
+	specMu.Lock()
+	if h, ok := specCache[f]; ok && h.size == st.Size() && h.mtime == st.ModTime().UnixNano() && h.bust == b {
+		specMu.Unlock()
+		return h.p
+	}
+	specMu.Unlock()
+	p := ParseSpec(readIf(f))
+	specMu.Lock()
+	specCache[f] = specHit{st.Size(), st.ModTime().UnixNano(), b, p}
+	specMu.Unlock()
+	return p
+}
+
+// ForgetSpec drops a cached parse after a writer rewrote the file.
+func ForgetSpec(f string) {
+	specMu.Lock()
+	delete(specCache, f)
+	specMu.Unlock()
+	runstate.ForgetRead(f)
 }
 
 // Reqs is an ordered requirement map keyed `cap/slug`.
@@ -275,7 +316,7 @@ func (r *Reqs) Len() int { return len(r.keys) }
 func Living(specsDir string) *Reqs {
 	out := NewReqs()
 	for _, sf := range SpecFilesOf(specsDir) {
-		for _, r := range ParseSpec(readIf(sf.File)).Reqs {
+		for _, r := range parseFile(sf.File).Reqs {
 			c := *r
 			c.Cap, c.Key, c.File = sf.Cap, sf.Cap+"/"+r.Slug, sf.File
 			out.Set(c.Key, &c)
@@ -294,7 +335,7 @@ type Delta struct {
 func Deltas(changeDir string) []Delta {
 	var out []Delta
 	for _, sf := range SpecFilesOf(filepath.Join(changeDir, "specs")) {
-		out = append(out, Delta{sf.Cap, sf.File, ParseSpec(readIf(sf.File))})
+		out = append(out, Delta{sf.Cap, sf.File, parseFile(sf.File)})
 	}
 	return out
 }

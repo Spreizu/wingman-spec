@@ -70,7 +70,7 @@ func (e *Env) Next() error {
 		e.emit(O("result", "blocked", "blocked_file", b))
 		return quit(Blocked)
 	}
-	ts, prog, err := loadTasks(changeDir)
+	ts, prog, err := e.loadTasks(changeDir)
 	if err != nil {
 		return err
 	}
@@ -109,8 +109,10 @@ func (e *Env) Next() error {
 	if e.moved, err = e.tr().RenameMarkers(changeDir); err != nil {
 		return err
 	}
+	if len(e.moved) > 0 {
+		e.dropIndex()
+	}
 	for _, m := range e.moved {
-		e.idx, e.memo = nil, nil
 		e.say("renamed: %s:%d @spec %s -> %s", m.File, m.Line, m.From, m.To)
 	}
 	if e.O.NewRun {
@@ -384,7 +386,7 @@ func (e *Env) packetFor(changeDir, r string, st *State, vl vlint, tinfo CmdInfo,
 		}
 	}
 	earlier := []string{}
-	for _, t := range tasks.Parse(readText(tasksFile(changeDir))).All() {
+	for _, t := range e.plan(changeDir).All() {
 		if t.Done && !t.Review {
 			s := t.Label + " " + t.Title
 			if len(t.Files) > 0 {

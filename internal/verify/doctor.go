@@ -125,7 +125,7 @@ func (e *Env) RunStatus() (*Obj, error) {
 	if !exists(tasksFile(changeDir)) {
 		return nil, nil
 	}
-	ts, prog, err := loadTasks(changeDir)
+	ts, prog, err := e.loadTasks(changeDir)
 	if err != nil {
 		return nil, err
 	}

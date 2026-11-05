@@ -78,7 +78,6 @@ func short(cmd string) string {
 // runCmd runs cmd with `sh -c` in its own process group and kills the group at the limit (rc 124). With a label it
 // says on stderr when the command is still running after 3 s and every 15 s after that, and when it ends.
 func (e *Env) runCmd(cmd, dir string, limit int, label string) Result {
-	runstate.ForgetTrees()
 	t0 := time.Now()
 	ctx, cancel := context.WithTimeout(e.Ctx, time.Duration(limit)*time.Second)
 	defer cancel()
@@ -92,6 +91,7 @@ func (e *Env) runCmd(cmd, dir string, limit int, label string) Result {
 	if err := c.Start(); err != nil {
 		return Result{Cmd: cmd, Limit: limit, RC: 127, Tail: err.Error()}
 	}
+	defer runstate.ForgetTrees()
 	done := make(chan error, 1)
 	go func() { done <- c.Wait() }()
 	secs := func() int { return int(time.Since(t0).Seconds() + 0.5) }

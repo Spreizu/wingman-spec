@@ -21,6 +21,9 @@ import (
 // ExitRefused is the exit code of a command the project-mode guard refuses: nothing was written.
 const ExitRefused = 6
 
+// yamlCommentRE keeps a trailing comment on a front-matter line.
+var yamlCommentRE = regexp.MustCompile(`^[^:]+:[^#]*?([ \t]*#.*)?$`)
+
 // Run is how the texts name the CLI (the shim init writes).
 const Run = ".wingman-spec/bin/wingman-spec"
 
@@ -224,7 +227,6 @@ func SetFM(text string, keys []string, vals map[string]string) string {
 	if strings.HasSuffix(lines[0], "\r\n") {
 		eol = "\r\n"
 	}
-	commentRE := regexp.MustCompile(`^[^:]+:[^#]*?([ \t]*#.*)?$`)
 	for _, k := range keys {
 		v := vals[k]
 		found := -1
@@ -237,7 +239,7 @@ func SetFM(text string, keys []string, vals map[string]string) string {
 		if found >= 0 {
 			l := lines[found]
 			c := ""
-			if m := commentRE.FindStringSubmatch(strip(l)); m != nil {
+			if m := yamlCommentRE.FindStringSubmatch(strip(l)); m != nil {
 				c = m[1]
 			}
 			le := eol

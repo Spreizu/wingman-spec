@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Spreizu/wingman-spec/internal/runstate"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
 	"github.com/Spreizu/wingman-spec/internal/testpaths"
 )
@@ -375,11 +376,7 @@ func IsNoneADR(fileName, text string) bool {
 }
 
 func readIf(f string) (string, bool) {
-	b, err := os.ReadFile(f)
-	if err != nil {
-		return "", false
-	}
-	return string(b), true
+	return runstate.ReadCached(f)
 }
 
 // SpecFile is one spec file of a specs directory: <dir>/<capability>.md.

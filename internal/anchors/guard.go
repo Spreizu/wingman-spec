@@ -8,7 +8,10 @@ import (
 	"strconv"
 	"strings"
 
+	"sync"
+
 	"github.com/Spreizu/wingman-spec/internal/gitx"
+	"github.com/Spreizu/wingman-spec/internal/runstate"
 )
 
 var (
@@ -62,7 +65,11 @@ func ChangedSince(codeRoot, base string) []Changed {
 			out = append(out, c)
 		}
 	}
-	for _, f := range gitx.Lines(codeRoot, "-c", "core.quotepath=off", "ls-files", "--others", "--exclude-standard") {
+	others := runstate.Files(codeRoot).Untracked
+	if !runstate.Files(codeRoot).OK {
+		others = gitx.Lines(codeRoot, "-c", "core.quotepath=off", "ls-files", "--others", "--exclude-standard")
+	}
+	for _, f := range others {
 		if !seen[f] {
 			seen[f] = true
 			out = append(out, Changed{File: f})
@@ -356,8 +363,17 @@ func InFiles(patterns []string, f string) bool {
 	return false
 }
 
+var (
+	globRes   sync.Map
+	neverGlob = regexp.MustCompile(`$^`)
+)
+
 // GlobRE compiles a `*` / `**` / `?` path glob (`**/` also matches no directory).
+// Each distinct pattern is compiled once.
 func GlobRE(p string) *regexp.Regexp {
+	if v, ok := globRes.Load(p); ok {
+		return v.(*regexp.Regexp)
+	}
 	var b strings.Builder
 	b.WriteString("^")
 	for i := 0; i < len(p); i++ {
@@ -377,7 +393,12 @@ func GlobRE(p string) *regexp.Regexp {
 		}
 	}
 	b.WriteString("$")
-	return regexp.MustCompile(b.String())
+	re, err := regexp.Compile(b.String())
+	if err != nil {
+		re = neverGlob
+	}
+	actual, _ := globRes.LoadOrStore(p, re)
+	return actual.(*regexp.Regexp)
 }
 
 func cutRunes(s string, n int) string {

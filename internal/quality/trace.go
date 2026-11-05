@@ -30,6 +30,11 @@ func GitFiles(root string, args ...string) []string {
 //
 // globs is the config's `test_files:`: a path glob (`*`, `**`) adds the files it matches, `!glob` drops them.
 func ListTestFiles(root string, globs []string, skip ...string) []string {
+	return FilterListed(nil, root, globs, skip...)
+}
+
+// FilterListed keeps the test files of files (nil: list them with git, else a walk).
+func FilterListed(files []string, root string, globs []string, skip ...string) []string {
 	var add, drop []*regexp.Regexp
 	for _, g := range globs {
 		if rest, ok := strings.CutPrefix(g, "!"); ok {
@@ -41,7 +46,9 @@ func ListTestFiles(root string, globs []string, skip ...string) []string {
 	match := func(res []*regexp.Regexp, f string) bool {
 		return slices.ContainsFunc(res, func(re *regexp.Regexp) bool { return re.MatchString(f) })
 	}
-	files := GitFiles(root, "ls-files", "-co", "--exclude-standard")
+	if files == nil {
+		files = GitFiles(root, "ls-files", "-co", "--exclude-standard")
+	}
 	if files == nil {
 		_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 			if err != nil {
@@ -73,9 +80,16 @@ func ListTestFiles(root string, globs []string, skip ...string) []string {
 
 // TraceTags maps tag id -> files over the given test files (relative to root).
 func TraceTags(files []string, root string) map[string][]string {
+	return TraceTagsRead(files, func(f string) ([]byte, error) {
+		return os.ReadFile(filepath.Join(root, f))
+	})
+}
+
+// TraceTagsRead maps tag id -> files. read returns a file's bytes (the index, or the disk).
+func TraceTagsRead(files []string, read func(string) ([]byte, error)) map[string][]string {
 	tags := map[string][]string{}
 	for _, f := range files {
-		b, err := os.ReadFile(filepath.Join(root, f))
+		b, err := read(f)
 		if err != nil {
 			continue
 		}

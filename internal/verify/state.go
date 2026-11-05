@@ -205,11 +205,10 @@ func (e *Env) readLedger(ts []taskRef) *runstate.Ledger {
 	return &l
 }
 
-func (e *Env) recordPass(run string, m Member) {
+func (e *Env) recordPass(run string, m Member, fp runstate.Fingerprint) {
 	l := e.readLedger(nil)
 	var rec runstate.Run
 	runstate.ReadJSON(filepath.Join(run, "run.json"), &rec)
-	fp := runstate.Fingerprinted(e.code, true)
 	l.Passed[m.Description] = &runstate.Record{At: runstate.Now(), Run: filepath.Base(run), Session: rec.Session, Head: fp.Head, Branch: fp.Branch, Tree: fp.Tree, Worktree: e.code, FilesHash: runstate.FilesHash(e.code, filesOf(m.Details))}
 	_ = runstate.WriteJSON(e.ledgerFile(), l)
 }

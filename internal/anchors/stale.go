@@ -316,6 +316,7 @@ func Stale(o StaleOpts) ([]StaleAnchor, []string) {
 	fileBlame := blameAll(o.CodeRoot, codeFiles, true)
 	seen := map[string]bool{}
 	texts := map[string]string{}
+	units := map[string]map[int][]Unit{}
 	for _, m := range use {
 		req := o.Reqs[m.Key]
 		key := m.Key + "@" + m.File
@@ -346,10 +347,17 @@ func Stale(o StaleOpts) ([]StaleAnchor, []string) {
 		if IsGenerated(m.File, text) {
 			continue
 		}
+		if units[m.File] == nil {
+			by := map[int][]Unit{}
+			for _, x := range Analyze(text) {
+				by[x.Line] = append(by[x.Line], x)
+			}
+			units[m.File] = by
+		}
 		var u *Unit
-		for _, x := range Analyze(text) {
-			if x.Key == m.Key && x.Line == m.Line {
-				u = &x
+		for i := range units[m.File][m.Line] {
+			if units[m.File][m.Line][i].Key == m.Key {
+				u = &units[m.File][m.Line][i]
 				break
 			}
 		}

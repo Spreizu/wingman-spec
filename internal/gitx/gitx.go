@@ -6,7 +6,9 @@ import (
 	"bytes"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // Run runs git in dir with extra environment variables and returns the trimmed stdout.
@@ -63,13 +65,57 @@ func Z(dir string, env []string, args ...string) ([]string, bool) {
 	return xs, true
 }
 
-// Head is the commit of HEAD ("" without git or commits).
-func Head(dir string) string {
-	h, ok := Run(dir, nil, "rev-parse", "HEAD")
-	if !ok {
+var gitDirs sync.Map
+
+// gitDir is the absolute git directory of dir, asked once. The directory does not move during a command.
+func gitDir(dir string) string {
+	if v, ok := gitDirs.Load(dir); ok {
+		return v.(string)
+	}
+	gd, ok := Run(dir, nil, "rev-parse", "--absolute-git-dir")
+	if !ok || gd == "" {
 		return ""
 	}
-	return h
+	gitDirs.Store(dir, gd)
+	return gd
+}
+
+// Head is the commit of HEAD ("" without git or commits). It reads the ref file, so a later commit is visible
+// without another rev-parse.
+func Head(dir string) string {
+	gd := gitDir(dir)
+	if gd == "" {
+		h, ok := Run(dir, nil, "rev-parse", "HEAD")
+		if !ok {
+			return ""
+		}
+		return h
+	}
+	b, err := os.ReadFile(filepath.Join(gd, "HEAD"))
+	if err != nil {
+		return ""
+	}
+	s := strings.TrimSpace(string(b))
+	if !strings.HasPrefix(s, "ref: ") {
+		return s
+	}
+	rb, err := os.ReadFile(filepath.Join(gd, filepath.FromSlash(strings.TrimSpace(strings.TrimPrefix(s, "ref: ")))))
+	if err != nil {
+		h, ok := Run(dir, nil, "rev-parse", "HEAD")
+		if !ok {
+			return ""
+		}
+		return h
+	}
+	return strings.TrimSpace(string(rb))
+}
+
+// ForgetHead drops the memo of the git directory. A later command in this process resolves it again.
+func ForgetHead() {
+	gitDirs.Range(func(k, _ any) bool {
+		gitDirs.Delete(k)
+		return true
+	})
 }
 
 // IsAncestor reports whether commit a is an ancestor of b.

@@ -2,12 +2,12 @@ package quality
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 
+	"github.com/Spreizu/wingman-spec/internal/runstate"
 	"github.com/Spreizu/wingman-spec/internal/spec"
 )
 
@@ -36,11 +36,11 @@ func transformWord(stmt string) string {
 }
 
 func lines(path string) []string {
-	b, err := os.ReadFile(path)
-	if err != nil {
+	text, ok := runstate.ReadCached(path)
+	if !ok {
 		return nil
 	}
-	return strings.Split(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n")
+	return strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
 }
 
 // InvariantLint lists the ADDED/MODIFIED requirements whose statement transforms or stores data but that have no invariant scenario.

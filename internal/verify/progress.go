@@ -54,7 +54,7 @@ func (e *Env) Progress() error {
 	heading := "Change"
 	var task *tasks.Task
 	if o.Task != "" {
-		refs, _, err := loadTasks(changeDir)
+		refs, _, err := e.loadTasks(changeDir)
 		if err != nil {
 			return err
 		}

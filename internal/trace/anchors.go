@@ -24,10 +24,14 @@ var (
 )
 
 // Ctx is the layout and configuration the checks read.
+// IsSpecPath and IsScannable do not use Idx. Ensure builds the index the first time a scan needs file bodies.
+// Listed, when set, is the command's one git file list.
 type Ctx struct {
-	R   *layout.Root
-	Cfg *config.Config
-	Idx *codeindex.Index
+	R      *layout.Root
+	Cfg    *config.Config
+	Idx    *codeindex.Index
+	Ensure func() *codeindex.Index
+	Listed func() []string
 }
 
 // Specs is the living specs directory.
@@ -72,8 +76,17 @@ func (c Ctx) files() *codeindex.Index {
 	if c.Idx != nil {
 		return c.Idx
 	}
+	if c.Ensure != nil {
+		if idx := c.Ensure(); idx != nil {
+			return idx
+		}
+	}
 	anchors.SetAliases(c.IDAliases())
-	return codeindex.Scan(c.R.Code, c.IsScannable)
+	var rels []string
+	if c.Listed != nil {
+		rels = c.Listed()
+	}
+	return codeindex.Scan(c.R.Code, c.IsScannable, rels)
 }
 
 // CodeFiles lists the scannable files of the code root (git ls-files, else a walk).
@@ -148,8 +161,10 @@ type Facts struct {
 
 // AnchorFacts matches the markers and test tags of the code root against reqs.
 func (c Ctx) AnchorFacts(reqs *Reqs) Facts {
+	idx := c.files()
+	c.Idx = idx
 	f := Facts{Requirements: map[string]*ReqAnchors{}, Markers: c.ScanAnchors(nil)}
-	f.Tags = quality.TraceTags(quality.ListTestFiles(c.R.Code, c.Cfg.TestFiles), c.R.Code)
+	f.Tags = tagsIn(idx, c.testFiles(), c.R.Code)
 	sc := scenarioIndex(reqs)
 	for _, k := range reqs.keys {
 		f.Requirements[k] = &ReqAnchors{Code: map[string]bool{}, Tests: map[string]bool{}, Why: reqs.m[k].WhyText()}
@@ -193,6 +208,34 @@ func (c Ctx) AnchorFacts(reqs *Reqs) Facts {
 		}
 	}
 	return f
+}
+
+func (c Ctx) testFiles() []string {
+	var files []string
+	if c.Listed != nil {
+		files = c.Listed()
+	}
+	globs := []string(nil)
+	if c.Cfg != nil {
+		globs = c.Cfg.TestFiles
+	}
+	return quality.FilterListed(files, c.R.Code, globs)
+}
+
+// tagsIn reads scenario tags from the index when the file was scanned, and from disk otherwise.
+func tagsIn(idx *codeindex.Index, files []string, root string) map[string][]string {
+	have := map[string]string{}
+	if idx != nil {
+		for _, f := range idx.Files {
+			have[f.Rel] = f.Text
+		}
+	}
+	return quality.TraceTagsRead(files, func(f string) ([]byte, error) {
+		if t, ok := have[f]; ok && t != "" {
+			return []byte(t), nil
+		}
+		return os.ReadFile(filepath.Join(root, f))
+	})
 }
 
 func sortedKeys(m map[string]bool) []string {

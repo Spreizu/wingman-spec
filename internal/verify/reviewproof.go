@@ -74,6 +74,10 @@ func (e *Env) reviewProof(changeDir string, st *State, tinfo CmdInfo, o *outcome
 	var proven, untestable, tests []string
 	bySlug := map[string][]string{}
 	all := e.testFiles()
+	bodies := map[string]string{}
+	for _, t := range all {
+		bodies[t] = e.testBody(t)
+	}
 	for _, f := range fixes {
 		if f.untestable != "" {
 			untestable = append(untestable, f.slug+": "+f.untestable)
@@ -82,7 +86,7 @@ func (e *Env) reviewProof(changeDir string, st *State, tinfo CmdInfo, o *outcome
 		}
 		var by []string
 		for _, t := range all {
-			if testpaths.Tagged(readText(filepath.Join(e.code, t)), f.slug) {
+			if testpaths.Tagged(bodies[t], f.slug) {
 				by = append(by, t)
 			}
 		}

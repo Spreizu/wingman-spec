@@ -112,6 +112,11 @@ func (c Ctx) ArchivedExpectation(pendingDir string) ([]string, map[string]string
 var (
 	ObservedKinds = []string{"contradicts-doc", "suspected-bug", "debug-leftover", "incidental", "unclear", "untested"}
 	confirmKinds  = []string{"test", "doc", "owner"}
+	confirmREs    = []*regexp.Regexp{
+		regexp.MustCompile(`(?i)^test\b\s*\S`),
+		regexp.MustCompile(`(?i)^doc\b\s*\S`),
+		regexp.MustCompile(`(?i)^owner\b\s*\S`),
+	}
 	obsHeadRE     = regexp.MustCompile(`^##\s+(.+?)\s*$`)
 	obsFieldRE    = regexp.MustCompile(`(?i)^\s*[-*]\s*(Observed|Why unconfirmed|Owner|To confirm)\s*:\s*(.*?)\s*$`)
 	contRE        = regexp.MustCompile(`^\s{2,}\S`)
@@ -199,8 +204,8 @@ func confirmedProblem(r *Requirement) string {
 	if r.Confirmed == nil {
 		return "has no `Confirmed:` line"
 	}
-	for _, k := range confirmKinds {
-		if regexp.MustCompile(`(?i)^` + k + `\b\s*\S`).MatchString(*r.Confirmed) {
+	for _, re := range confirmREs {
+		if re.MatchString(*r.Confirmed) {
 			return ""
 		}
 	}

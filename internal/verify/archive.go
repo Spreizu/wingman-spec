@@ -79,7 +79,7 @@ func (e *Env) archiveGate(changeDir string) []gateCheck {
 	add(g)
 	g = gateCheck{Check: "tasks"}
 	if exists(tasksFile(changeDir)) {
-		if ts, _, err := loadTasks(changeDir); err != nil {
+		if ts, _, err := e.loadTasks(changeDir); err != nil {
 			g.Problem = err.Error()
 		} else {
 			for _, t := range ts {

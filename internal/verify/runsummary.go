@@ -10,6 +10,7 @@ import (
 
 	"github.com/Spreizu/wingman-spec/internal/gitx"
 	"github.com/Spreizu/wingman-spec/internal/layout"
+	"github.com/Spreizu/wingman-spec/internal/runstate"
 )
 
 // The finish event carries what the editor's run summary shows: each check's verdict, and the code files changed since
@@ -56,7 +57,7 @@ func (e *Env) diffSinceBase() map[string]any {
 	if ls == nil {
 		return nil
 	}
-	tr := e.tr()
+	tr := e.paths()
 	keep := func(f string) bool { return !tr.IsSpecPath(f) && !strings.HasPrefix(f, layout.Dir+"/") }
 	type stat struct {
 		file           string
@@ -72,7 +73,11 @@ func (e *Env) diffSinceBase() map[string]any {
 		r, _ := strconv.Atoi(parts[1])
 		all = append(all, stat{parts[2], a, r})
 	}
-	for _, f := range gitx.Lines(e.code, "ls-files", "--others", "--exclude-standard") {
+	others := runstate.Files(e.code).Untracked
+	if !runstate.Files(e.code).OK {
+		others = gitx.Lines(e.code, "ls-files", "--others", "--exclude-standard")
+	}
+	for _, f := range others {
 		if !keep(f) {
 			continue
 		}

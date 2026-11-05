@@ -45,7 +45,7 @@ func findingsOfProblems(fs []Finding) []report.Finding {
 }
 
 func (e *Env) saySkipped() {
-	n := len(e.index().Skipped)
+	n := len(e.skippedList())
 	if n == 0 {
 		return
 	}

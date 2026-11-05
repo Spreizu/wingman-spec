@@ -11,7 +11,6 @@ import (
 
 	"github.com/Spreizu/wingman-spec/internal/anchors"
 	"github.com/Spreizu/wingman-spec/internal/checkparse"
-	"github.com/Spreizu/wingman-spec/internal/gitx"
 	"github.com/Spreizu/wingman-spec/internal/quality"
 	"github.com/Spreizu/wingman-spec/internal/runstate"
 	"github.com/Spreizu/wingman-spec/internal/spec"
@@ -82,7 +81,7 @@ func (e *Env) Finish() error {
 		e.emit(O("result", "blocked", "blocked_file", b))
 		return quit(Blocked)
 	}
-	ts, _, err := loadTasks(changeDir)
+	ts, _, err := e.loadTasks(changeDir)
 	if err != nil {
 		return err
 	}
@@ -163,7 +162,7 @@ func (e *Env) Finish() error {
 	vrep, verr := validateChange(e.R, e.O.Change)
 	vsecs := time.Since(vt0).Seconds()
 	wg.Wait()
-	e.memo = nil
+	e.dropIndex()
 	testOut := ""
 	ranTests := false
 	for i, j := range jobs {
@@ -198,102 +197,111 @@ func (e *Env) Finish() error {
 			o.warn("the test results were not recorded: " + err.Error())
 		}
 	}
-	e.finishVisual(changeDir, run, &o)
-	// trace: every scenario of the change has a tagged test (visual ones are covered by the visual check)
-	tq0 := time.Now()
-	scens := quality.SpecScenarios(filepath.Join(changeDir, "specs"))
-	res := runstate.Timed("scan: traceability", func() quality.TraceResult {
-		return quality.Trace(scens, quality.TraceTags(e.testFiles(), e.code), !e.Cfg.Visual.Off)
+	e.warm(changeDir)
+	e.dropIndex()
+	scens := e.scenariosOf(changeDir)
+	var vis, cpu outcome
+	var nr whyRep
+	var scan sync.WaitGroup
+	scan.Go(func() { e.finishVisual(changeDir, run, &vis) })
+	scan.Go(func() {
+		tq0 := time.Now()
+		res := runstate.Timed("scan: traceability", func() quality.TraceResult {
+			return quality.Trace(scens, e.traceTags(e.testFiles()), !e.Cfg.Visual.Off)
+		})
+		var untested []string
+		for _, s := range res.Missing {
+			untested = append(untested, s.ID)
+		}
+		cpu.check(O("check", "trace", "ok", len(untested) == 0, "scenarios", res.Total, "tagged", len(res.Covered), "visual", len(res.Visual), "verified", len(res.Verified), "untested", list(untested), "seconds", time.Since(tq0).Seconds()))
+		if len(untested) > 0 {
+			cpu.fail(fmt.Sprintf("%d of %d scenarios have no tagged test: %s. Write (or tag) a test that proves each one. %s", len(untested), res.Total, bracket(untested), tagHelp))
+		}
+		up := runstate.Timed("scan: path and scope", func() []string { return e.checkScope(changeDir) })
+		var pathProbs []string
+		for _, p := range e.sizeReport(changeDir).Problems {
+			if p.Kind == "path-artifacts" {
+				pathProbs = append(pathProbs, p.Text)
+			}
+		}
+		pc := O("check", "path", "ok", len(pathProbs) == 0, "path", quality.PlanPath(quality.SizeFacts(changeDir, e.readUpgrade())).Path)
+		if len(up) > 0 {
+			pc.Set("upgraded_by", up)
+		}
+		cpu.check(pc)
+		for _, p := range pathProbs {
+			cpu.fail(p)
+		}
+		cbase := e.changeBase()
+		var touched []string
+		if cbase != "" {
+			touched = e.changedTestFiles(cbase)
+		}
+		stFiles := touched
+		if stFiles == nil {
+			stFiles = e.testFiles()
+		}
+		var bad, allowed []string
+		runstate.Timed("scan: source-text tests", func() bool { bad, allowed = e.sourceTextCheck(stFiles); return true })
+		scope := "all test files (no recorded base commit: warn only)"
+		if touched != nil {
+			scope = "test files changed since " + cbase[:min(12, len(cbase))]
+		}
+		cpu.check(O("check", "source_text", "ok", touched == nil || len(bad) == 0, "files", len(touched), "findings", len(bad), "allowed", len(allowed), "scope", scope))
+		switch {
+		case len(bad) > 0 && touched != nil:
+			cpu.fail("tests read source files as text:\n" + bullets(bad) + "\n" + quality.SourceTextFix)
+		case len(bad) > 0:
+			for _, b := range bad {
+				cpu.warn("source-text test (pre-existing?): " + b)
+			}
+		}
+		for _, a := range allowed {
+			cpu.warn("allowed source-text test: " + a)
+		}
+		if cbase != "" {
+			if now := e.changedFiles(); now != nil {
+				cpu.addTokenLint(runstate.Timed("scan: design tokens", func() *tokenResult {
+					return e.tokenLint(changeDir, uniq(append(e.namesSince(cbase), now...)))
+				}))
+			}
+		}
+		nr = runstate.Timed("scan: why", func() whyRep { return e.whyReport(changeDir) })
+		if nr.mode != "off" {
+			var keys []string
+			for _, a := range nr.Approvals {
+				keys = append(keys, a.Key)
+			}
+			cpu.check(O("check", "why", "ok", !slices.ContainsFunc(nr.Problems, func(p trace.Problem) bool { return p.Severity == "error" }), "why_owner_approval", list(keys)))
+			for _, p := range nr.Problems {
+				if p.Severity == "error" {
+					cpu.fail("why: " + p.Text)
+				} else {
+					cpu.warn("why: " + p.Text)
+				}
+			}
+			ar := runstate.Timed("scan: anchors", func() trace.LintResult { return e.tr().AnchorLint(changeDir) })
+			aps := trace.BySeverity(ar.Problems, nr.mode)
+			sm := ar.Summary
+			cpu.check(O("check", "anchors", "ok", !slices.ContainsFunc(aps, func(p trace.Problem) bool { return p.Severity == "error" }), "requirements", sm["change_requirements"],
+				"without_code_anchor", sm["without_code"], "without_test_anchor", sm["without_test"], "unresolved", sm["unresolved"], "stale_tags", sm["stale_tags"]))
+			for _, p := range aps {
+				if p.Severity == "error" {
+					cpu.fail("code anchors: " + p.Text)
+				} else {
+					cpu.warn("code anchors: " + p.Text)
+				}
+			}
+			var gr *anchors.GuardResult
+			var glvl string
+			runstate.Timed("scan: anchor guard (git blame)", func() bool { gr, glvl = e.guardReport(changeDir, cbase, "change", nil); return true })
+			cpu.addGuard(gr, glvl, nr.mode)
+			e.testEvidence(&cpu, ranTests, testOut, scens, len(untested) == 0)
+		}
 	})
-	var untested []string
-	for _, s := range res.Missing {
-		untested = append(untested, s.ID)
-	}
-	o.check(O("check", "trace", "ok", len(untested) == 0, "scenarios", res.Total, "tagged", len(res.Covered), "visual", len(res.Visual), "verified", len(res.Verified), "untested", list(untested), "seconds", time.Since(tq0).Seconds()))
-	if len(untested) > 0 {
-		o.fail(fmt.Sprintf("%d of %d scenarios have no tagged test: %s. Write (or tag) a test that proves each one. %s", len(untested), res.Total, bracket(untested), tagHelp))
-	}
-	up := runstate.Timed("scan: path and scope", func() []string { return e.checkScope(changeDir) })
-	var pathProbs []string
-	for _, p := range e.sizeReport(changeDir).Problems {
-		if p.Kind == "path-artifacts" {
-			pathProbs = append(pathProbs, p.Text)
-		}
-	}
-	pc := O("check", "path", "ok", len(pathProbs) == 0, "path", quality.PlanPath(quality.SizeFacts(changeDir, e.readUpgrade())).Path)
-	if len(up) > 0 {
-		pc.Set("upgraded_by", up)
-	}
-	o.check(pc)
-	for _, p := range pathProbs {
-		o.fail(p)
-	}
-	cbase := e.changeBase()
-	var touched []string
-	if cbase != "" {
-		touched = e.changedTestFiles(cbase)
-	}
-	stFiles := touched
-	if stFiles == nil {
-		stFiles = e.testFiles()
-	}
-	var bad, allowed []string
-	runstate.Timed("scan: source-text tests", func() bool { bad, allowed = e.sourceTextCheck(stFiles); return true })
-	scope := "all test files (no recorded base commit: warn only)"
-	if touched != nil {
-		scope = "test files changed since " + cbase[:min(12, len(cbase))]
-	}
-	o.check(O("check", "source_text", "ok", touched == nil || len(bad) == 0, "files", len(touched), "findings", len(bad), "allowed", len(allowed), "scope", scope))
-	switch {
-	case len(bad) > 0 && touched != nil:
-		o.fail("tests read source files as text:\n" + bullets(bad) + "\n" + quality.SourceTextFix)
-	case len(bad) > 0:
-		for _, b := range bad {
-			o.warn("source-text test (pre-existing?): " + b)
-		}
-	}
-	for _, a := range allowed {
-		o.warn("allowed source-text test: " + a)
-	}
-	if cbase != "" {
-		if now := e.changedFiles(); now != nil {
-			o.addTokenLint(runstate.Timed("scan: design tokens", func() *tokenResult {
-				return e.tokenLint(changeDir, uniq(append(gitx.Lines(e.code, "diff", "--name-only", cbase, "--"), now...)))
-			}))
-		}
-	}
-	nr := runstate.Timed("scan: why", func() whyRep { return e.whyReport(changeDir) })
-	if nr.mode != "off" {
-		var keys []string
-		for _, a := range nr.Approvals {
-			keys = append(keys, a.Key)
-		}
-		o.check(O("check", "why", "ok", !slices.ContainsFunc(nr.Problems, func(p trace.Problem) bool { return p.Severity == "error" }), "why_owner_approval", list(keys)))
-		for _, p := range nr.Problems {
-			if p.Severity == "error" {
-				o.fail("why: " + p.Text)
-			} else {
-				o.warn("why: " + p.Text)
-			}
-		}
-		ar := runstate.Timed("scan: anchors", func() trace.LintResult { return e.tr().AnchorLint(changeDir) })
-		aps := trace.BySeverity(ar.Problems, nr.mode)
-		sm := ar.Summary
-		o.check(O("check", "anchors", "ok", !slices.ContainsFunc(aps, func(p trace.Problem) bool { return p.Severity == "error" }), "requirements", sm["change_requirements"],
-			"without_code_anchor", sm["without_code"], "without_test_anchor", sm["without_test"], "unresolved", sm["unresolved"], "stale_tags", sm["stale_tags"]))
-		for _, p := range aps {
-			if p.Severity == "error" {
-				o.fail("code anchors: " + p.Text)
-			} else {
-				o.warn("code anchors: " + p.Text)
-			}
-		}
-		var gr *anchors.GuardResult
-		var glvl string
-		runstate.Timed("scan: anchor guard (git blame)", func() bool { gr, glvl = e.guardReport(changeDir, cbase, "change", nil); return true })
-		o.addGuard(gr, glvl, nr.mode)
-		e.testEvidence(&o, ranTests, testOut, scens, len(untested) == 0)
-	}
+	scan.Wait()
+	o.merge(vis)
+	o.merge(cpu)
 	secs := time.Since(t0).Seconds()
 	for _, w := range o.warnings {
 		e.say("WARNING: %s", w)
@@ -384,7 +392,7 @@ func (e *Env) finishVisual(changeDir, run string, o *outcome) {
 	}
 	outDir := filepath.Join(run, "visual", "finish-"+stamp())
 	declared := map[string]bool{}
-	ts, _, _ := loadTasks(changeDir)
+	ts, _, _ := e.loadTasks(changeDir)
 	for _, t := range ts {
 		for _, f := range filesOf(t.T.Detail) {
 			b := filepath.Base(f)

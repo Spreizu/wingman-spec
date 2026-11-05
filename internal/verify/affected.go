@@ -7,8 +7,6 @@ import (
 	"slices"
 
 	"github.com/Spreizu/wingman-spec/internal/anchors"
-	"github.com/Spreizu/wingman-spec/internal/gitx"
-	"github.com/Spreizu/wingman-spec/internal/quality"
 	"github.com/Spreizu/wingman-spec/internal/testpaths"
 	"github.com/Spreizu/wingman-spec/internal/trace"
 )
@@ -26,10 +24,10 @@ type affectedSet struct {
 func (e *Env) affectedTests(changeDir string) affectedSet {
 	base := e.changeBase()
 	diffBase := cmp.Or(base, "HEAD")
-	tr := e.tr()
+	tr := e.paths()
 	keys := anchors.TouchedKeys(e.code, diffBase, func(f string) bool { return testpaths.IsTestPath(f) || tr.IsSpecPath(f) })
 	var src []string
-	for _, f := range uniq(append(gitx.Lines(e.code, "diff", "--name-only", diffBase, "--"), e.changedFiles()...)) {
+	for _, f := range uniq(append(e.namesSince(diffBase), e.changedFiles()...)) {
 		if !testpaths.IsTestPath(f) && !tr.IsSpecPath(f) {
 			src = append(src, f)
 		}
@@ -46,7 +44,7 @@ func (e *Env) affectedTests(changeDir string) affectedSet {
 	}
 	eff := trace.Effective(e.R.LivingSpecs(), changeDir)
 	all := e.testFiles()
-	tags := quality.TraceTags(all, e.code)
+	tags := e.traceTags(all)
 	var files []string
 	for k := range keys {
 		if r, ok := eff.Get(k); ok {
