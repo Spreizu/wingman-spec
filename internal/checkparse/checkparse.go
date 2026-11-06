@@ -55,10 +55,14 @@ type Summary struct {
 	Errors   int       `json:"errors"` // lint and type errors
 	Failures []Failure `json:"failures"`
 	More     int       `json:"more,omitempty"` // failures not listed
+	first    string
 }
 
 // Read reports whether any format was recognised.
 func (s *Summary) Read() bool { return len(s.Formats) > 0 }
+
+// FirstFailure is the name of the first failing test in the output, or "".
+func (s Summary) FirstFailure() string { return s.first }
 
 // Counts is the one-line count ("3 failed, 40 passed, 1 skipped", "2 errors").
 func (s *Summary) Counts() string {
@@ -122,7 +126,9 @@ var ansi = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
 // Parse reads a command's output, and a JUnit XML report when the project writes one (nil: none).
 func Parse(output string, junit []byte) Summary {
 	var s Summary
-	out := strings.ReplaceAll(ansi.ReplaceAllString(output, ""), "\r\n", "\n")
+	plain := ansi.ReplaceAllString(output, "")
+	s.first = failureName(plain)
+	out := strings.ReplaceAll(plain, "\r\n", "\n")
 	lines := strings.Split(out, "\n")
 	if len(junit) > 0 {
 		parseJUnit(&s, junit)

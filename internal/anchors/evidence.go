@@ -3,14 +3,11 @@ package anchors
 import (
 	"regexp"
 	"strings"
+
+	"github.com/Spreizu/wingman-spec/internal/checkparse"
 )
 
-var (
-	failLine    = regexp.MustCompile(`^\s*(?:not ok\b|[✗✖✕×]|FAIL(?:ED)?\b|--- FAIL\b|\[?FAILED\]?\b|\d+\)\s)`)
-	passLine    = regexp.MustCompile(`^\s*(?:ok\b|[✓✔]|PASS(?:ED)?\b|--- PASS\b|\[?PASSED\]?\b)`)
-	skipLine    = regexp.MustCompile(`(?i)#\s*(?:SKIP|TODO)\b|\bskipped\b|^\s*[○↓-]\s|^\s*--- SKIP\b|\bSKIPPED\b`)
-	evidenceTag = regexp.MustCompile(`\[([a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*)\]`)
-)
+var evidenceTag = regexp.MustCompile(`\[([a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*)\]`)
 
 // EvidenceScenario is a scenario to look for in the test output.
 type EvidenceScenario struct{ ID, Requirement string }
@@ -46,12 +43,12 @@ func TestEvidence(output string, scenarios []EvidenceScenario) Evidence {
 			continue
 		}
 		kind := 0
-		switch {
-		case skipLine.MatchString(l):
+		switch checkparse.Class(l) {
+		case checkparse.LineSkip:
 			kind = 1
-		case failLine.MatchString(l):
+		case checkparse.LineFail:
 			kind = 2
-		case passLine.MatchString(l):
+		case checkparse.LinePass:
 			kind = 3
 		}
 		seen := map[string]bool{}
