@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Spreizu/wingman-spec/internal/checkparse"
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/timeline"
 )
 
@@ -17,7 +18,7 @@ func (e *Env) checksDir() string {
 	d := filepath.Join(e.R.Runs(""), "checks")
 	if e.O.Change != "" {
 		d = filepath.Join(e.runsDir(), "checks")
-	} else if !exists(filepath.Join(e.R.Runs(""), ".gitignore")) {
+	} else if !layout.Exists(filepath.Join(e.R.Runs(""), ".gitignore")) {
 		_ = os.MkdirAll(e.R.Runs(""), 0o755)
 		_ = os.WriteFile(filepath.Join(e.R.Runs(""), ".gitignore"), []byte("*\n"), 0o644)
 	}

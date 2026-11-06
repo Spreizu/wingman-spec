@@ -1,12 +1,14 @@
 package verify
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 
 	"github.com/Spreizu/wingman-spec/internal/anchors"
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/testpaths"
 	"github.com/Spreizu/wingman-spec/internal/trace"
 )
@@ -41,7 +43,7 @@ func (e *Env) Anchors() error {
 			continue
 		}
 		x := r.Facts.Requirements[k]
-		reqs.Set(k, O("code", sortedKeys(x.Code), "tests", sortedKeys(x.Tests), "coverage", cov[k]))
+		reqs.Set(k, O("code", append([]string{}, slices.Sorted(maps.Keys(x.Code))...), "tests", append([]string{}, slices.Sorted(maps.Keys(x.Tests))...), "coverage", cov[k]))
 	}
 	var index any = Skip
 	if e.O.JSON {
@@ -57,16 +59,7 @@ func (e *Env) Anchors() error {
 // coverageObj summarizes the recorded test results: where they live and the requirement count per state.
 func (e *Env) coverageObj(cov map[string]trace.Coverage) *Obj {
 	p := e.tr().ResultsPath()
-	return O("results", If(exists(p), rel(e.code, p)), "counts", trace.CoverageCounts(cov))
-}
-
-func sortedKeys(m map[string]bool) []string {
-	out := []string{}
-	for k := range m {
-		out = append(out, k)
-	}
-	slices.Sort(out)
-	return out
+	return O("results", If(layout.Exists(p), rel(e.code, p)), "counts", trace.CoverageCounts(cov))
 }
 
 var selectRE = regexp.MustCompile(`^(.*):(\d+)$`)
@@ -134,7 +127,7 @@ func (e *Env) AnchorsPrune() error {
 	texts := map[string]string{}
 	for _, p := range picks {
 		if _, ok := texts[p.File]; !ok {
-			texts[p.File] = readText(filepath.Join(e.code, p.File))
+			texts[p.File] = layout.Text(filepath.Join(e.code, p.File))
 		}
 	}
 	removed := 0

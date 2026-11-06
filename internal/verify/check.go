@@ -100,7 +100,7 @@ func diffTasks(st *State, files []string) []string {
 			out = append(out, s.File+" was deleted")
 			continue
 		}
-		preL := strings.Split(readText(s.Snap), "\n")
+		preL := strings.Split(layout.Text(s.Snap), "\n")
 		postL := strings.Split(string(post), "\n")
 		base := filepath.Base(s.File)
 		if len(preL) != len(postL) {
@@ -177,7 +177,7 @@ func (e *Env) changedTestFiles(base string) []string {
 	}
 	out := []string{}
 	for _, f := range uniq(append(since, now...)) {
-		if testpaths.IsTestFile(f) && exists(filepath.Join(e.code, f)) {
+		if testpaths.IsTestFile(f) && layout.Exists(filepath.Join(e.code, f)) {
 			out = append(out, f)
 		}
 	}
@@ -233,7 +233,7 @@ func (e *Env) targetedTests(changeDir string, st *State, testCmd string, scens [
 	mapped := testpaths.TestsFor(sources, all)
 	var files []string
 	for _, f := range uniq(slices.Concat(changed, tagged, mapped)) {
-		if exists(filepath.Join(e.code, f)) {
+		if layout.Exists(filepath.Join(e.code, f)) {
 			files = append(files, f)
 		}
 	}
@@ -252,7 +252,7 @@ func (e *Env) endsGroup(st *State) bool {
 	plans := map[string]*tasks.Plan{}
 	mem := st.members()
 	for _, m := range mem {
-		if m.File == "" || m.Line == 0 || !exists(m.File) {
+		if m.File == "" || m.Line == 0 || !layout.Exists(m.File) {
 			return true
 		}
 		if plans[m.File] == nil {
@@ -330,7 +330,7 @@ func (e *Env) scopeReasons() []string {
 	}
 	tr := e.paths()
 	prod := func(f string) bool {
-		return !tr.IsSpecPath(f) && !testpaths.IsTestPath(f) && exists(filepath.Join(e.code, f))
+		return !tr.IsSpecPath(f) && !testpaths.IsTestPath(f) && layout.Exists(filepath.Join(e.code, f))
 	}
 	var files []string
 	for _, f := range uniq(append(e.namesSince(base), now...)) {
@@ -449,7 +449,7 @@ func (e *Env) sourceTextCheck(files []string) (bad, allowed []string) {
 func (e *Env) tokenLint(changeDir string, files []string) *tokenResult {
 	var ui []string
 	for _, f := range files {
-		if visual.IsUIFile(f, e.Cfg.Visual) && !testpaths.IsTestPath(f) && exists(filepath.Join(e.code, f)) {
+		if visual.IsUIFile(f, e.Cfg.Visual) && !testpaths.IsTestPath(f) && layout.Exists(filepath.Join(e.code, f)) {
 			ui = append(ui, f)
 		}
 	}
@@ -556,7 +556,7 @@ func (o *outcome) addGuard(r *anchors.GuardResult, lvl, mode string) {
 func (e *Env) existing(files []string) []string {
 	out := []string{}
 	for _, f := range files {
-		if exists(filepath.Join(e.code, f)) {
+		if layout.Exists(filepath.Join(e.code, f)) {
 			out = append(out, f)
 		}
 	}
@@ -718,7 +718,7 @@ func (e *Env) Check() error {
 		return err
 	}
 	run := e.currentRun(false)
-	if run == "" || !exists(filepath.Join(run, "state.json")) {
+	if run == "" || !layout.Exists(filepath.Join(run, "state.json")) {
 		return die(Usage, "no task in progress: run `next` first")
 	}
 	st, err := readState(run)
@@ -749,7 +749,7 @@ func (e *Env) Check() error {
 		logMetric(run, O("event", "reopen", "task", st.Task.Label, "attempt", st.Attempts+1))
 	}
 	t0 := time.Now()
-	blocked := exists(filepath.Join(changeDir, "BLOCKED.md"))
+	blocked := layout.Exists(filepath.Join(changeDir, "BLOCKED.md"))
 	if blocked && st.lane != nil && e.O.Reported != "blocked" {
 		blocked = false // another task of the wave is blocked; this one is judged on its own work
 		o.warn("BLOCKED.md exists (another task of this wave is blocked); this task is checked on its own work")
@@ -805,6 +805,11 @@ func (e *Env) Check() error {
 		o.warn(warns...)
 		o.check(O("check", "ownership", "ok", len(fails) == 0, "files", len(e.waveTouched(st.parent.Wave))))
 	}
+	return e.checkReport(changeDir, run, tinfo, t0, blocked, st, &o)
+}
+
+// checkReport applies the report, the scans and the pass or reject result.
+func (e *Env) checkReport(changeDir, run string, tinfo CmdInfo, t0 time.Time, blocked bool, st *State, o *outcome) error {
 	// 2. the subagent's own report and BLOCKED.md
 	if blocked {
 		o.fail("BLOCKED.md exists")
@@ -820,7 +825,7 @@ func (e *Env) Check() error {
 	review := ""
 	var rubric []string
 	if len(o.failures) == 0 {
-		vis, review, rubric = e.runChecks(changeDir, run, st, tinfo, &o)
+		vis, review, rubric = e.runChecks(changeDir, run, st, tinfo, o)
 	}
 	if len(o.failures) == 0 {
 		if up := e.checkScope(changeDir); len(up) > 0 {

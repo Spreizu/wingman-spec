@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/runstate"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
 	"github.com/Spreizu/wingman-spec/internal/timeline"
@@ -119,14 +120,14 @@ func stamp() string {
 func (e *Env) currentRun(create bool) string {
 	d := e.runsDir()
 	ptr := filepath.Join(d, "current")
-	if id := strings.TrimSpace(readText(ptr)); id != "" && exists(filepath.Join(d, id)) {
+	if id := strings.TrimSpace(layout.Text(ptr)); id != "" && layout.Exists(filepath.Join(d, id)) {
 		return filepath.Join(d, id)
 	}
 	if !create {
 		return ""
 	}
 	id := fmt.Sprintf("%s-%d", stamp(), os.Getpid())
-	for n := 1; exists(filepath.Join(d, id)); n++ {
+	for n := 1; layout.Exists(filepath.Join(d, id)); n++ {
 		id = fmt.Sprintf("%s-%d-%d", stamp(), os.Getpid(), n)
 	}
 	_ = os.MkdirAll(filepath.Join(d, id, "pre"), 0o755)

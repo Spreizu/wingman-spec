@@ -73,12 +73,12 @@ func (e *Env) archiveGate(changeDir string) []gateCheck {
 	var out []gateCheck
 	add := func(g gateCheck) { g.OK = g.Problem == ""; out = append(out, g) }
 	g := gateCheck{Check: "blocked"}
-	if exists(filepath.Join(changeDir, "BLOCKED.md")) {
+	if layout.Exists(filepath.Join(changeDir, "BLOCKED.md")) {
 		g.Problem, g.blocked = "BLOCKED.md exists: run /spec-fix first", true
 	}
 	add(g)
 	g = gateCheck{Check: "tasks"}
-	if exists(tasksFile(changeDir)) {
+	if layout.Exists(tasksFile(changeDir)) {
 		if ts, _, err := e.loadTasks(changeDir); err != nil {
 			g.Problem = err.Error()
 		} else {

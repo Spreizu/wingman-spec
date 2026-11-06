@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Spreizu/wingman-spec/internal/gitx"
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/runstate"
 	"github.com/Spreizu/wingman-spec/internal/visual"
 )
@@ -40,7 +41,7 @@ func (e *Env) Visual() error {
 	scens := e.scenarios(filepath.Join(changeDir, "specs"))
 	run := e.currentRun(false)
 	var st *State
-	if run != "" && exists(filepath.Join(run, "state.json")) {
+	if run != "" && layout.Exists(filepath.Join(run, "state.json")) {
 		if s, err := readState(run); err == nil {
 			st = s
 		}
@@ -122,7 +123,7 @@ func (e *Env) RunStatus() (*Obj, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !exists(tasksFile(changeDir)) {
+	if !layout.Exists(tasksFile(changeDir)) {
 		return nil, nil
 	}
 	ts, prog, err := e.loadTasks(changeDir)
@@ -138,7 +139,7 @@ func (e *Env) RunStatus() (*Obj, error) {
 	}
 	run := e.currentRun(false)
 	var st *State
-	if run != "" && exists(filepath.Join(run, "state.json")) {
+	if run != "" && layout.Exists(filepath.Join(run, "state.json")) {
 		st, _ = readState(run)
 	}
 	runStatus := "no open run"

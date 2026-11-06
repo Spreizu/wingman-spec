@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/quality"
 	"github.com/Spreizu/wingman-spec/internal/runstate"
 	"github.com/Spreizu/wingman-spec/internal/spec"
@@ -31,7 +32,7 @@ type PacketTask struct {
 // review task goes alone.
 func (e *Env) batchTasks(changeDir string, ts []taskRef, pending int) []taskRef {
 	isReview := func(t taskRef) bool { return tasks.IsReview(t.T.Label, t.T.Title) }
-	size := quality.ReadProposalSize(readText(filepath.Join(changeDir, "proposal.md"))).Size
+	size := quality.ReadProposalSize(layout.Text(filepath.Join(changeDir, "proposal.md"))).Size
 	scope := "group"
 	switch {
 	case e.O.PerTask || size == "" || isReview(ts[pending]):
@@ -67,7 +68,7 @@ func (e *Env) Next() error {
 	if err := e.Begin(); err != nil {
 		return err
 	}
-	if b := filepath.Join(changeDir, "BLOCKED.md"); exists(b) {
+	if b := filepath.Join(changeDir, "BLOCKED.md"); layout.Exists(b) {
 		e.emit(O("result", "blocked", "blocked_file", b))
 		return quit(Blocked)
 	}
@@ -123,7 +124,7 @@ func (e *Env) Next() error {
 	}
 	run := e.currentRun(false)
 	var st *State
-	if run != "" && exists(filepath.Join(run, "state.json")) {
+	if run != "" && layout.Exists(filepath.Join(run, "state.json")) {
 		st, _ = readState(run)
 	}
 	if st != nil && st.Exhausted {
@@ -134,6 +135,14 @@ func (e *Env) Next() error {
 		e.emit(O("result", "review-pending", "task", st.Task.Label, "review_prompt", st.Review.Prompt, "fix", fmt.Sprintf("dispatch spec-visual-reviewer with %s, then run `review %s --reply <file>`", st.Review.Prompt, e.O.Change)))
 		return quit(Usage)
 	}
+	if err := e.refuseUnverified(ts, st); err != nil {
+		return err
+	}
+	return e.nextDispatch(changeDir, run, files, ts, prog, st, vl, tinfo)
+}
+
+// refuseUnverified stops when a ticked task has no passing check.
+func (e *Env) refuseUnverified(ts []taskRef, st *State) error {
 	// A ticked task that no check passed (re-ticked after a failed check, or ticked without one) is never skipped.
 	ledger := e.readLedger(ts)
 	foreign := e.foreignRecords(ts, ledger)
@@ -168,6 +177,11 @@ func (e *Env) Next() error {
 		e.say("REFUSED: %s", fix)
 		return quit(Usage)
 	}
+	return nil
+}
+
+// nextDispatch hands out the next task, batch or wave, or reports the change complete.
+func (e *Env) nextDispatch(changeDir, run string, files []string, ts []taskRef, prog Progress, st *State, vl vlint, tinfo CmdInfo) error {
 	pending := slices.IndexFunc(ts, func(t taskRef) bool { return !t.Done })
 	if pending < 0 {
 		if run != "" {
@@ -457,7 +471,7 @@ var (
 func readFiles(changeDir string, st *State, scens []*quality.Scenario) []string {
 	var read []string
 	add := func(p string) {
-		if p != "" && exists(p) && !slices.Contains(read, p) {
+		if p != "" && layout.Exists(p) && !slices.Contains(read, p) {
 			read = append(read, p)
 		}
 	}

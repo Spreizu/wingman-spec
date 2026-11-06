@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Spreizu/wingman-spec/internal/checkparse"
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
 	"github.com/Spreizu/wingman-spec/internal/visual"
 )
@@ -266,7 +267,7 @@ func (e *Env) checkVisual(changeDir, run string, st *State, o *outcome) (vis *Ob
 	if len(p.mine) > 0 && p.cfg.Review != "off" && p.cfg.Screenshots != "off" && len(rep.Shots) > 0 {
 		in := visual.ReviewInput{Change: e.O.Change, Task: st.Task.Label, Attempt: st.Attempts + 1, MaxAttempts: e.O.MaxAttempts,
 			Root: e.R.Specs, ChangeDir: changeDir, Code: e.code, Scenarios: p.mine}
-		if dm := filepath.Join(changeDir, "design-map.md"); exists(dm) {
+		if dm := filepath.Join(changeDir, "design-map.md"); layout.Exists(dm) {
 			in.DesignMap = dm
 		}
 		for _, s := range p.mine {
@@ -379,7 +380,7 @@ func (e *Env) Review() error {
 		return err
 	}
 	run := e.currentRun(false)
-	if run == "" || !exists(filepath.Join(run, "state.json")) {
+	if run == "" || !layout.Exists(filepath.Join(run, "state.json")) {
 		return die(Usage, "no task in progress: run `next` first")
 	}
 	st, err := readState(run)

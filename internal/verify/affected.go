@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/Spreizu/wingman-spec/internal/anchors"
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/testpaths"
 	"github.com/Spreizu/wingman-spec/internal/trace"
 )
@@ -63,7 +64,7 @@ func (e *Env) affectedTests(changeDir string) affectedSet {
 	files = slices.Concat(files, e.changedTestFiles(base), testpaths.TestsFor(src, all))
 	out := affectedSet{files: []string{}, keys: []string{}}
 	for _, f := range uniq(files) {
-		if exists(filepath.Join(e.code, f)) {
+		if layout.Exists(filepath.Join(e.code, f)) {
 			out.files = append(out.files, f)
 		}
 	}

@@ -8,7 +8,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Spreizu/wingman-spec/internal/checkparse"
 	"github.com/Spreizu/wingman-spec/internal/gitx"
+	"github.com/Spreizu/wingman-spec/internal/layout"
 )
 
 // Retry bookkeeping of one task: a failure fingerprint per attempt, the pre-task tree, and the implementer's note.
@@ -24,17 +26,7 @@ var (
 	hexRE      = regexp.MustCompile(`\b[0-9a-f]{7,40}\b`)
 	tmpRE      = regexp.MustCompile(`/(tmp|var/folders|private/var)/\S*`)
 	spaceRE    = regexp.MustCompile(`\s+`)
-	// the first failing test: node:test, TAP, vitest/jest, pytest, go, mocha
-	testIDREs = []*regexp.Regexp{
-		regexp.MustCompile(`(?m)^\s*not ok \d+ - (.+)$`),
-		regexp.MustCompile(`(?m)^\s*[✖×✗]\s+(.+?)(\s+\(\d.*\))?$`),
-		regexp.MustCompile(`(?m)^\s*FAIL\s+(\S+.*)$`),
-		regexp.MustCompile(`(?m)^FAILED (\S+)`),
-		regexp.MustCompile(`(?m)^\s*--- FAIL: (\S+)`),
-		regexp.MustCompile(`(?m)^\s*\d+\) (.+)$`),
-	}
-	tapDirRE  = regexp.MustCompile(`\s+#\s.*$`) // a TAP directive or timing after the test name
-	errLineRE = regexp.MustCompile(`(?i)(error|assert|expected|exception|panic|cannot|undefined|not found|fail)`)
+	errLineRE  = regexp.MustCompile(`(?i)(error|assert|expected|exception|panic|cannot|undefined|not found|fail)`)
 )
 
 // normLine makes a line comparable across attempts: no colours, timings, line:column positions, hashes or temp paths.
@@ -63,13 +55,7 @@ func fingerprint(checks []any, failures []string) string {
 		return ""
 	}
 	text := ansiRE.ReplaceAllString(strings.Join(failures, "\n"), "")
-	test := ""
-	for _, re := range testIDREs {
-		if m := re.FindStringSubmatch(text); m != nil {
-			test = normLine(tapDirRE.ReplaceAllString(m[1], ""))
-			break
-		}
-	}
+	test := normLine(checkparse.Parse(text, nil).FirstFailure())
 	first := ""
 	lines := strings.Split(text, "\n")
 	for _, l := range lines[1:] {
@@ -91,7 +77,7 @@ func (e *Env) notePath(label string) string {
 
 // readNote is the task's attempt note, cut to noteWords words; "" when there is none.
 func (e *Env) readNote(label string) string {
-	w := strings.Fields(readText(e.notePath(label)))
+	w := strings.Fields(layout.Text(e.notePath(label)))
 	if len(w) == 0 {
 		return ""
 	}
@@ -144,10 +130,10 @@ func taskFiles(t *TaskState) []string {
 // savePre kept them (a file the task created is removed). It returns the diff file, "" if nothing changed.
 func (e *Env) startOver(st *State) string {
 	d := e.notePath(st.Task.Label) + ".d"
-	if !exists(filepath.Join(d, "absent")) {
+	if !layout.Exists(filepath.Join(d, "absent")) {
 		return ""
 	}
-	absent := strings.Fields(readText(filepath.Join(d, "absent")))
+	absent := strings.Fields(layout.Text(filepath.Join(d, "absent")))
 	var diff strings.Builder
 	var restore []string
 	for _, f := range taskFiles(st.Task) {
@@ -155,10 +141,10 @@ func (e *Env) startOver(st *State) string {
 		switch {
 		case slices.Contains(absent, f):
 			if fi, err := os.Stat(p); err == nil && fi.Mode().IsRegular() {
-				fmt.Fprintf(&diff, "--- new file %s\n%s\n", f, readText(p))
+				fmt.Fprintf(&diff, "--- new file %s\n%s\n", f, layout.Text(p))
 				restore = append(restore, f)
 			}
-		case exists(pre):
+		case layout.Exists(pre):
 			if out, _ := gitx.RunRaw(e.code, nil, nil, "diff", "--no-index", "--", pre, p); out != "" {
 				diff.WriteString(out)
 				restore = append(restore, f)

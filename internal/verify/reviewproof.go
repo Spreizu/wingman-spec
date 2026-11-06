@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Spreizu/wingman-spec/internal/gitx"
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/runstate"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
 	"github.com/Spreizu/wingman-spec/internal/testpaths"
@@ -59,7 +60,7 @@ func (e *Env) reviewProof(changeDir string, st *State, tinfo CmdInfo, o *outcome
 		return
 	}
 	code := e.codeChanges(st.Task.PreTree, now.Head)
-	fixes := reviewFixes(readText(filepath.Join(changeDir, "progress.md")))
+	fixes := reviewFixes(layout.Text(filepath.Join(changeDir, "progress.md")))
 	x := O("check", "review_proof", "ok", true, "code_files", len(code))
 	defer o.check(x)
 	if len(code) == 0 {
@@ -185,7 +186,7 @@ func (e *Env) preCopy(tree string, tests []string) (string, string) {
 		_ = os.MkdirAll(filepath.Dir(filepath.Join(d, t)), 0o755)
 		_ = os.WriteFile(filepath.Join(d, t), b, 0o644)
 	}
-	if nm := filepath.Join(e.code, "node_modules"); exists(nm) && !exists(filepath.Join(d, "node_modules")) {
+	if nm := filepath.Join(e.code, "node_modules"); layout.Exists(nm) && !layout.Exists(filepath.Join(d, "node_modules")) {
 		_ = os.Symlink(nm, filepath.Join(d, "node_modules"))
 	}
 	return d, ""

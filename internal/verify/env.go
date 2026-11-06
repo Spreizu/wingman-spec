@@ -268,7 +268,7 @@ func (e *Env) testBody(rel string) string {
 			return s
 		}
 	}
-	return readText(filepath.Join(e.code, rel))
+	return layout.Text(filepath.Join(e.code, rel))
 }
 
 func (e *Env) headSHA() string {
@@ -468,7 +468,7 @@ func (e *Env) scenariosOf(changeDir string) []*quality.Scenario {
 func (e *Env) loadTasks(changeDir string) ([]taskRef, Progress, error) {
 	e.warm(changeDir)
 	f := tasksFile(changeDir)
-	if !exists(f) {
+	if !layout.Exists(f) {
 		return nil, Progress{}, die(Usage, "%s has no tasks.md (is the tasks artifact created?)", filepath.Base(changeDir))
 	}
 	p := e.plan(changeDir)
@@ -484,13 +484,6 @@ func (e *Env) loadTasks(changeDir string) ([]taskRef, Progress, error) {
 	prog.Remaining = prog.Total - prog.Complete
 	return out, prog, nil
 }
-
-func readText(f string) string {
-	b, _ := os.ReadFile(f)
-	return string(b)
-}
-
-func exists(f string) bool { _, err := os.Stat(f); return err == nil }
 
 // ---------- project commands ----------
 
@@ -660,7 +653,7 @@ func (e *Env) changedFiles() []string {
 func (e *Env) runsDir() string {
 	base := filepath.Dir(e.R.Runs(e.O.Change))
 	_ = os.MkdirAll(base, 0o755)
-	if gi := filepath.Join(base, ".gitignore"); !exists(gi) {
+	if gi := filepath.Join(base, ".gitignore"); !layout.Exists(gi) {
 		_ = os.WriteFile(gi, []byte("*\n"), 0o644)
 	}
 	d := e.R.Runs(e.O.Change)
@@ -670,12 +663,12 @@ func (e *Env) runsDir() string {
 
 // changeBase is the commit the change's first run started from (recorded by `next`).
 func (e *Env) changeBase() string {
-	return strings.TrimSpace(readText(filepath.Join(e.R.Runs(e.O.Change), "base")))
+	return strings.TrimSpace(layout.Text(filepath.Join(e.R.Runs(e.O.Change), "base")))
 }
 
 func (e *Env) recordBase() {
 	f := filepath.Join(e.runsDir(), "base")
-	if exists(f) {
+	if layout.Exists(f) {
 		return
 	}
 	if h := e.headSHA(); h != "" {

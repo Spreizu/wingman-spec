@@ -4,12 +4,12 @@ import (
 	"cmp"
 	"fmt"
 	"maps"
-	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/trace"
 )
 
@@ -44,16 +44,8 @@ func sevOf(s string) string {
 
 type hit struct{ line, col, length int }
 
-func fileLines(f string) []string {
-	b, err := os.ReadFile(f)
-	if err != nil {
-		return nil
-	}
-	return strings.Split(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n")
-}
-
 func lineOf(f string, n int) (string, bool) {
-	ls := fileLines(f)
+	ls := layout.Lines(f)
 	if n < 1 || n > len(ls) {
 		return "", false
 	}
@@ -63,7 +55,7 @@ func lineOf(f string, n int) (string, bool) {
 // locateAll is every occurrence of needle in f.
 func locateAll(f, needle string) []hit {
 	var out []hit
-	for i, l := range fileLines(f) {
+	for i, l := range layout.Lines(f) {
 		for c := 0; ; {
 			j := strings.Index(l[c:], needle)
 			if j < 0 {
@@ -211,7 +203,7 @@ func (e *Env) lintFindings(ps []PlanFinding, name, changeDir string) []Finding {
 		}
 		file := p.File
 		if file != "" && !filepath.IsAbs(file) {
-			if a := filepath.Join(changeDir, file); exists(a) {
+			if a := filepath.Join(changeDir, file); layout.Exists(a) {
 				file = a
 			} else {
 				file = filepath.Join(e.code, file)

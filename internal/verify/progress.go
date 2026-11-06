@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
 	"github.com/Spreizu/wingman-spec/internal/timeline"
 )
@@ -71,7 +72,7 @@ func (e *Env) Progress() error {
 		heading = describe(task)
 	}
 	f := filepath.Join(changeDir, "progress.md")
-	old := readText(f)
+	old := layout.Text(f)
 	line, summary := note, note
 	switch {
 	case o.ReviewFix != "":

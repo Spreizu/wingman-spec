@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/Spreizu/wingman-spec/internal/gitx"
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/quality"
 	"github.com/Spreizu/wingman-spec/internal/runstate"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
@@ -195,7 +196,7 @@ func (e *Env) parallelN() int {
 func (e *Env) waveTasks(changeDir string, ts []taskRef, pending int) []taskRef {
 	n := e.parallelN()
 	first := ts[pending]
-	if n < 2 || !laneable(first.T) || quality.ReadProposalSize(readText(filepath.Join(changeDir, "proposal.md"))).Size == "S" {
+	if n < 2 || !laneable(first.T) || quality.ReadProposalSize(layout.Text(filepath.Join(changeDir, "proposal.md"))).Size == "S" {
 		return nil
 	}
 	open := map[string]bool{}

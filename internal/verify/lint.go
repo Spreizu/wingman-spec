@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Spreizu/wingman-spec/internal/change"
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/quality"
 	"github.com/Spreizu/wingman-spec/internal/report"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
@@ -107,7 +108,7 @@ var testidRE = regexp.MustCompile(`data-testid\s*=\s*["']?([\w-]+)`)
 // before the task that builds its elements (error) or its component (info), and scenarios no task names (warning).
 func (e *Env) visualLineLint(changeDir string, scens []*visual.Scenario) []VProblem {
 	f := tasksFile(changeDir)
-	if !exists(f) {
+	if !layout.Exists(f) {
 		return nil
 	}
 	var out []VProblem
@@ -238,8 +239,8 @@ func (e *Env) planProblems(changeDir string) []quality.Finding {
 		return out
 	}
 	opts := quality.PlanOpts{Files: trace.Mode(e.Cfg)}
-	if p := filepath.Join(changeDir, "proposal.md"); exists(p) {
-		opts.Size = quality.ReadProposalSize(readText(p)).Size
+	if p := filepath.Join(changeDir, "proposal.md"); layout.Exists(p) {
+		opts.Size = quality.ReadProposalSize(layout.Text(p)).Size
 		if opts.Size != "" {
 			r := quality.PlanPath(quality.SizeFacts(changeDir, e.readUpgrade())).Review
 			opts.Review = &r
@@ -298,7 +299,7 @@ func (e *Env) whyReport(changeDir string) whyRep {
 var sliceRE = regexp.MustCompile("(?mi)^\\s*(?:[-*]\\s+)?\\**Slice\\**:\\s*`?([a-z0-9][a-z0-9-]*)`?")
 
 func sliceProblems(changeDir string) []quality.Finding {
-	m := sliceRE.FindStringSubmatch(readText(filepath.Join(changeDir, "proposal.md")))
+	m := sliceRE.FindStringSubmatch(layout.Text(filepath.Join(changeDir, "proposal.md")))
 	if m == nil {
 		return nil
 	}
@@ -419,7 +420,7 @@ func (e *Env) findingFile(changeDir, f string) string {
 		return ""
 	}
 	if !filepath.IsAbs(f) {
-		if a := filepath.Join(changeDir, f); exists(a) {
+		if a := filepath.Join(changeDir, f); layout.Exists(a) {
 			f = a
 		} else {
 			f = filepath.Join(e.code, f)
