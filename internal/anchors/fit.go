@@ -336,6 +336,13 @@ func FitFindings(o FitOpts) []FitFinding {
 		byKey[a.Key] = append(byKey[a.Key], a)
 	}
 	bad := map[string]bool{}
+	judgeKeys(o, max, keyOrder, byKey, &out, add, bad, id)
+	judgeUnits(o, anchors, add, bad, id)
+	return keepLastAnchor(out, byKey)
+}
+
+// judgeKeys flags boilerplate, foreign, unrelated and over-anchored markers of one requirement.
+func judgeKeys(o FitOpts, max int, keyOrder []string, byKey map[string][]*fitAnchor, out *[]*FitFinding, add func(*fitAnchor, string, string), bad map[string]bool, id func(*fitAnchor) string) {
 	for _, key := range keyOrder {
 		list := byKey[key]
 		r := o.Reqs[key]
@@ -409,9 +416,13 @@ func FitFindings(o FitOpts) []FitFinding {
 		}
 		if !skip && len(list) > ceiling && !weakFound {
 			first := list[0]
-			out = append(out, &FitFinding{File: first.file, Line: first.Line, Key: key, Kind: "many-anchors", Info: true, Text: first.file + ":" + strconv.Itoa(first.Line) + ": `" + key + "`: " + fixMany(len(list))})
+			*out = append(*out, &FitFinding{File: first.file, Line: first.Line, Key: key, Kind: "many-anchors", Info: true, Text: first.file + ":" + strconv.Itoa(first.Line) + ": `" + key + "`: " + fixMany(len(list))})
 		}
 	}
+}
+
+// judgeUnits flags a crowded unit: too many requirements anchored on a short span, the weakest ones removable.
+func judgeUnits(o FitOpts, anchors []*fitAnchor, add func(*fitAnchor, string, string), bad map[string]bool, id func(*fitAnchor) string) {
 	perUnit := map[string][]*fitAnchor{}
 	var unitOrder []string
 	for _, a := range anchors {
@@ -452,6 +463,10 @@ func FitFindings(o FitOpts) []FitFinding {
 			}
 		}
 	}
+}
+
+// keepLastAnchor sorts findings and refuses to remove a requirement's only anchor.
+func keepLastAnchor(out []*FitFinding, byKey map[string][]*fitAnchor) []FitFinding {
 	// the last marker of a requirement is never removable
 	slices.SortStableFunc(out, func(a, b *FitFinding) int {
 		if c := strings.Compare(a.File, b.File); c != 0 {

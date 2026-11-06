@@ -194,7 +194,6 @@ func shallow(dir string) bool {
 
 // Stale lists units whose code changed in a commit later than the last commit that touched their requirement's text.
 func Stale(o StaleOpts) ([]StaleAnchor, []string) {
-	var stale []StaleAnchor
 	if !isRepo(o.CodeRoot) {
 		return nil, []string{"stale-anchor skipped: the code repository has no git history"}
 	}
@@ -215,15 +214,6 @@ func Stale(o StaleOpts) ([]StaleAnchor, []string) {
 	rs, _ := filepath.EvalSymlinks(specTop)
 	rc, _ := filepath.EvalSymlinks(codeTop)
 	same := rs == rc
-	specRel := func(file string) string {
-		real, err := filepath.EvalSymlinks(file)
-		if err != nil {
-			real = file
-		}
-		rel, _ := filepath.Rel(rs, real)
-		return filepath.ToSlash(rel)
-	}
-	// The markers the loop below looks at, so their spec and code blames can run in parallel first.
 	var use []Marker
 	for _, m := range o.Markers {
 		if _, ok := o.Reqs[m.Key]; ok && !m.Test && !IsGenerated(m.File, "") {
@@ -231,105 +221,135 @@ func Stale(o StaleOpts) ([]StaleAnchor, []string) {
 		}
 	}
 	specFiles := map[string]string{}
+	j := &staleJob{o: o, specTop: specTop, rs: rs, same: same, use: use,
+		touched: map[string]bool{}, filesOf: map[string][]string{}, anc: map[string]bool{}}
 	for _, m := range use {
-		specFiles[o.Reqs[m.Key].File] = specRel(o.Reqs[m.Key].File)
+		specFiles[o.Reqs[m.Key].File] = j.specRel(o.Reqs[m.Key].File)
 	}
-	specBlame := blameAll(specTop, specFiles, false)
-	touched := map[string]bool{}
-	filesOf := map[string][]string{}
-	anc := map[string]bool{}
-	isAnc := func(a, b, cwd string) bool {
-		if cwd == "" {
-			cwd = o.CodeRoot
+	j.specBlame = blameAll(specTop, specFiles, false)
+	return j.anchors(), nil
+}
+
+type specC struct {
+	c           *commit
+	uncommitted bool
+}
+
+type staleJob struct {
+	o         StaleOpts
+	specTop   string
+	rs        string
+	same      bool
+	use       []Marker
+	specBlame map[string]*blame
+	touched   map[string]bool
+	filesOf   map[string][]string
+	anc       map[string]bool
+}
+
+func (j *staleJob) specRel(file string) string {
+	real, err := filepath.EvalSymlinks(file)
+	if err != nil {
+		real = file
+	}
+	rel, _ := filepath.Rel(j.rs, real)
+	return filepath.ToSlash(rel)
+}
+
+func (j *staleJob) isAnc(a, b, cwd string) bool {
+	if cwd == "" {
+		cwd = j.o.CodeRoot
+	}
+	k := a + "|" + b + "|" + cwd
+	v, ok := j.anc[k]
+	if !ok {
+		v = gitx.IsAncestor(cwd, a, b)
+		j.anc[k] = v
+	}
+	return v
+}
+
+func (j *staleJob) newer(c, best *commit, cwd string) bool {
+	return best == nil || c.Time > best.Time || (c.Time == best.Time && j.isAnc(best.SHA, c.SHA, cwd))
+}
+
+func (j *staleJob) specCommit(r StaleReq) specC {
+	b, ok := j.specBlame[r.File]
+	if !ok {
+		b = blameOf(j.specTop, j.specRel(r.File), false)
+		j.specBlame[r.File] = b
+	}
+	if b == nil {
+		return specC{}
+	}
+	text, err := os.ReadFile(r.File)
+	if err != nil {
+		return specC{}
+	}
+	a, z := specRange(string(text), r.Line)
+	var best *commit
+	for i := a - 1; i < z && i < len(b.PerLine); i++ {
+		sha := b.PerLine[i]
+		if sha == "" {
+			continue
 		}
-		k := a + "|" + b + "|" + cwd
-		v, ok := anc[k]
-		if !ok {
-			v = gitx.IsAncestor(cwd, a, b)
-			anc[k] = v
+		if zeroSHA.MatchString(sha) {
+			return specC{uncommitted: true}
 		}
+		if c := b.Info[sha]; c != nil && j.newer(c, best, j.specTop) {
+			best = c
+		}
+	}
+	return specC{c: best}
+}
+
+func (j *staleJob) touchesSpec(sha, cap string) bool {
+	k := sha + "|" + cap
+	if v, ok := j.touched[k]; ok {
 		return v
 	}
-	newer := func(c, best *commit, cwd string) bool {
-		return best == nil || c.Time > best.Time || (c.Time == best.Time && isAnc(best.SHA, c.SHA, cwd))
+	names, ok := j.filesOf[sha]
+	if !ok {
+		out, _ := gitx.RunRaw(j.o.CodeRoot, nil, nil, "diff-tree", "-r", "--name-only", "--no-commit-id", "--root", sha)
+		names = strings.Split(out, "\n")
+		j.filesOf[sha] = names
 	}
-	type specC struct {
-		c           *commit
-		uncommitted bool
+	hit := false
+	for _, n := range names {
+		if n != "" && j.o.SpecPath != nil && j.o.SpecPath(n, cap) {
+			hit = true
+			break
+		}
 	}
-	specCommit := func(r StaleReq) specC {
-		b, ok := specBlame[r.File]
-		if !ok {
-			b = blameOf(specTop, specRel(r.File), false)
-			specBlame[r.File] = b
-		}
-		if b == nil {
-			return specC{}
-		}
-		text, err := os.ReadFile(r.File)
-		if err != nil {
-			return specC{}
-		}
-		a, z := specRange(string(text), r.Line)
-		var best *commit
-		for i := a - 1; i < z && i < len(b.PerLine); i++ {
-			sha := b.PerLine[i]
-			if sha == "" {
-				continue
-			}
-			if zeroSHA.MatchString(sha) {
-				return specC{uncommitted: true}
-			}
-			if c := b.Info[sha]; c != nil && newer(c, best, specTop) {
-				best = c
-			}
-		}
-		return specC{c: best}
-	}
-	touchesSpec := func(sha, cap string) bool {
-		k := sha + "|" + cap
-		if v, ok := touched[k]; ok {
-			return v
-		}
-		names, ok := filesOf[sha]
-		if !ok {
-			out, _ := gitx.RunRaw(o.CodeRoot, nil, nil, "diff-tree", "-r", "--name-only", "--no-commit-id", "--root", sha)
-			names = strings.Split(out, "\n")
-			filesOf[sha] = names
-		}
-		hit := false
-		for _, n := range names {
-			if n != "" && o.SpecPath != nil && o.SpecPath(n, cap) {
-				hit = true
-				break
-			}
-		}
-		touched[k] = hit
-		return hit
-	}
+	j.touched[k] = hit
+	return hit
+}
+
+func (j *staleJob) anchors() []StaleAnchor {
+	var stale []StaleAnchor
 	codeFiles := map[string]string{}
-	for _, m := range use {
-		if sc := specCommit(o.Reqs[m.Key]); sc.c != nil && !sc.uncommitted {
+	for _, m := range j.use {
+		if sc := j.specCommit(j.o.Reqs[m.Key]); sc.c != nil && !sc.uncommitted {
 			codeFiles[m.File] = m.File
 		}
 	}
-	fileBlame := blameAll(o.CodeRoot, codeFiles, true)
+	fileBlame := blameAll(j.o.CodeRoot, codeFiles, true)
 	seen := map[string]bool{}
 	texts := map[string]string{}
 	units := map[string]map[int][]Unit{}
-	for _, m := range use {
-		req := o.Reqs[m.Key]
+	for _, m := range j.use {
+		req := j.o.Reqs[m.Key]
 		key := m.Key + "@" + m.File
 		if seen[key] {
 			continue
 		}
-		sc := specCommit(req)
+		sc := j.specCommit(req)
 		if sc.c == nil || sc.uncommitted {
 			continue
 		}
 		fb, ok := fileBlame[m.File]
 		if !ok {
-			fb = blameOf(o.CodeRoot, m.File, true)
+			fb = blameOf(j.o.CodeRoot, m.File, true)
 			fileBlame[m.File] = fb
 		}
 		if fb == nil {
@@ -337,7 +357,7 @@ func Stale(o StaleOpts) ([]StaleAnchor, []string) {
 		}
 		text, ok := texts[m.File]
 		if !ok {
-			b, err := os.ReadFile(filepath.Join(o.CodeRoot, m.File))
+			b, err := os.ReadFile(filepath.Join(j.o.CodeRoot, m.File))
 			if err != nil {
 				continue
 			}
@@ -375,10 +395,10 @@ func Stale(o StaleOpts) ([]StaleAnchor, []string) {
 				continue
 			}
 			c := fb.Info[sha]
-			if c == nil || touchesSpec(sha, req.Cap) {
+			if c == nil || j.touchesSpec(sha, req.Cap) {
 				continue
 			}
-			if newer(c, latest, "") {
+			if j.newer(c, latest, "") {
 				latest = c
 			}
 		}
@@ -386,8 +406,8 @@ func Stale(o StaleOpts) ([]StaleAnchor, []string) {
 			continue
 		}
 		var later bool
-		if same {
-			later = !isAnc(latest.SHA, sc.c.SHA, "") && (latest.Time > sc.c.Time || isAnc(sc.c.SHA, latest.SHA, ""))
+		if j.same {
+			later = !j.isAnc(latest.SHA, sc.c.SHA, "") && (latest.Time > sc.c.Time || j.isAnc(sc.c.SHA, latest.SHA, ""))
 		} else {
 			later = latest.Time > sc.c.Time
 		}
@@ -397,5 +417,5 @@ func Stale(o StaleOpts) ([]StaleAnchor, []string) {
 		seen[key] = true
 		stale = append(stale, StaleAnchor{Key: m.Key, File: m.File, Line: m.Line, Header: u.Header, Commit: latest.SHA, Subject: latest.Summary, SpecCommit: sc.c.SHA, SpecSj: sc.c.Summary})
 	}
-	return stale, nil
+	return stale
 }
