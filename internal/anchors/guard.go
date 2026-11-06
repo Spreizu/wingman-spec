@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/Spreizu/wingman-spec/internal/gitx"
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/runstate"
 )
 
@@ -262,7 +263,7 @@ func guardFinish(o GuardOpts, code []Marker, events []Event) GuardResult {
 		where := e.File + ":" + strconv.Itoa(e.Line)
 		unit := ""
 		if e.Header != "" {
-			unit = " (`" + cutRunes(e.Header, 80) + "`)"
+			unit = " (`" + layout.Cut(e.Header, 80) + "`)"
 		}
 		if (e.Kind == "modified" || e.Kind == "added") && !known(e.Key) {
 			rename := ""
@@ -399,12 +400,4 @@ func GlobRE(p string) *regexp.Regexp {
 	}
 	actual, _ := globRes.LoadOrStore(p, re)
 	return actual.(*regexp.Regexp)
-}
-
-func cutRunes(s string, n int) string {
-	r := []rune(s)
-	if len(r) <= n {
-		return s
-	}
-	return string(r[:n])
 }

@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/Spreizu/wingman-spec/internal/layout"
 )
 
 // Group is a `## N. Title` section.
@@ -49,7 +51,6 @@ var (
 	sizeRE     = regexp.MustCompile(`(?i)^\s*(?:[-*]\s+)?\**Size\**:\s*\**\s*(XXL|XL|[SML])\b`)
 	groupRE    = regexp.MustCompile(`^##\s+(?:(\d+)\.\s*)?(.*?)\s*$`)
 	detailRE   = regexp.MustCompile(`^\s+[-*+]\s+([A-Za-z ]+):\s*(.*)$`)
-	commentRE  = regexp.MustCompile(`<!--.*?-->`)
 	fenceRE    = regexp.MustCompile("^\\s*(`{3,}|~{3,})")
 	riskyRE    = regexp.MustCompile(`(?i)\(risky\)|\brisky\b`)
 	qaRE       = regexp.MustCompile(`(?i)^qa[ -]?fix`)
@@ -142,7 +143,7 @@ func parsePlan(text string) *Plan {
 			}
 		}
 		if m := groupRE.FindStringSubmatch(l); m != nil && !strings.HasPrefix(l, "###") {
-			title := strings.TrimSpace(commentRE.ReplaceAllString(m[2], ""))
+			title := strings.TrimSpace(layout.StripComments(m[2], false))
 			num := m[1]
 			if num == "" {
 				num = strconv.Itoa(len(p.Groups) + 1)
@@ -157,7 +158,7 @@ func parsePlan(text string) *Plan {
 				g = &Group{N: "1", Title: "Tasks", Line: n}
 				p.Groups = append(p.Groups, g)
 			}
-			title := strings.TrimSpace(commentRE.ReplaceAllString(m[3], ""))
+			title := strings.TrimSpace(layout.StripComments(m[3], false))
 			t = &Task{Label: m[2], Title: title, Line: n, Done: m[1] != " ", Details: map[string]string{}, Group: g}
 			t.Review = IsReview(t.Label, title)
 			t.Closeout = !t.Review && (g.Closeout || IsCloseoutTitle(title))

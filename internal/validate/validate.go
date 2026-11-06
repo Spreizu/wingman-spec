@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/spec"
 )
 
@@ -64,7 +65,6 @@ var (
 	shallMust = regexp.MustCompile(`\b(SHALL|MUST)\b`)
 	specsNone = regexp.MustCompile(`(?im)^Specs:\s*none\b`)
 	h2Line    = regexp.MustCompile(`(?m)^##\s+(.*?)\s*$`)
-	comment   = regexp.MustCompile(`(?s)<!--.*?-->`)
 )
 
 // SpecsNone reports whether a proposal declares `Specs: none` (a change without delta specs).
@@ -149,7 +149,7 @@ func delta(r *Report, path, livingDir string, bases map[string]spec.Base, rel fu
 		return err
 	}
 	if len(lb) == 0 {
-		if d.Purpose != "" && len(strings.TrimSpace(comment.ReplaceAllString(d.Purpose, ""))) < MinPurpose {
+		if d.Purpose != "" && len(strings.TrimSpace(layout.StripComments(d.Purpose, false))) < MinPurpose {
 			r.add(file, 0, "## Purpose is shorter than %d characters: write one or two sentences on what %s is for", MinPurpose, capability)
 		}
 	}
@@ -182,7 +182,7 @@ func requirement(r *Report, file string, req spec.Requirement) {
 	} else {
 		body = ""
 	}
-	if !shallMust.MatchString(comment.ReplaceAllString(body, "")) {
+	if !shallMust.MatchString(layout.StripComments(body, false)) {
 		r.add(file, req.Line, "requirement %q has no SHALL or MUST statement", req.Name)
 	}
 	if len(req.Scenarios) == 0 {

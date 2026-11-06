@@ -11,7 +11,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/Spreizu/wingman-spec/internal/runstate"
+	"github.com/Spreizu/wingman-spec/internal/frontmatter"
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
 	"github.com/Spreizu/wingman-spec/internal/testpaths"
 )
@@ -285,21 +286,16 @@ func disjoint(a, b *tasks.Task) bool {
 }
 
 var (
-	commentBlock = regexp.MustCompile(`(?s)<!--.*?-->`)
-	propSizeRE   = regexp.MustCompile(`(?i)^\s*(?:[-*]\s+)?\**Size\**:\s*\**\s*(XXL|XL|[SML])\b`)
-	propRiskRE   = regexp.MustCompile(`(?i)^\s*(?:[-*]\s+)?\**Risk\**:\s*\**\s*(.*?)\s*$`)
-	riskNoneRE   = regexp.MustCompile(`^(none|no|-|n/a)?$`)
-	riskSplitRE  = regexp.MustCompile(`\s*[,;/]\s*|\s+and\s+`)
-	spaceRE      = regexp.MustCompile(`\s+`)
-	h2RE         = regexp.MustCompile(`^##\s`)
+	propSizeRE  = regexp.MustCompile(`(?i)^\s*(?:[-*]\s+)?\**Size\**:\s*\**\s*(XXL|XL|[SML])\b`)
+	propRiskRE  = regexp.MustCompile(`(?i)^\s*(?:[-*]\s+)?\**Risk\**:\s*\**\s*(.*?)\s*$`)
+	riskNoneRE  = regexp.MustCompile(`^(none|no|-|n/a)?$`)
+	riskSplitRE = regexp.MustCompile(`\s*[,;/]\s*|\s+and\s+`)
+	spaceRE     = regexp.MustCompile(`\s+`)
+	h2RE        = regexp.MustCompile(`^##\s`)
 )
 
 // StripComments blanks HTML comments, keeping the line count.
-func StripComments(t string) string {
-	return commentBlock.ReplaceAllStringFunc(t, func(m string) string {
-		return strings.Repeat("\n", strings.Count(m, "\n"))
-	})
-}
+func StripComments(t string) string { return layout.StripComments(t, true) }
 
 // ProposalSize is the `Size:` and `Risk:` lines of proposal.md. Risk is nil when there is no Risk line.
 type ProposalSize struct {
@@ -338,6 +334,16 @@ func ReadProposalSize(text string) ProposalSize {
 	return out
 }
 
+// HasSection reports whether a `##` heading matches re.
+func HasSection(text string, re *regexp.Regexp) bool {
+	for l := range strings.SplitSeq(text, "\n") {
+		if h2RE.MatchString(l) && re.MatchString(strings.TrimSpace(strings.TrimPrefix(l, "##"))) {
+			return true
+		}
+	}
+	return false
+}
+
 // Section returns the body of the `## <name>` sections whose heading matches re.
 func Section(text string, re *regexp.Regexp) string {
 	var out []string
@@ -354,29 +360,13 @@ func Section(text string, re *regexp.Regexp) string {
 	return strings.Join(out, "\n")
 }
 
-var (
-	fmRE     = regexp.MustCompile(`^---\r?\n((?s:.*?))\r?\n---`)
-	statusRE = regexp.MustCompile(`(?im)^status:[ \t]*(.*)$`)
-)
-
 // IsNoneADR reports whether an ADR file is the "no architectural decision" record (none.md or `status: none`).
 func IsNoneADR(fileName, text string) bool {
 	if strings.EqualFold(fileName, "none.md") {
 		return true
 	}
-	m := fmRE.FindStringSubmatch(text)
-	if m == nil {
-		return false
-	}
-	s := statusRE.FindStringSubmatch(m[1])
-	if s == nil {
-		return false
-	}
-	return strings.ToLower(strings.Trim(strings.TrimSpace(s[1]), `"'`)) == "none"
-}
-
-func readIf(f string) (string, bool) {
-	return runstate.ReadCached(f)
+	status, ok := frontmatter.Status(text)
+	return ok && strings.EqualFold(status, "none")
 }
 
 // SpecFile is one spec file of a specs directory: <dir>/<capability>.md.

@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/Spreizu/wingman-spec/internal/layout"
 )
 
 var (
@@ -143,7 +145,7 @@ func SourceTextFindings(file, rel string) ([]SourceTextFinding, string) {
 	}
 	opt := ""
 	if m := optOutRE.FindStringSubmatch(s); m != nil {
-		opt = cut(strings.TrimSpace(m[1]), 160)
+		opt = layout.Cut(strings.TrimSpace(m[1]), 160)
 	}
 	return out, opt
 }

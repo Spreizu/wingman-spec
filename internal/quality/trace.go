@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/Spreizu/wingman-spec/internal/anchors"
+	"github.com/Spreizu/wingman-spec/internal/codeindex"
 	"github.com/Spreizu/wingman-spec/internal/gitx"
 
 	"github.com/Spreizu/wingman-spec/internal/spec"
@@ -17,8 +18,6 @@ import (
 
 // TagRE matches a scenario trace tag `[capability/scenario-slug]`.
 var TagRE = regexp.MustCompile(`\[([a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*)\]`)
-
-var skipWalk = regexp.MustCompile(`^(node_modules|\.git|dist|build|\.wingman-spec)$`)
 
 // GitFiles runs git with args in root and returns the output lines, or nil when git fails.
 func GitFiles(root string, args ...string) []string {
@@ -55,7 +54,7 @@ func FilterListed(files []string, root string, globs []string, skip ...string) [
 				return nil
 			}
 			if d.IsDir() {
-				if p != root && skipWalk.MatchString(d.Name()) {
+				if p != root && codeindex.SkipDir(d.Name()) {
 					return filepath.SkipDir
 				}
 				return nil

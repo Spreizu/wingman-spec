@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/Spreizu/wingman-spec/internal/runstate"
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/spec"
 )
 
@@ -35,14 +35,6 @@ func transformWord(stmt string) string {
 	return ""
 }
 
-func lines(path string) []string {
-	text, ok := runstate.ReadCached(path)
-	if !ok {
-		return nil
-	}
-	return strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
-}
-
 // InvariantLint lists the ADDED/MODIFIED requirements whose statement transforms or stores data but that have no invariant scenario.
 func InvariantLint(specsDir string) []Finding {
 	var out []Finding
@@ -64,7 +56,7 @@ func InvariantLint(specsDir string) []Finding {
 			}
 			cur = nil
 		}
-		for i, l := range lines(sf.File) {
+		for i, l := range layout.Lines(sf.File) {
 			if fenceRE.MatchString(l) {
 				fence = !fence
 				continue
@@ -130,7 +122,7 @@ func SpecScenarios(dir string) []*Scenario {
 		section, req, verify := "", "", ""
 		var cur *Scenario
 		fence := byte(0)
-		for i, l := range lines(sf.File) {
+		for i, l := range layout.Lines(sf.File) {
 			if m := fenceOpenRE.FindStringSubmatch(l); m != nil {
 				if fence == 0 {
 					fence = m[1][0]
@@ -362,7 +354,7 @@ func scenarioWords(specsDir string) (map[string]bool, map[string]bool) {
 	var txt strings.Builder
 	codes := map[string]bool{}
 	for _, sf := range SpecFiles(specsDir) {
-		for _, l := range lines(sf.File) {
+		for _, l := range layout.Lines(sf.File) {
 			m := scenLineRE.FindStringSubmatch(l)
 			if m == nil {
 				m = gwtLineRE.FindStringSubmatch(l)
@@ -412,12 +404,4 @@ func splitIDs(s string) []string {
 		}
 	}
 	return out
-}
-
-func cut(s string, n int) string {
-	r := []rune(s)
-	if len(r) > n {
-		return string(r[:n])
-	}
-	return s
 }

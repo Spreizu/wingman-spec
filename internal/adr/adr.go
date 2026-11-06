@@ -12,15 +12,16 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/Spreizu/wingman-spec/internal/frontmatter"
 )
 
 // Readme is the static adrs/README.md (no table: a generated table conflicts between parallel branches).
 const Readme = "# Architecture Decision Records\n\nOne file per decision: `NNNN-<slug>.md`. List them with `wingman-spec adrs`.\n"
 
 var (
-	frontMatter = regexp.MustCompile(`(?s)^---\n(.*?)\n---\n?(.*)$`)
-	numbered    = regexp.MustCompile(`^(\d{4})-(.+)\.md$`)
-	statusLine  = regexp.MustCompile(`(?m)^status:.*$`)
+	numbered   = regexp.MustCompile(`^(\d{4})-(.+)\.md$`)
+	statusLine = regexp.MustCompile(`(?m)^status:.*$`)
 )
 
 // Doc is a Markdown file with simple `key: value` front matter.
@@ -30,24 +31,25 @@ type Doc struct {
 	Body  string
 }
 
-// Parse splits front matter and body. A file without front matter has an empty Value.
+// Parse splits front matter and body, keeping scalar values only.
+// Lists stay in frontmatter.Parse. A file without front matter has an empty Value.
 func Parse(src string) Doc {
 	d := Doc{Value: map[string]string{}}
-	m := frontMatter.FindStringSubmatch(strings.ReplaceAll(src, "\r\n", "\n"))
-	if m == nil {
+	matter, body, ok := frontmatter.Split(src)
+	if !ok {
 		d.Body = src
 		return d
 	}
-	for l := range strings.SplitSeq(m[1], "\n") {
-		k, v, ok := strings.Cut(l, ":")
-		if !ok {
+	for l := range strings.SplitSeq(matter, "\n") {
+		k, v, found := strings.Cut(l, ":")
+		if !found {
 			continue
 		}
 		k = strings.TrimSpace(k)
 		d.Keys = append(d.Keys, k)
 		d.Value[k] = scalar(v)
 	}
-	d.Body = m[2]
+	d.Body = body
 	return d
 }
 

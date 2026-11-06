@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/tasks"
 	"github.com/Spreizu/wingman-spec/internal/testpaths"
 )
@@ -66,7 +67,7 @@ func isVisual(lang string) bool { return strings.EqualFold(lang, "visual") }
 // SizeFacts reads what the change's artifacts contain.
 func SizeFacts(changeDir string, upgrade *Upgrade) Facts {
 	f := Facts{Upgrade: upgrade, Capabilities: []string{}, ADRs: []string{}, RiskyGroups: []string{}, RiskWords: []string{}, Files: []string{}}
-	proposal, hasProp := readIf(filepath.Join(changeDir, "proposal.md"))
+	proposal, hasProp := layout.ReadString(filepath.Join(changeDir, "proposal.md"))
 	f.HasProposal = hasProp && proposal != ""
 	if hasProp {
 		ps := ReadProposalSize(proposal)
@@ -75,7 +76,7 @@ func SizeFacts(changeDir string, upgrade *Upgrade) Facts {
 	breakingSpecs := false
 	for _, sf := range SpecFiles(filepath.Join(changeDir, "specs")) {
 		f.Capabilities = append(f.Capabilities, sf.Cap)
-		t, _ := readIf(sf.File)
+		t, _ := layout.ReadString(sf.File)
 		sec := ""
 		fence := false
 		for l := range strings.SplitSeq(strings.ReplaceAll(t, "\r\n", "\n"), "\n") {
@@ -113,13 +114,13 @@ func SizeFacts(changeDir string, upgrade *Upgrade) Facts {
 				continue
 			}
 			f.HasADRFile = true
-			t, _ := readIf(filepath.Join(adrDir, e.Name()))
+			t, _ := layout.ReadString(filepath.Join(adrDir, e.Name()))
 			if !IsNoneADR(e.Name(), t) {
 				f.ADRs = append(f.ADRs, e.Name())
 			}
 		}
 	}
-	if t, ok := readIf(filepath.Join(changeDir, "tasks.md")); ok {
+	if t, ok := layout.ReadString(filepath.Join(changeDir, "tasks.md")); ok {
 		p := tasks.Parse(t)
 		f.TasksSize = p.Size
 		for _, g := range p.Groups {
@@ -143,11 +144,11 @@ func SizeFacts(changeDir string, upgrade *Upgrade) Facts {
 			}
 		}
 	}
-	if d, ok := readIf(filepath.Join(changeDir, "design.md")); ok {
+	if d, ok := layout.ReadString(filepath.Join(changeDir, "design.md")); ok {
 		f.HasDesign = true
 		f.DesignSections = headings(d)
 	}
-	if a, ok := readIf(filepath.Join(changeDir, "app-map.md")); ok {
+	if a, ok := layout.ReadString(filepath.Join(changeDir, "app-map.md")); ok {
 		f.HasAppMap = true
 		f.AppMapSections = headings(a)
 	}
@@ -346,13 +347,13 @@ func SizeCheck(f Facts) SizeResult {
 // AppMapText is the two-line app map of a Size S change, built from its specs and proposal.
 func AppMapText(changeDir, livingDir string) string {
 	f := SizeFacts(changeDir, nil)
-	proposal, _ := readIf(filepath.Join(changeDir, "proposal.md"))
+	proposal, _ := layout.ReadString(filepath.Join(changeDir, "proposal.md"))
 	why := strings.TrimSpace(spaceRE.ReplaceAllString(StripComments(Section(proposal, whyRE)), " "))
 	why = firstSentence(why)
 	if why != "" && strings.ContainsRune(".!?", rune(why[len(why)-1])) {
 		why = why[:len(why)-1]
 	}
-	why = cut(why, 140)
+	why = layout.Cut(why, 140)
 	if why == "" {
 		why = "see proposal.md"
 	}

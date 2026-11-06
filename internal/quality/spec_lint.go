@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/testpaths"
 )
 
@@ -19,7 +20,7 @@ import (
 func EdgeLint(changeDir, livingDir string, visual map[string]VisualScenario, ui bool) ([]EdgeItem, []Finding) {
 	var out []Finding
 	items := []EdgeItem{}
-	prop, ok := readIf(filepath.Join(changeDir, "proposal.md"))
+	prop, ok := layout.ReadString(filepath.Join(changeDir, "proposal.md"))
 	if !ok {
 		return items, out
 	}
@@ -62,7 +63,7 @@ func EdgeLint(changeDir, livingDir string, visual map[string]VisualScenario, ui 
 		item := EdgeItem{Line: i + 1, Text: desc, IDs: ids, UI: uiEdge.match(desc)}
 		items = append(items, item)
 		if len(ids) == 0 {
-			out = append(out, Finding{File: "proposal.md", Line: i + 1, Severity: "error", Kind: "edge-cases", Text: fmt.Sprintf(`proposal.md:%d: edge case "%s" names no scenario: end the bullet with "-> <capability>/<scenario-slug>" and give that case its own scenario in the specs (Size never removes one)`, i+1, cut(desc, 80))})
+			out = append(out, Finding{File: "proposal.md", Line: i + 1, Severity: "error", Kind: "edge-cases", Text: fmt.Sprintf(`proposal.md:%d: edge case "%s" names no scenario: end the bullet with "-> <capability>/<scenario-slug>" and give that case its own scenario in the specs (Size never removes one)`, i+1, layout.Cut(desc, 80))})
 			continue
 		}
 		var unknown []string
@@ -72,7 +73,7 @@ func EdgeLint(changeDir, livingDir string, visual map[string]VisualScenario, ui 
 			}
 		}
 		if len(unknown) > 0 {
-			out = append(out, Finding{File: "proposal.md", Line: i + 1, Severity: "error", Kind: "edge-cases", Text: fmt.Sprintf(`proposal.md:%d: edge case "%s" points at %s, which is not a scenario of this change (scenario ids are <capability>/<slug of the scenario name>)`, i+1, cut(desc, 80), strings.Join(unknown, ", "))})
+			out = append(out, Finding{File: "proposal.md", Line: i + 1, Severity: "error", Kind: "edge-cases", Text: fmt.Sprintf(`proposal.md:%d: edge case "%s" points at %s, which is not a scenario of this change (scenario ids are <capability>/<slug of the scenario name>)`, i+1, layout.Cut(desc, 80), strings.Join(unknown, ", "))})
 		}
 		if item.UI && (len(visual) > 0 || ui) && len(unknown) == 0 {
 			want := EdgeTokens(desc)
@@ -97,7 +98,7 @@ func EdgeLint(changeDir, livingDir string, visual map[string]VisualScenario, ui 
 				}
 			}
 			if !found {
-				out = append(out, Finding{File: "proposal.md", Line: i + 1, Severity: "error", Kind: "edge-cases", Text: fmt.Sprintf("proposal.md:%d: UI edge case \"%s\" needs a visual scenario with a state that shows it (e.g. `state: long-name` with `do:` steps that add an item with the long text, checked at 375; the state name or its steps should name the case; a narrow case needs only `viewports: 375`): none of %s has one. %s", i+1, cut(desc, 80), strings.Join(ids, ", "), dataStateHint)})
+				out = append(out, Finding{File: "proposal.md", Line: i + 1, Severity: "error", Kind: "edge-cases", Text: fmt.Sprintf("proposal.md:%d: UI edge case \"%s\" needs a visual scenario with a state that shows it (e.g. `state: long-name` with `do:` steps that add an item with the long text, checked at 375; the state name or its steps should name the case; a narrow case needs only `viewports: 375`): none of %s has one. %s", i+1, layout.Cut(desc, 80), strings.Join(ids, ", "), dataStateHint)})
 			}
 		}
 	}
@@ -121,8 +122,8 @@ func EdgeLint(changeDir, livingDir string, visual map[string]VisualScenario, ui 
 			kept = append(kept, l)
 		}
 	}
-	design, _ := readIf(filepath.Join(changeDir, "design.md"))
-	dmap, _ := readIf(filepath.Join(changeDir, "design-map.md"))
+	design, _ := layout.ReadString(filepath.Join(changeDir, "design.md"))
+	dmap, _ := layout.ReadString(filepath.Join(changeDir, "design-map.md"))
 	var missed []string
 	for _, t := range []string{strings.Join(kept, "\n"), design, dmap} {
 		for _, x := range edgeWords.all(edgeProse(t, codes)) {
@@ -159,7 +160,7 @@ var (
 
 // TaskUIFiles are the UI files named by the Files: lines of tasks.md (test files do not count).
 func TaskUIFiles(changeDir string, exts ...string) []string {
-	t, ok := readIf(filepath.Join(changeDir, "tasks.md"))
+	t, ok := layout.ReadString(filepath.Join(changeDir, "tasks.md"))
 	if !ok {
 		return nil
 	}
@@ -189,7 +190,7 @@ func firstN(xs []string, n int) string {
 // UXLint checks the UX checklist of a UI-facing change (warnings only). visualIDs are the change's visual scenarios.
 func UXLint(changeDir string, visualIDs []string, uiExts ...string) []Finding {
 	var out []Finding
-	prop, ok := readIf(filepath.Join(changeDir, "proposal.md"))
+	prop, ok := layout.ReadString(filepath.Join(changeDir, "proposal.md"))
 	if !ok {
 		return out
 	}
@@ -324,7 +325,7 @@ func ThenLint(changeDir string) []Finding {
 			if x == "" {
 				continue
 			}
-			out = append(out, Finding{File: sf.File, Line: i + 1, Severity: "info", Kind: "vague-then", Text: fmt.Sprintf(`specs/%s.md:%d: %s "%s" says "%s" but names no value a test can check. Name the result: a quoted text, a number or a state, e.g. THEN the row shows "Overdue".`, sf.Cap, i+1, m[1], cut(m[2], 60), x), Fix: `Name a quoted text, a number or a state the test can check.`})
+			out = append(out, Finding{File: sf.File, Line: i + 1, Severity: "info", Kind: "vague-then", Text: fmt.Sprintf(`specs/%s.md:%d: %s "%s" says "%s" but names no value a test can check. Name the result: a quoted text, a number or a state, e.g. THEN the row shows "Overdue".`, sf.Cap, i+1, m[1], layout.Cut(m[2], 60), x), Fix: `Name a quoted text, a number or a state the test can check.`})
 		}
 	}
 	return out
@@ -335,7 +336,6 @@ func ThenLint(changeDir string) []Finding {
 var (
 	namedOpenRE  = regexp.MustCompile(`<(button|a|summary|label|h[1-6]|[A-Z][A-Za-z]*(?:Button|Link))\b([^>]*?)\s(?::|v-bind:)?aria-label\s*=\s*("[^"]*"|'[^']*'|\{[^}]*\})([^>]*)>`)
 	hiddenOpenRE = regexp.MustCompile(`(?i)<(\w[\w-]*)\b[^>]*(?:aria-hidden\s*=\s*["']?true|class\s*=\s*["'][^"']*\b(?:sr-only|visually-hidden|screen-reader-text)\b)[^>]*>`)
-	htmlCommRE   = regexp.MustCompile(`(?s)<!--.*?-->`)
 	tagRE        = regexp.MustCompile(`<[^>]+>`)
 	emptyMustRE  = regexp.MustCompile(`\{\{\s*(?:''|"")\s*\}\}`)
 	nbspRE       = regexp.MustCompile(`&nbsp;|&#160;`)
@@ -427,7 +427,7 @@ func AriaLabelFindings(abs, rel string) []AriaFinding {
 			continue
 		}
 		inner := dropHidden(src[openEnd:a])
-		visible := htmlCommRE.ReplaceAllString(inner, " ")
+		visible := layout.StripComments(strings.ReplaceAll(inner, "<!--", " <!--"), false)
 		visible = tagRE.ReplaceAllString(visible, " ")
 		visible = emptyMustRE.ReplaceAllString(visible, " ")
 		visible = nbspRE.ReplaceAllString(visible, " ")
@@ -436,8 +436,8 @@ func AriaLabelFindings(abs, rel string) []AriaFinding {
 			continue
 		}
 		line := strings.Count(src[:start], "\n") + 1
-		v := cut(visible, 60)
-		out = append(out, AriaFinding{Line: line, Tag: tag, Label: label, Visible: v, Text: fmt.Sprintf(`%s:%d: <%s> has aria-label=%s and visible text "%s": the aria-label replaces the visible text as its accessible name, which must contain that text (axe label-content-name-mismatch). Drop the aria-label and extend the visible text with visually hidden text that starts with an explicit space ({{ ' ' }} or &nbsp;, e.g. Cart<span class="sr-only">{{ ' ' }}{{ n }} items</span>), mark a decorative badge aria-hidden="true", or use aria-describedby`, rel, line, tag, cut(label, 60), v)})
+		v := layout.Cut(visible, 60)
+		out = append(out, AriaFinding{Line: line, Tag: tag, Label: label, Visible: v, Text: fmt.Sprintf(`%s:%d: <%s> has aria-label=%s and visible text "%s": the aria-label replaces the visible text as its accessible name, which must contain that text (axe label-content-name-mismatch). Drop the aria-label and extend the visible text with visually hidden text that starts with an explicit space ({{ ' ' }} or &nbsp;, e.g. Cart<span class="sr-only">{{ ' ' }}{{ n }} items</span>), mark a decorative badge aria-hidden="true", or use aria-describedby`, rel, line, tag, layout.Cut(label, 60), v)})
 	}
 	return out
 }
@@ -448,7 +448,7 @@ var testingSection = regexp.MustCompile(`(?i)^testing approach\b`)
 // approach** section in design.md (error), and that section names each such scenario (its id or slug) with how its
 // states are reached (warning).
 func ReachLint(changeDir string, vm map[string]VisualScenario) []Finding {
-	design, ok := readIf(filepath.Join(changeDir, "design.md"))
+	design, ok := layout.ReadString(filepath.Join(changeDir, "design.md"))
 	if !ok {
 		return nil
 	}
