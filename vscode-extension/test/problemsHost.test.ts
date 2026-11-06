@@ -49,7 +49,7 @@ test('refresh asks the verifier once per project with a timeout and the project 
   assert.equal(calls[0]?.cmd, join(bundled, 'wingman-spec'));
   assert.deepEqual(calls[0]?.args, ['problems', '--json', '--root', dir]);
   assert.equal(calls[0]?.cwd, dir);
-  assert.equal(calls[0]?.timeoutMs, 30000);
+  assert.equal(calls[0]?.timeoutMs, 120000);
   // 8 findings; orphan anchor, misplaced marker and stale tag are the live anchor diagnostics' job while the code view is on
   assert.equal(entries().length, 5);
   assert.deepEqual([service.summary.error, service.summary.warning], [4, 1]);
@@ -140,7 +140,7 @@ test('a verifier that cannot start or times out is a message, never a thrown err
   assert.match(host.messages.at(-1) ?? '', /could not start `.*wingman-spec`/);
   reply = { code: null, stdout: '', stderr: '', timedOut: true };
   await host.commands.get('wingmanSpec.refreshProblems')();
-  assert.match(host.messages.at(-1) ?? '', /did not answer within 30s/);
+  assert.match(host.messages.at(-1) ?? '', /did not answer within 120s/);
   reply = { code: 0, stdout: 'garbage', stderr: '', timedOut: false };
   await host.commands.get('wingmanSpec.refreshProblems')();
   assert.match(host.messages.at(-1) ?? '', /not understood/);

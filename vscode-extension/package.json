@@ -266,9 +266,9 @@
         },
         "wingmanSpec.verifierTimeoutSeconds": {
           "type": "number",
-          "default": 30,
+          "default": 120,
           "minimum": 1,
-          "description": "How long the extension waits for the wingman-spec CLI before it gives up (Problems panel, change dashboard)."
+          "description": "How long the extension waits for read-only wingman-spec CLI calls (Problems panel, change dashboard checks). Archive and Sync wait at least 5 minutes so a GateTree hash is not killed early."
         },
         "wingmanSpec.dashboardChecks": {
           "type": "boolean",

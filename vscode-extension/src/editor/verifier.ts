@@ -85,14 +85,27 @@ export class VerifierClient {
     return cli(args.join(' '));
   }
 
-  private async call(p: ProjectModel, args: string[]): Promise<Outcome<RunResult>> {
+  /**
+   * Read-only calls use `wingmanSpec.verifierTimeoutSeconds` (default 120).
+   * Mutating panel actions (`archive`, `sync`) wait at least 300s so GateTree hashing is not killed early.
+   */
+  private timeoutSeconds(kind: 'read' | 'mutate'): number {
+    const configured = Math.max(1, cfg().get<number>('verifierTimeoutSeconds', 120));
+    return kind === 'mutate' ? Math.max(configured, 300) : configured;
+  }
+
+  private async call(p: ProjectModel, args: string[], kind: 'read' | 'mutate' = 'read'): Promise<Outcome<RunResult>> {
     if (!vscode.workspace.isTrusted) return { ok: false, reason: 'the workspace is not trusted, so the wingman-spec CLI is not run' };
-    const timeoutMs = Math.max(1, cfg().get<number>('verifierTimeoutSeconds', 30)) * 1000;
+    const seconds = this.timeoutSeconds(kind);
+    const timeoutMs = seconds * 1000;
     const bin = this.bin();
     if (!bin) return { ok: false, reason: 'this build of the extension has no bundled wingman-spec CLI; install the build for your platform' };
     const r = await this.run(bin, [...args, '--root', p.root], { cwd: p.workspaceFolder, timeoutMs, env: { WINGMAN_SPEC_SOURCE: 'editor' } });
     if (r.spawnError) return { ok: false, reason: `could not start \`${bin}\` (${r.spawnError}); reinstall the extension` };
-    if (r.timedOut) return { ok: false, reason: `the CLI did not answer within ${timeoutMs / 1000}s (wingmanSpec.verifierTimeoutSeconds)` };
+    if (r.timedOut) {
+      const hint = kind === 'mutate' ? ' (Archive and Sync allow longer than wingmanSpec.verifierTimeoutSeconds)' : ' (wingmanSpec.verifierTimeoutSeconds)';
+      return { ok: false, reason: `the CLI did not answer within ${seconds}s${hint}` };
+    }
     return { ok: true, value: r };
   }
 
@@ -144,7 +157,8 @@ export class VerifierClient {
 
   /** A deterministic action the panel runs directly (`<action> [change] --json`); a refusal with JSON is a result, not an error. */
   async action(p: ProjectModel, action: CliAction, change?: string): Promise<Outcome<ActionResult>> {
-    const r = await this.call(p, actionArgs(action, change));
+    const kind = action === 'archive' || action === 'sync' ? 'mutate' : 'read';
+    const r = await this.call(p, actionArgs(action, change), kind);
     return r.ok ? { ok: true, value: readAction(action, change, r.value, p.workspaceFolder) } : r;
   }
 }

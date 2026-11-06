@@ -8,7 +8,7 @@ const { archiveFocus, dashboardCard } = await import('../src/webview/dashboardVi
 
 const drift: BlockingItem = { id: 'drift-gaps', title: '1 drift gap', detail: ['auth/login has no test'], todo: [{ kind: 'agent', text: '/spec-fix demo' }, { kind: 'terminal', text: '.wingman-spec/bin/wingman-spec drift demo' }] };
 const sync: BlockingItem = { id: 'unsynced-specs', title: 'Specs not synced', detail: [], todo: [{ kind: 'agent', text: '/spec-sync demo' }] };
-function dash(done: number, total: number, known: boolean, blocking: BlockingItem[]): Dashboard {
+function dash(done: number, total: number, known: boolean, blocking: BlockingItem[], unavailable?: string): Dashboard {
   return {
     tasks: { total, done, verified: done, rows: [] },
     checks: { known, passed: done, failed: 0, exhausted: false, lintErrors: 0, guardFindings: 0, attempts: done },
@@ -16,7 +16,8 @@ function dash(done: number, total: number, known: boolean, blocking: BlockingIte
     size: { planned: total, over: false },
     approvals: [],
     blocking,
-    notes: [],
+    notes: unavailable ? [`Not checked: ${unavailable}. Sync, check and drift items below may be missing.`] : [],
+    ...(unavailable ? { unavailable } : {}),
   };
 }
 const buttons = (html: string): number => (html.match(/data-(agent|term)=/g) ?? []).length;
@@ -49,5 +50,23 @@ test('every task ticked and something blocks: expanded warning; the header comma
 test('every task ticked and nothing blocks: a calm line', () => {
   const html = dashboardCard(dash(3, 3, true, []), false);
   assert.match(html, /Nothing blocks the archive/);
-  assert.doesNotMatch(html, /Blocking archive/);
+  assert.doesNotMatch(html, /Blocking archive|Archive readiness was not fully checked/);
+});
+
+test('every task ticked but verifier unavailable: never claim nothing blocks', () => {
+  const reason = 'the CLI did not answer within 120s (wingmanSpec.verifierTimeoutSeconds)';
+  const html = dashboardCard(dash(3, 3, true, [], reason), false);
+  assert.doesNotMatch(html, /Nothing blocks the archive/);
+  assert.match(html, /Archive readiness was not fully checked/);
+  assert.match(html, /did not answer within 120s/);
+  assert.match(html, /Refresh/);
+});
+
+test('every task ticked, unavailable, and a known blocker: incomplete warning plus the blocker', () => {
+  const html = dashboardCard(dash(3, 3, true, [drift], 'the workspace is not trusted'), false, ['/spec-apply demo', '/spec-fix demo']);
+  assert.doesNotMatch(html, /Nothing blocks the archive/);
+  assert.match(html, /Archive readiness was not fully checked/);
+  assert.match(html, /incomplete/);
+  assert.match(html, /1 drift gap/);
+  assert.doesNotMatch(html, /data-agent="\/spec-fix demo"/);
 });

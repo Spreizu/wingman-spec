@@ -102,6 +102,7 @@ test('without the verifier the page says what it could not check and falls back 
   const tasks = [task('1.1', 'A', true)];
   const d = buildDashboard({ change: changeOf(tasks, { adrsSynced: false }), gaps: [{ key: 'k', type: 'untested-requirement', subject: 'a/b', text: 'no test' }], inputs: { unavailable: 'the workspace is not trusted' }, cmd });
   assert.match(d.notes[0] ?? '', /Not checked: the workspace is not trusted/);
+  assert.equal(d.unavailable, 'the workspace is not trusted');
   assert.deepEqual(d.blocking.map((b) => b.id), ['unsynced-specs', 'drift-gaps']);
   assert.equal(d.checks.known, false);
 });

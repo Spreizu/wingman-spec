@@ -148,6 +148,8 @@ export interface Dashboard {
   blocking: BlockingItem[];
   /** What could not be checked (verifier not run, script missing): the blocking list is then incomplete. */
   notes: string[];
+  /** Why the verifier answers are missing (when set, archive readiness was not fully checked). */
+  unavailable?: string;
 }
 
 export interface DashboardInputs {
@@ -281,5 +283,6 @@ export function buildDashboard(a: DashboardArgs): Dashboard {
     ...(run && run.recent.length > 0 ? { activity: run.recent } : {}),
     blocking,
     notes,
+    ...(inputs.unavailable ? { unavailable: inputs.unavailable } : {}),
   };
 }

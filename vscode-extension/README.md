@@ -68,7 +68,7 @@ All commands start with **Wingman Spec:** in the Command Palette.
 | wingmanSpec.runTestsLens | on | A Run tests action on markers |
 | wingmanSpec.problemsPanel | on | CLI findings (`wingman-spec problems`) in the Problems panel, with quick fixes |
 | wingmanSpec.dashboardChecks | on | The change page asks the CLI what blocks the archive |
-| wingmanSpec.verifierTimeoutSeconds | 30 | Time limit of CLI calls |
+| wingmanSpec.verifierTimeoutSeconds | 120 | Time limit of read-only CLI calls (Archive/Sync wait at least 5 minutes) |
 
 ## Troubleshooting
 

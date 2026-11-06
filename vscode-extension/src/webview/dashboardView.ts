@@ -56,6 +56,13 @@ function archiveSection(d: Dashboard, loading: boolean, headerCmds: readonly str
   }
   const refresh = `<button class="link" style="margin-left:auto" ${cmdAttr('refreshView')} title="Ask the verifier again">Refresh</button>`;
   if (loading) return `<h3 class="dash-h">Before archive${refresh}</h3><p class="muted">Checking with the verifier...</p>`;
+  // Verifier answers missing: never claim the archive is clear (blocking may be incomplete).
+  if (d.unavailable) {
+    const warn = `<p class="muted">Archive readiness was not fully checked: ${esc(d.unavailable)}. Refresh to try again.</p>`;
+    if (!d.blocking.length) return `<h3 class="dash-h">Before archive${refresh}</h3>${warn}`;
+    const skip = new Set(headerCmds);
+    return `<h3 class="dash-h">Before archive ${badge('incomplete', 'warn')}${refresh}</h3>${warn}${d.blocking.map((b) => blocking(b, skip)).join('')}`;
+  }
   if (!d.blocking.length) return `<h3 class="dash-h">Before archive${refresh}</h3><p class="muted">Nothing blocks the archive.</p>`;
   const skip = new Set(headerCmds);
   return `<h3 class="dash-h">Blocking archive ${badge(String(d.blocking.length), 'warn')}${refresh}</h3>${d.blocking.map((b) => blocking(b, skip)).join('')}`;
