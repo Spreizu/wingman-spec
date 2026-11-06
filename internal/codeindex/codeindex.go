@@ -150,7 +150,7 @@ func listFiles(root string) []string {
 			return nil
 		}
 		if d.IsDir() {
-			if p != root && skipDir(d.Name()) {
+			if p != root && SkipDir(d.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -165,7 +165,8 @@ func listFiles(root string) []string {
 	return walk
 }
 
-func skipDir(name string) bool {
+// SkipDir reports a directory name the code index does not enter.
+func SkipDir(name string) bool {
 	switch name {
 	case "node_modules", ".git", "dist", "build", "out", "coverage", "vendor", ".venv", "venv", "target", "__pycache__",
 		".next", ".nuxt", ".svelte-kit", ".turbo", ".cache", ".wingman-spec", ".cursor", ".claude", ".agents", ".codex":

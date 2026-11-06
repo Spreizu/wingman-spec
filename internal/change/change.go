@@ -269,6 +269,12 @@ func SyncCheck(r *layout.Root, name string) ([]string, error) {
 // ArchiveName is the archive folder of a change archived at t: YYYY-MM-DD-HHMM-<change>.
 func ArchiveName(name string, t time.Time) string { return t.Format("2006-01-02-1504") + "-" + name }
 
+// archivePrefix is the date, and the optional HHMM, that ArchiveName writes before the change name.
+var archivePrefix = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}-(?:\d{4}-)?`)
+
+// NameOf is the change name stored in an archive folder.
+func NameOf(folder string) string { return archivePrefix.ReplaceAllString(folder, "") }
+
 // Archive moves a change to archive/YYYY-MM-DD-HHMM-<change> and returns the new folder. The checks that come first
 // are verify's archive gate.
 func Archive(r *layout.Root, name string, now time.Time) (string, error) {

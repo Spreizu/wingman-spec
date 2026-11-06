@@ -16,10 +16,13 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/Spreizu/wingman-spec/internal/runstate"
 )
 
 // Names of the files and directories that make up a layout.
@@ -276,3 +279,51 @@ func CleanURL(u string) string {
 
 func isFile(p string) bool { st, err := os.Stat(p); return err == nil && st.Mode().IsRegular() }
 func isDir(p string) bool  { st, err := os.Stat(p); return err == nil && st.IsDir() }
+
+// Exists reports whether path is present, as a file or a directory.
+func Exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// ReadString reads path as text. The bool is false when the file cannot be read.
+// A file is read once per size and mtime.
+func ReadString(path string) (string, bool) { return runstate.ReadCached(path) }
+
+// Text is ReadString for a caller that treats a missing file as empty text.
+func Text(path string) string {
+	s, _ := ReadString(path)
+	return s
+}
+
+// Lines reads path, drops CR and splits on LF. A missing file is nil.
+func Lines(path string) []string {
+	text, ok := ReadString(path)
+	if !ok {
+		return nil
+	}
+	return strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+}
+
+// Cut returns s shortened to at most n runes.
+func Cut(s string, n int) string {
+	r := []rune(s)
+	if len(r) > n {
+		return string(r[:n])
+	}
+	return s
+}
+
+// htmlComment is the only HTML-comment pattern in the module.
+var htmlComment = regexp.MustCompile(`(?s)<!--.*?-->`)
+
+// StripComments removes HTML comments. When keepLines is set, each comment becomes
+// the same number of newlines, so later lines keep their numbers.
+func StripComments(text string, keepLines bool) string {
+	if !keepLines {
+		return htmlComment.ReplaceAllString(text, "")
+	}
+	return htmlComment.ReplaceAllStringFunc(text, func(m string) string {
+		return strings.Repeat("\n", strings.Count(m, "\n"))
+	})
+}
