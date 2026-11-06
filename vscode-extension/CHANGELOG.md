@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.13.0
+
+- Drift in the trace view comes from `wingman-spec problems` (the same gaps as the Problems panel). When that list has not been read, Drift says "not checked" instead of a list computed in the editor. Details in the repository changelog.
+- The bundled CLI keeps the app server in the warm visual helper, skips an unchanged visual run, and reuses a passing `run-checks --store` result. `import openspec` is not in that binary: rebuild the CLI with `-tags importer`, or use the archived 0.12 binary. Details in the repository changelog.
+
 ## 0.12.2
 
 - The bundled CLI no longer leaves a `wingman-visual-before-*` folder in the temp folder when a visual run is stopped mid-run. Details in the repository changelog.

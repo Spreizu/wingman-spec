@@ -2,6 +2,16 @@
 
 Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
+## 0.13.0
+
+- **Faster check.** A passing `check` lists the code files once, hashes the tree once and reuses spec parses for the rest of the command. The read-only scans overlap. The verdicts are the same.
+- **Warm helper keeps the app server.** After a visual run the helper keeps the app server when the next run uses the same command, url, port and app tree. A different app, or a changed tree, starts the server again. The helper stops that server when it exits. A one-shot run still starts and stops its own server. Each state still opens in a fresh browser context ([reference](docs/reference.md)).
+- **Skip an unchanged visual run.** With `visual.changed_only` (or `--changed`), a visual check that already passed for the same app tree, commit, before-capture and scenarios is not opened again. The run names the earlier pass and how long it took. A run that takes screenshots (review on, screenshots not off), or a scenario whose role is not anonymous, is still run. `WINGMAN_SPEC_NO_CACHE` turns the skip off.
+- **Shorter visual answer.** The `run` answer keeps `summary`, `defect_count`, `shots`, `pairs` and `aria_changes` (no `in_scope`), plus `warnings`, `seconds`, `before`, `ignored` and `skipped_steps`. Axe dumps, timings and unread paths stay in `report.json` only.
+- **`run-checks --store`.** A passing lint, typecheck or test is saved for `check`, which reuses it when the tree is unchanged and runs the command again only on a miss. A failure is not saved. Visual is not saved there. The implementer prompt names only the specs the task needs, and the dispatch records the prompt length.
+- **`import openspec` is out of the default binary.** The command tells you to rebuild with `-tags importer`, or to run the archived 0.12 binary. The old `## ADDED Requirements` heading is still accepted.
+- **Editor drift comes from the CLI.** The trace view fills its drift list from `wingman-spec problems` instead of a second gap walk. When that list has not been read, Drift says "not checked".
+
 ## 0.12.2
 
 - **No leftover before folders.** A visual run's capture at HEAD (a temporary git worktree in
