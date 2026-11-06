@@ -47,7 +47,8 @@ func Synced(living string, d *Delta) []Problem {
 	return probs
 }
 
-// norm ignores trailing spaces and blank-line runs.
+// norm ignores trailing spaces and drops blank lines.
+// trace.Norm keeps one blank line between paragraphs. Do not merge the two: requirement hashes depend on that difference.
 func norm(s string) string {
 	var out []string
 	for l := range strings.SplitSeq(s, "\n") {

@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/Spreizu/wingman-spec/internal/config"
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/quality"
 	"github.com/Spreizu/wingman-spec/internal/runstate"
 	"github.com/Spreizu/wingman-spec/internal/spec"
@@ -84,13 +85,13 @@ var (
 	confirmedRE = regexp.MustCompile(`(?i)^\s*(?:[-*]\s*)?\**Confirmed\**:\s*(.+?)\s*$`)
 	acceptedRE  = regexp.MustCompile(`(?i)^\s*(?:[-*]\s*)?\**Accepted\**:\s*(.+?)\s*$`)
 	whyRE       = regexp.MustCompile(`(?i)^\s*(?:[-*]\s*)?\**Why\**:\s*(.*?)\s*$`)
-	htmlComment = regexp.MustCompile(`(?s)<!--.*?-->`)
 	baselineRE  = regexp.MustCompile(`(?im)^\s*Baseline:\s*adopted\b`)
 	trailingWS  = regexp.MustCompile(`[ \t\r]+$`)
 	multiNL     = regexp.MustCompile(`\n{2,}`)
 )
 
-// Norm compares requirement text: trailing spaces and blank lines do not count.
+// Norm compares requirement text: trailing spaces do not count, and a run of blank lines becomes one.
+// spec.norm drops blank lines instead. Do not merge the two: requirement hashes depend on that difference.
 func Norm(t string) string {
 	ls := strings.Split(strings.ReplaceAll(t, "\r\n", "\n"), "\n")
 	for i, l := range ls {
@@ -201,7 +202,7 @@ func ParseSpec(text string) Parsed {
 		}
 	}
 	closeReq(len(lines))
-	out.Purpose = strings.TrimSpace(htmlComment.ReplaceAllString(purpose.String(), ""))
+	out.Purpose = strings.TrimSpace(layout.StripComments(purpose.String(), false))
 	out.Baseline = baselineRE.MatchString(out.Purpose)
 	for _, r := range out.Reqs {
 		r.Baseline = out.Baseline
@@ -239,14 +240,6 @@ var (
 	specCache = map[string]specHit{}
 )
 
-func readIf(f string) string {
-	s, ok := runstate.ReadCached(f)
-	if !ok {
-		return ""
-	}
-	return s
-}
-
 // parseFile parses one spec, reusing the previous parse until the file's size or mtime changes.
 func parseFile(f string) Parsed {
 	st, err := os.Stat(f)
@@ -260,7 +253,7 @@ func parseFile(f string) Parsed {
 		return h.p
 	}
 	specMu.Unlock()
-	p := ParseSpec(readIf(f))
+	p := ParseSpec(layout.Text(f))
 	specMu.Lock()
 	specCache[f] = specHit{st.Size(), st.ModTime().UnixNano(), b, p}
 	specMu.Unlock()

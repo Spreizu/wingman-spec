@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/Spreizu/wingman-spec/internal/anchors"
+	"github.com/Spreizu/wingman-spec/internal/layout"
+	"github.com/Spreizu/wingman-spec/internal/spec"
 )
 
 // ArchiveOrder lists the archived change folders, oldest first: by archived.json's archived_at, else by the folder name.
@@ -144,10 +146,10 @@ func (c Ctx) ObservedEntries() []ObservedEntry {
 				out = append(out, *e)
 			}
 		}
-		for i, l := range strings.Split(strings.ReplaceAll(readIf(sf.File), "\r\n", "\n"), "\n") {
+		for i, l := range strings.Split(strings.ReplaceAll(layout.Text(sf.File), "\r\n", "\n"), "\n") {
 			if m := obsHeadRE.FindStringSubmatch(l); m != nil {
 				flush()
-				e = &ObservedEntry{Cap: sf.Cap, Slug: slugOf(m[1]), File: sf.File, Line: i + 1}
+				e = &ObservedEntry{Cap: sf.Cap, Slug: spec.Slug(m[1]), File: sf.File, Line: i + 1}
 				last = ""
 				continue
 			}
@@ -209,19 +211,7 @@ func confirmedProblem(r *Requirement) string {
 			return ""
 		}
 	}
-	return fmt.Sprintf("`Confirmed: %s` must start with test, doc or owner and name the evidence", cut(*r.Confirmed, 40))
-}
-
-func cut(s string, n int) string {
-	r := []rune(s)
-	if len(r) > n {
-		return string(r[:n])
-	}
-	return s
-}
-
-func slugOf(s string) string {
-	return strings.Trim(nonAlnumRE.ReplaceAllString(strings.ToLower(s), "-"), "-")
+	return fmt.Sprintf("`Confirmed: %s` must start with test, doc or owner and name the evidence", layout.Cut(*r.Confirmed, 40))
 }
 
 // Gap is one drift finding.
@@ -286,7 +276,7 @@ func (c Ctx) Drift(pendingDir string, light bool) DriftReport {
 			add(Gap{Type: "unanchored-requirement", Subject: k, Text: fmt.Sprintf("requirement %q has no code anchor", r.Name), Hint: "put `@spec " + k + "` on the code that implements it (the code may have lost its marker when moved); if the code is gone, rebuild it test-first or retire the requirement in a change; if it is knowingly unanchored: `wingman-spec drift decide unanchored-requirement:" + k + " --accept --note \"<why>\"`"})
 		case len(x.Tests) == 0 && r.Verified() == "":
 			cp, _, _ := strings.Cut(k, "/")
-			add(Gap{Type: "untested-requirement", Subject: k, Files: sortedKeys(x.Code), Text: fmt.Sprintf("requirement %q has code anchors but no test anchor (no test tagged for its scenarios, no @spec marker in a test)", r.Name), Hint: "tag a test `[" + cp + "/<scenario-slug>]` or put `@spec " + k + "` in it; if a test cannot prove it, say how it is verified with a `Verify: inspection|analysis|demonstration` line in a change; if it is knowingly untested: `wingman-spec drift decide untested-requirement:" + k + " --accept --note \"<why>\"`"})
+			add(Gap{Type: "untested-requirement", Subject: k, Files: append([]string{}, slices.Sorted(maps.Keys(x.Code))...), Text: fmt.Sprintf("requirement %q has code anchors but no test anchor (no test tagged for its scenarios, no @spec marker in a test)", r.Name), Hint: "tag a test `[" + cp + "/<scenario-slug>]` or put `@spec " + k + "` in it; if a test cannot prove it, say how it is verified with a `Verify: inspection|analysis|demonstration` line in a change; if it is knowingly untested: `wingman-spec drift decide untested-requirement:" + k + " --accept --note \"<why>\"`"})
 		}
 	}
 	byID := map[string][]string{}
@@ -347,6 +337,11 @@ func (c Ctx) Drift(pendingDir string, light bool) DriftReport {
 			add(Gap{Type: "observed-incomplete", Subject: e.Cap + "/" + e.Slug, Files: []string{c.R.Rel(e.File)}, Line: e.Line, Severity: "warn", Text: fmt.Sprintf("%s:%d: entry %q %s", c.R.Rel(e.File), e.Line, e.Slug, why), Hint: "every entry says what was observed, why it is unconfirmed, who can decide (Owner) and how to confirm it"})
 		}
 	}
+	return c.driftRest(pendingDir, light, reqs, facts, &gaps, add, observed, obsCaps)
+}
+
+// driftRest adds the archive, placement, fit, stale and coverage gaps, then sorts them into open and accepted.
+func (c Ctx) driftRest(pendingDir string, light bool, reqs *Reqs, facts Facts, gaps *[]Gap, add func(Gap), observed []ObservedEntry, obsCaps map[string]bool) DriftReport {
 	order, exp := c.ArchivedExpectation(pendingDir)
 	for _, k := range order {
 		if !reqs.Has(k) {
@@ -404,7 +399,7 @@ func (c Ctx) Drift(pendingDir string, light bool) DriftReport {
 		for _, x := range stale {
 			hdr := ""
 			if x.Header != "" {
-				hdr = " (`" + cut(x.Header, 70) + "`)"
+				hdr = " (`" + layout.Cut(x.Header, 70) + "`)"
 			}
 			add(Gap{Type: "stale-anchor", Subject: x.Key + "@" + x.File, Files: []string{x.File}, Commit: x.Commit[:12], Severity: sev,
 				Text: fmt.Sprintf("%s:%d: the code anchored to `%s`%s last changed in %s %q, after the requirement text last changed in %s %q", x.File, x.Line, x.Key, hdr, x.Commit[:8], x.Subject, x.SpecCommit[:8], x.SpecSj),
@@ -425,7 +420,7 @@ func (c Ctx) Drift(pendingDir string, light bool) DriftReport {
 	if rep.Notes == nil {
 		rep.Notes = []string{}
 	}
-	for _, g := range gaps {
+	for _, g := range *gaps {
 		rep.Counts[g.Type]++
 		var r *Requirement
 		if slices.Contains(Acceptable, g.Type) {
@@ -444,9 +439,9 @@ func (c Ctx) Drift(pendingDir string, light bool) DriftReport {
 
 // coverageGap is the advisory gap of a requirement whose recorded test result failed, was skipped, or is stale.
 func coverageGap(k string, r *Requirement, cv Coverage) (Gap, bool) {
-	when := cut(cv.At, 10)
+	when := layout.Cut(cv.At, 10)
 	if cv.Commit != "" {
-		when += ", " + cut(cv.Commit, 8)
+		when += ", " + layout.Cut(cv.Commit, 8)
 	}
 	var bad []string
 	for id, st := range cv.Scenarios {
@@ -584,7 +579,7 @@ func (c Ctx) Accept(gaps []Gap, note string) ([]AcceptResult, error) {
 	var out []AcceptResult
 	for _, f := range files {
 		items := byFile[f]
-		orig := readIf(f)
+		orig := layout.Text(f)
 		text := orig
 		seen := map[string]bool{}
 		slices.SortStableFunc(items, func(a, b item) int { return b.r.Line - a.r.Line })

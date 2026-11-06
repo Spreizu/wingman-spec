@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/Spreizu/wingman-spec/internal/layout"
 )
 
 // WhyMinWords is the shortest Why that can say who wants a requirement and why.
@@ -12,7 +14,6 @@ const WhyMinWords = 5
 
 var (
 	approvalRE     = regexp.MustCompile(`(?i)^(?:[-*]\s*)?\**Owner approval\**:\s*(.*)$`)
-	inlineComment  = regexp.MustCompile(`<!--.*?-->`)
 	fenceToggleRE  = regexp.MustCompile("^\\s*(`{3,}|~{3,})")
 	specOnlyKindRE = regexp.MustCompile(`(?mi)^\s*(?:[-*]\s+)?\**Kind\**:\s*\**spec-only\b`)
 )
@@ -29,7 +30,7 @@ func ProposalApproval(text string) string {
 		if fence {
 			continue
 		}
-		m := approvalRE.FindStringSubmatch(strings.TrimSpace(inlineComment.ReplaceAllString(l, "")))
+		m := approvalRE.FindStringSubmatch(strings.TrimSpace(layout.StripComments(l, false)))
 		if m != nil {
 			if v := strings.TrimSpace(strings.ReplaceAll(m[1], "*", "")); v != "" {
 				out = v
@@ -41,7 +42,7 @@ func ProposalApproval(text string) string {
 
 // IsSpecOnly reports `Kind: spec-only` in proposal.md: the change only writes specs.
 func IsSpecOnly(changeDir string) bool {
-	return specOnlyKindRE.MatchString(readIf(filepath.Join(changeDir, "proposal.md")))
+	return specOnlyKindRE.MatchString(layout.Text(filepath.Join(changeDir, "proposal.md")))
 }
 
 // Approval is a requirement change that needs the owner.
@@ -117,7 +118,7 @@ func (c Ctx) WhyLint(changeDir string) WhyResult {
 			}
 		}
 	}
-	if len(out.Approvals) > 0 && ProposalApproval(readIf(filepath.Join(changeDir, "proposal.md"))) == "" {
+	if len(out.Approvals) > 0 && ProposalApproval(layout.Text(filepath.Join(changeDir, "proposal.md"))) == "" {
 		var what []string
 		for _, a := range out.Approvals {
 			verb := "rewrites the Why of"

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/quality"
 )
 
@@ -58,7 +59,7 @@ func touches(changeDir string) map[string]Problem {
 		for _, r := range d.Reqs {
 			out[d.Cap+"/"+r.Slug] = Problem{File: rel, Line: r.Line, Text: r.Op}
 		}
-		lines := strings.Split(readIf(d.File), "\n")
+		lines := strings.Split(layout.Text(d.File), "\n")
 		for _, rn := range d.Renames {
 			n := slices.IndexFunc(lines, func(l string) bool { return strings.Contains(l, rn.From) && strings.Contains(l, "->") })
 			out[d.Cap+"/"+rn.FromSlug] = Problem{File: rel, Line: n + 1, Text: "RENAMED"}

@@ -2,6 +2,7 @@ package trace
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -20,7 +21,6 @@ import (
 
 var (
 	skipExt = regexp.MustCompile(`(?i)\.(md|markdown|mdx|txt|json|jsonc|lock|lockb|svg|png|jpe?g|gif|webp|ico|pdf|woff2?|ttf|eot|map|min\.js|snap|csv|tsv|zip|gz|wasm)$`)
-	skipDir = regexp.MustCompile(`^(node_modules|\.git|dist|build|out|coverage|vendor|\.venv|venv|target|__pycache__|\.next|\.nuxt|\.svelte-kit|\.turbo|\.cache|\.wingman-spec|\.cursor|\.claude|\.agents|\.codex)$`)
 )
 
 // Ctx is the layout and configuration the checks read.
@@ -65,7 +65,7 @@ func (c Ctx) IsSpecPath(f string) bool {
 func (c Ctx) IsScannable(f string) bool {
 	segs := strings.Split(f, "/")
 	for i, s := range segs[:len(segs)-1] {
-		if skipDir.MatchString(s) || (i == 0 && c.specTop(s)) {
+		if codeindex.SkipDir(s) || (i == 0 && c.specTop(s)) {
 			return false
 		}
 	}
@@ -238,15 +238,6 @@ func tagsIn(idx *codeindex.Index, files []string, root string) map[string][]stri
 	})
 }
 
-func sortedKeys(m map[string]bool) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	slices.Sort(out)
-	return out
-}
-
 // IndexEntry is one requirement of the derived anchor index.
 type IndexEntry struct {
 	Why   string   `json:"why"`
@@ -268,9 +259,9 @@ func AnchorIndex(reqs *Reqs, f Facts) Index {
 	for _, k := range reqs.keys {
 		caps[reqs.m[k].Cap] = true
 		x := f.Requirements[k]
-		ix.Requirements[k] = IndexEntry{Why: x.Why, Code: sortedKeys(x.Code), Tests: sortedKeys(x.Tests)}
+		ix.Requirements[k] = IndexEntry{Why: x.Why, Code: append([]string{}, slices.Sorted(maps.Keys(x.Code))...), Tests: append([]string{}, slices.Sorted(maps.Keys(x.Tests))...)}
 	}
-	ix.Capabilities = sortedKeys(caps)
+	ix.Capabilities = append([]string{}, slices.Sorted(maps.Keys(caps))...)
 	return ix
 }
 
@@ -411,7 +402,7 @@ func (c Ctx) ChangeMentions(changeDir string) Mentions {
 		}
 	}
 	scens := append(quality.SpecScenarios(filepath.Join(changeDir, "specs")), quality.SpecScenarios(c.Specs())...)
-	for l := range strings.SplitSeq(readIf(filepath.Join(changeDir, "tasks.md")), "\n") {
+	for l := range strings.SplitSeq(layout.Text(filepath.Join(changeDir, "tasks.md")), "\n") {
 		sm := specLineRE.FindStringSubmatch(l)
 		if sm == nil {
 			continue
@@ -427,7 +418,7 @@ func (c Ctx) ChangeMentions(changeDir string) Mentions {
 		}
 	}
 	for _, f := range []string{"tasks.md", "progress.md"} {
-		for _, rm := range reviewedRE.FindAllStringSubmatch(readIf(filepath.Join(changeDir, f)), -1) {
+		for _, rm := range reviewedRE.FindAllStringSubmatch(layout.Text(filepath.Join(changeDir, f)), -1) {
 			for _, k := range keyWordRE.FindAllStringSubmatch(rm[1], -1) {
 				m.Reviewed[k[1]] = true
 			}
@@ -446,7 +437,7 @@ func (c Ctx) PlacementProblems(keys map[string]bool, files []string) []anchors.P
 	for _, f := range files {
 		s := idx.Text(f)
 		if s == "" {
-			s = readIf(filepath.Join(c.R.Code, f))
+			s = layout.Text(filepath.Join(c.R.Code, f))
 		}
 		if s == "" || len(s) > 1<<20 || strings.Contains(s, "\x00") || !strings.Contains(s, "@spec") {
 			continue
@@ -481,7 +472,7 @@ func (c Ctx) FitProblems(keys map[string]bool, files []string) ([]anchors.FitFin
 		}
 	}
 	for _, sf := range SpecFilesOf(c.Specs()) {
-		add(sf.Cap, ParseSpec(readIf(sf.File)).Reqs)
+		add(sf.Cap, ParseSpec(layout.Text(sf.File)).Reqs)
 	}
 	ents, _ := os.ReadDir(c.R.Changes())
 	for _, e := range ents {
@@ -492,7 +483,7 @@ func (c Ctx) FitProblems(keys map[string]bool, files []string) ([]anchors.FitFin
 		for _, d := range Deltas(dir) {
 			add(d.Cap, d.Reqs)
 		}
-		plan := tasks.Parse(readIf(filepath.Join(dir, "tasks.md")))
+		plan := tasks.Parse(layout.Text(filepath.Join(dir, "tasks.md")))
 		for _, t := range plan.All() {
 			caps := map[string]bool{}
 			for _, m := range keyWordRE.FindAllStringSubmatch(t.Details["spec"], -1) {
@@ -521,7 +512,7 @@ func (c Ctx) FitProblems(keys map[string]bool, files []string) ([]anchors.FitFin
 		seen[m.File] = true
 		t := c.files().Text(m.File)
 		if t == "" {
-			t = readIf(filepath.Join(c.R.Code, m.File))
+			t = layout.Text(filepath.Join(c.R.Code, m.File))
 		}
 		if t != "" && len(t) < 1<<20 && !strings.Contains(t, "\x00") {
 			texts = append(texts, anchors.FitFile{File: m.File, Text: t, Test: testpaths.IsTestPath(m.File)})
