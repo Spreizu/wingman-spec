@@ -1,3 +1,5 @@
+//go:build importer
+
 // Package importer converts an OpenSpec-based Wingman Spec project (openspec/ plus a root adr/) to the 0.12 layout.
 // It is a one-shot move; nothing at runtime reads the old layout.
 package importer

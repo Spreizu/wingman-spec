@@ -1,3 +1,5 @@
+//go:build importer
+
 package importer
 
 import (
