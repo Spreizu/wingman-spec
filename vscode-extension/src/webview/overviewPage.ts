@@ -39,8 +39,8 @@ function changeCard(project: ProjectModel, c: Change, d: ViewData): string {
   return `<article class="card click po-card" ${routeAttr({ page: 'change', root: project.root, name: c.name })}>
 <div class="cc-top">${ring(c.taskDone, c.taskTotal, 44, STATE_TONE[c.state])}
 <div class="t"><h3 title="${esc(c.name)}">${esc(c.name)}</h3>
-<div class="cc-meta" title="${esc(whenTitle(c.created, 'Created'))}">${c.taskTotal > 0 ? `${c.taskDone} of ${c.taskTotal} tasks` : 'No tasks yet'}${c.created && c.created.source !== 'none' ? ` &middot; ${esc(whenText('', c.created))}` : ''}</div></div>
-${c.state === 'blocked' || c.state === 'complete' ? badge(STATE_LABEL[c.state], STATE_TONE[c.state]) : ''}</div>
+<div class="cc-meta" title="${esc(whenTitle(c.created, 'Created'))}">${c.taskTotal > 0 ? `${c.taskDone} of ${c.taskTotal} tasks` : 'No tasks yet'}${c.created && c.created.source !== 'none' ? ` &middot; ${esc(whenText('', c.created))}` : ''}</div>
+${c.state === 'blocked' || c.state === 'complete' ? `<div class="cc-state">${badge(STATE_LABEL[c.state], STATE_TONE[c.state])}</div>` : ''}</div></div>
 ${why ? `<p class="snippet">${esc(why)}</p>` : ''}
 ${blocked ? `<p class="muted">${esc(blocked)}</p>` : ''}
 ${pillRow(`${c.capabilities.map((cap) => badge(cap.name, 'info')).join('')}${c.state === 'blocked' ? agentButton(`/spec-explore ${c.name}`, 'Explore the blocker') : ''}`)}

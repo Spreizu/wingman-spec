@@ -126,6 +126,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .cc-top .t { flex: 1; min-width: 0; }
 .cc-top h3 { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cc-meta { color: var(--muted); font-size: 12px; margin-top: 3px; }
+.cc-state { margin-top: 6px; }
 .cc-body { margin-top: 14px; display: flex; flex-direction: column; gap: 12px; }
 
 /* tabs */
