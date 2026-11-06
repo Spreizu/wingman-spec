@@ -1,19 +1,18 @@
 /**
- * Read-only traceability model: requirements (with their `Why:`) -> scenarios and code/test anchors, plus the flags and
- * drift gaps `wingman-spec lint|drift` would report. It parses files only (specs, proposals and a scan for markers:
- * the markers are the anchor index, nothing is stored); it never runs the verifier and never writes. Gap types and
- * keys match the verifier's.
+ * Read-only traceability model: requirements (with their `Why:`) -> scenarios and code/test anchors.
+ * It parses files only (specs, proposals and a scan for markers: the markers are the anchor index, nothing is stored).
+ * Drift gaps are not computed here. The trace view fills them from `wingman-spec problems --json`.
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import chrono from '../core/chronology.ts';
 import placementCore from '../core/placement.ts';
-import { archiveDir, changesDir as changesOf, configFiles, livingSpecsDir } from '../core/paths.ts';
+import { changesDir as changesOf, configFiles, livingSpecsDir } from '../core/paths.ts';
 import { nearest, scanCode, slug } from './anchors.ts';
 import type { ScannedFile } from './anchors.ts';
 import { acceptedOf, idOf, proposalApproval, verifyOf, whyOf } from './requirementLines.ts';
 import { parseSpec } from './specParser.ts';
 import { parseTasks } from './tasksParser.ts';
+import type { VerifierFinding } from './verifier.ts';
 
 export type TraceMode = 'on' | 'warn' | 'off';
 
@@ -117,6 +116,24 @@ export interface TraceGap {
   line?: number;
   /** The reason of the `Accepted:` line on the requirement, for the gaps that line covers (unanchored, untested). */
   accepted?: string;
+}
+
+/** Drift rows from `wingman-spec problems --json`. The CLI line is 1-based; the tree line is 0-based. Accepted gaps are not in this JSON. */
+export function gapsFromFindings(findings: VerifierFinding[]): TraceGap[] {
+  const gaps: TraceGap[] = [];
+  for (const f of findings) {
+    if (f.source !== 'drift' || !f.key) continue;
+    const prefix = `${f.code}:`;
+    gaps.push({
+      key: f.key,
+      type: f.code as GapType,
+      subject: f.key.startsWith(prefix) ? f.key.slice(prefix.length) : f.key,
+      text: f.message,
+      ...(f.file ? { file: f.file } : {}),
+      ...(f.line > 0 ? { line: f.line - 1 } : {}),
+    });
+  }
+  return gaps;
 }
 
 export interface UnresolvedMarker {
@@ -280,32 +297,6 @@ function idAliases(root: string, living: Map<string, TraceRequirement>): Map<str
   return m;
 }
 
-/** Requirement keys the archived changes say should be in the living specs. */
-function archivedExpectation(root: string): Map<string, string> {
-  const dir = archiveDir(root);
-  const exp = new Map<string, string>();
-  for (const { name: a } of chrono.archiveOrder(dir)) { // in the order they were archived (to the second), not by folder name
-    for (const d of deltasOf(join(dir, a))) {
-      for (const rn of d.renames) {
-        if (exp.delete(`${d.cap}/${slug(rn.from)}`)) exp.set(`${d.cap}/${slug(rn.to)}`, a);
-      }
-      for (const r of d.reqs) {
-        if (r.op === 'ADDED') exp.set(r.key, a);
-        else if (r.op === 'REMOVED') exp.delete(r.key);
-      }
-    }
-  }
-  return exp;
-}
-
-/** Capabilities that an archived change specified but that have no living spec now: their test tags are stale. */
-function retiredCapabilities(root: string, living: Set<string>): Set<string> {
-  const dir = archiveDir(root);
-  const gone = new Set<string>();
-  for (const a of dirs(dir)) for (const cap of specFiles(join(dir, a, 'specs'))) if (!living.has(cap)) gone.add(cap);
-  return gone;
-}
-
 /**
  * Builds the model. `root` is the specs root (specs, changes, archive); `codeRoot` is scanned for markers.
  */
@@ -321,10 +312,7 @@ export function buildTrace(root: string, codeRoot: string, opts: { scan?: Scanne
   // anchors
   const scenarioOwner = new Map<string, string>();
   for (const r of reqs.values()) for (const s of r.scenarios) scenarioOwner.set(`${r.cap}/${s.slug}`, r.key);
-  const caps = new Set([...reqs.values()].map((r) => r.cap));
-  const goneCaps = retiredCapabilities(root, caps);
   const unresolved: UnresolvedMarker[] = [];
-  const stale: { tag: string; file: string; line: number; why: string }[] = [];
   for (const f of scan) {
     for (const m of f.markers) {
       const key = ids.get(m.key) ?? m.key; // a scan cached before the IDs were known
@@ -337,11 +325,6 @@ export function buildTrace(root: string, codeRoot: string, opts: { scan?: Scanne
     for (const t of f.tags) {
       const owner = scenarioOwner.get(t.tag);
       if (owner) reqs.get(owner)?.tests.push({ file: f.file, line: t.line, kind: 'tag', scenario: t.tag.split('/')[1] ?? '' });
-      else {
-        const cap = t.tag.split('/')[0] ?? '';
-        if (caps.has(cap)) stale.push({ tag: t.tag, file: f.file, line: t.line, why: 'no such scenario in the specs' });
-        else if (goneCaps.has(cap)) stale.push({ tag: t.tag, file: f.file, line: t.line, why: 'capability no longer in the specs' });
-      }
     }
   }
   for (const r of reqs.values()) {
@@ -387,30 +370,7 @@ export function buildTrace(root: string, codeRoot: string, opts: { scan?: Scanne
     changes.push({ name, dir, touches, proposal, requirements: eff, approval: proposalApproval(text), missingWhy, approvals });
   }
 
-  // drift over the living specs (same gap types and keys as `wingman-spec drift`)
-  const gaps: TraceGap[] = [];
-  const add = (type: GapType, subject: string, text: string, extra: Partial<TraceGap> = {}): void => {
-    const key = `${type}:${subject}`;
-    gaps.push({ key, type, subject, text, ...extra });
-  };
-  for (const r of reqs.values()) {
-    const acc = r.accepted === null ? {} : { accepted: r.accepted };
-    if (!r.code.length) add('unanchored-requirement', r.key, `requirement "${r.name}" has no code anchor`, { file: r.file, line: r.line, ...acc });
-    else if (!r.tests.length && !r.verify) add('untested-requirement', r.key, `requirement "${r.name}" has code anchors but no test anchor`, { file: r.file, line: r.line, ...acc });
-  }
-  const seen = new Set<string>();
-  for (const u of unresolved) {
-    const subject = `${u.key}@${u.file}`;
-    if (seen.has(subject)) continue;
-    seen.add(subject);
-    add('orphan-anchor', subject, `\`@spec ${u.key}\` in ${u.file}:${u.line + 1} points at a requirement that does not exist${u.hint ? ` (perhaps ${u.hint})` : ''}`, { file: join(codeRoot, u.file), line: u.line });
-  }
-  for (const s of stale) add('stale-test-tag', s.tag, `test tag [${s.tag}] in ${s.file}: ${s.why}`, { file: join(codeRoot, s.file), line: s.line });
-  for (const [k, a] of archivedExpectation(root)) {
-    if (!reqs.has(k)) add('unsynced-archive', k, `change ${a} was archived with requirement ${k} that is not in the living specs`);
-  }
-
   const hasLayer = mode !== 'off' || [...reqs.values()].some((r) => r.why !== null);
-  return { root, codeRoot, mode, placement, many: anchorMany(configs), hasLayer, requirements: reqs, changes, gaps, unresolved };
+  return { root, codeRoot, mode, placement, many: anchorMany(configs), hasLayer, requirements: reqs, changes, gaps: [], unresolved };
 }
 

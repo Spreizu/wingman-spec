@@ -40,6 +40,8 @@ export class ProblemsService implements vscode.CodeActionProvider, vscode.Dispos
   private readonly roots = new Map<string, ProjectModel>();
   /** Per project root: the recorded test state of each requirement (from the same `problems` run). */
   readonly coverage = new Map<string, Record<string, RequirementCoverage>>();
+  /** Per project root: drift findings from the same run. The trace view shows these; it does not walk the specs itself. */
+  readonly drift = new Map<string, VerifierFinding[]>();
   private timer: NodeJS.Timeout | undefined;
   private running: Promise<void> | undefined;
   private again = false;
@@ -87,6 +89,7 @@ export class ProblemsService implements vscode.CodeActionProvider, vscode.Dispos
     const all: VerifierFinding[] = [];
     const reasons: string[] = [];
     this.roots.clear();
+    this.drift.clear();
     const projects = this.store.projects.filter((p) => !p.error);
     const limit = 3;
     for (let i = 0; i < projects.length; i += limit) {
@@ -101,6 +104,7 @@ export class ProblemsService implements vscode.CodeActionProvider, vscode.Dispos
         }
         this.roots.set(p.root, p);
         this.coverage.set(p.root, r.value.coverage);
+        this.drift.set(p.root, r.value.findings.filter((f) => f.source === 'drift'));
         all.push(...r.value.findings);
       });
     }
@@ -133,6 +137,7 @@ export class ProblemsService implements vscode.CodeActionProvider, vscode.Dispos
 
   clear(): void {
     this.coverage.clear();
+    this.drift.clear();
     this.diag.clear();
     this.found.clear();
     this.summary = { error: 0, warning: 0, info: 0, problem: '' };

@@ -60,23 +60,20 @@ test('a MODIFIED requirement with the same Why needs no approval', async () => {
   assert.deepEqual(c?.approvals.map((x) => x.key), ['billing/legacy-thing']);
 });
 
-test('drift gaps use the verifier types and keys; an Accepted line is attached', () => {
-  const keys = model.gaps.map((g) => g.key).sort();
-  assert.deepEqual(keys, [
-    'orphan-anchor:billing/add-item@src/add.ts',
-    'stale-test-tag:billing/gone',
-    'stale-test-tag:legacy/x',
-    'unanchored-requirement:billing/legacy-thing',
-    'unanchored-requirement:billing/remove-an-item',
-    'unsynced-archive:billing/lost-one',
-    'untested-requirement:billing/rounding',
-  ]);
-  assert.equal(model.gaps.find((g) => g.key === 'untested-requirement:billing/rounding')?.accepted, 'covered elsewhere');
+test('drift gaps are left empty: the trace view reads them from problems JSON', () => {
+  assert.deepEqual(model.gaps, []);
   const r = model.requirements.get('billing/rounding');
   assert.equal(r?.accepted, 'covered elsewhere');
   assert.ok(!r?.statement.includes('Accepted'), 'the Accepted line is not part of the statement');
-  assert.equal(model.gaps.find((g) => g.type === 'unsynced-archive')?.text.includes('2026-01-01-first'), true);
-  assert.ok(model.gaps.find((g) => g.type === 'orphan-anchor')?.text.includes('perhaps billing/add-an-item'));
+});
+
+test('gapsFromFindings keeps drift rows and drops the rest; the line becomes 0-based', async () => {
+  const { gapsFromFindings } = await import('../src/model/traceability.ts');
+  const gaps = gapsFromFindings([
+    { source: 'drift', code: 'orphan-anchor', severity: 'error', message: 'missing', file: '/src/add.ts', line: 2, col: 1, length: 1, key: 'orphan-anchor:billing/add-item@src/add.ts' },
+    { source: 'lint', code: 'no-why', severity: 'warning', message: 'x', file: '/s.md', line: 1, col: 1, length: 1 },
+  ]);
+  assert.deepEqual(gaps, [{ key: 'orphan-anchor:billing/add-item@src/add.ts', type: 'orphan-anchor', subject: 'billing/add-item@src/add.ts', text: 'missing', file: '/src/add.ts', line: 1 }]);
 });
 
 test('unresolved markers carry a did-you-mean hint', () => {

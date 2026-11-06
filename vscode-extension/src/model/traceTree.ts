@@ -84,7 +84,7 @@ export function requirementNode(model: TraceModel, r: TraceRequirement, prefix: 
 }
 
 /** The whole tree for one project. */
-export function buildTraceNodes(model: TraceModel, coverage: Record<string, RequirementCoverage> = {}): TraceNode[] {
+export function buildTraceNodes(model: TraceModel, coverage: Record<string, RequirementCoverage> = {}, note = ''): TraceNode[] {
   const out: TraceNode[] = [];
   if (model.mode === 'off' && !model.hasLayer) {
     return [{ id: 'off', label: 'Traceability is off', description: 'set `traceability: on` in wingman-spec.yaml', icon: 'info', children: [] }];
@@ -146,13 +146,16 @@ export function buildTraceNodes(model: TraceModel, coverage: Record<string, Requ
   const open = model.gaps.filter((g) => !g.accepted);
   const byType = new Map<GapType, typeof model.gaps>();
   for (const g of model.gaps) byType.set(g.type, [...(byType.get(g.type) ?? []), g]);
+  const missed = note !== '' && model.gaps.length === 0;
   out.push({
     id: 'drift',
     label: 'Drift',
-    description: open.length ? `${open.length} open${model.gaps.length > open.length ? ` · ${model.gaps.length - open.length} accepted` : ''}` : 'no open gaps',
-    tooltip: 'Same gaps as `wingman-spec drift` (read from the files, nothing is run).',
-    icon: open.length ? 'warning' : 'pass',
-    children: [...byType].map(([type, gs]) => ({
+    description: missed ? 'not checked' : open.length ? `${open.length} open${model.gaps.length > open.length ? ` · ${model.gaps.length - open.length} accepted` : ''}` : 'no open gaps',
+    tooltip: [missed ? '' : 'Open gaps from `wingman-spec problems`.', note].filter(Boolean).join(' '),
+    icon: open.length || missed ? 'warning' : 'pass',
+    children: missed
+      ? [{ id: 'drift/unavailable', label: note, icon: 'error', tooltip: note, children: [] }]
+      : [...byType].map(([type, gs]) => ({
       id: `drift/${type}`,
       label: GAP_TITLE[type],
       description: String(gs.length),

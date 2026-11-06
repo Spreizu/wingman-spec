@@ -1,12 +1,25 @@
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { buildTrace } from '../src/model/traceability.ts';
+import type { TraceGap } from '../src/model/traceability.ts';
 import { buildTraceNodes } from '../src/model/traceTree.ts';
 import type { TraceNode } from '../src/model/traceTree.ts';
 import { traceProject } from './trace-fixture.ts';
 
 const dir = traceProject();
-const nodes = buildTraceNodes(buildTrace(dir, dir));
+const model = buildTrace(dir, dir);
+const shown: TraceGap[] = [
+  { key: 'orphan-anchor:billing/add-item@src/add.ts', type: 'orphan-anchor', subject: 'billing/add-item@src/add.ts', text: 'orphan', file: join(dir, 'src/add.ts'), line: 1 },
+  { key: 'stale-test-tag:billing/gone', type: 'stale-test-tag', subject: 'billing/gone', text: 'stale' },
+  { key: 'stale-test-tag:legacy/x', type: 'stale-test-tag', subject: 'legacy/x', text: 'stale' },
+  { key: 'unanchored-requirement:billing/legacy-thing', type: 'unanchored-requirement', subject: 'billing/legacy-thing', text: 'no code' },
+  { key: 'unanchored-requirement:billing/remove-an-item', type: 'unanchored-requirement', subject: 'billing/remove-an-item', text: 'no code' },
+  { key: 'unsynced-archive:billing/lost-one', type: 'unsynced-archive', subject: 'billing/lost-one', text: 'archive' },
+  { key: 'untested-requirement:billing/rounding', type: 'untested-requirement', subject: 'billing/rounding', text: 'no test', accepted: 'covered elsewhere' },
+];
+model.gaps = shown;
+const nodes = buildTraceNodes(model);
 const find = (list: TraceNode[], id: string): TraceNode | undefined => {
   for (const n of list) {
     if (n.id === id) return n;
@@ -58,6 +71,16 @@ test('drift groups every gap type; accepted gaps are marked', () => {
   assert.equal(accepted?.description, 'accepted: covered elsewhere');
   assert.equal(accepted?.icon, 'check');
   assert.ok(find(nodes, 'drift/orphan-anchor:billing/add-item@src/add.ts')?.file?.endsWith('src/add.ts'));
+});
+
+test('a missing verifier is named on the drift node and does not invent gaps', () => {
+  const bare = buildTrace(dir, dir);
+  assert.deepEqual(bare.gaps, []);
+  const n = buildTraceNodes(bare, {}, 'wingman-spec was not found');
+  const drift = n.find((x) => x.id === 'drift');
+  assert.equal(drift?.description, 'not checked');
+  assert.equal(drift?.children[0]?.id, 'drift/unavailable');
+  assert.match(drift?.children[0]?.label ?? '', /not found/);
 });
 
 test('a project without the traceability layer shows one hint node', async () => {

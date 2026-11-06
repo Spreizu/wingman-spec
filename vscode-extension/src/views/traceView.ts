@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { TraceCache } from '../editor/anchorCode.ts';
 import type { ProblemsService } from '../editor/problems.ts';
+import { gapsFromFindings } from '../model/traceability.ts';
 import { buildTraceNodes } from '../model/traceTree.ts';
 import type { TraceNode } from '../model/traceTree.ts';
 import type { ProjectStore } from '../store.ts';
@@ -46,12 +47,14 @@ class TraceProvider implements vscode.TreeDataProvider<TraceNode> {
   private roots(): TraceNode[] {
     const models = this.cache.all();
     const cov = this.problems.coverage;
-    if (models.length === 1 && models[0]) return buildTraceNodes(models[0], cov.get(models[0].root));
+    const nodes = (m: (typeof models)[number]): ReturnType<typeof buildTraceNodes> =>
+      buildTraceNodes({ ...m, gaps: gapsFromFindings(this.problems.drift.get(m.root) ?? []) }, cov.get(m.root), this.problems.summary.problem);
+    if (models.length === 1 && models[0]) return nodes(models[0]);
     return models.map((m) => ({
       id: `project/${m.root}`,
       label: this.store.projects.find((p) => p.root === m.root)?.workspaceFolder.split(/[\\/]/).pop() ?? m.root,
       icon: 'root-folder',
-      children: buildTraceNodes(m, cov.get(m.root)),
+      children: nodes(m),
     }));
   }
 }
