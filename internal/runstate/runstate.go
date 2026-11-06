@@ -488,12 +488,11 @@ func indexTree(dir string, drop *regexp.Regexp, dropIgnored bool, stage ...strin
 	return t
 }
 
-// Fingerprint is HEAD, the branch and (optionally) the working-tree hashes.
+// Fingerprint is HEAD, the branch and (optionally) the working-tree hash.
 type Fingerprint struct {
 	Head   string `json:"head"`
 	Branch string `json:"branch"`
 	Tree   string `json:"tree,omitempty"`
-	Gate   string `json:"gate,omitempty"` // GateTree: stable across a same-content commit
 }
 
 // Fingerprinted returns the fingerprint of dir.
@@ -506,7 +505,6 @@ func Fingerprinted(dir string, withTree bool) Fingerprint {
 	fp := Fingerprint{Head: head, Branch: b}
 	if withTree {
 		fp.Tree = WorkTree(dir, NotBase)
-		fp.Gate = GateTree(dir)
 	}
 	return fp
 }
@@ -789,9 +787,9 @@ func Judge(dir string, rec *Record, now Fingerprint, filesHash string) (string, 
 }
 
 // FinishLine says whether the last finish still holds.
-// Prefer Gate (content tree, stable when the user commits the same files) over Tree (WorkTree, which
-// changes shape when untracked files become tracked).
-func FinishLine(f *Record, fp Fingerprint) string {
+// When the record has Gate, compare GateTree(dir) so a same-content commit stays fresh. GateTree is only
+// computed when needed (a prior finish exists); next/check on a large untracked tree must not hash it into .git.
+func FinishLine(f *Record, dir string, fp Fingerprint) string {
 	if f == nil {
 		return "finish has not passed yet: run finish"
 	}
@@ -800,9 +798,11 @@ func FinishLine(f *Record, fp Fingerprint) string {
 		br = "?"
 	}
 	tail := "the working tree has changed since (STALE): run finish again"
-	holds := f.Gate != "" && fp.Gate != "" && f.Gate == fp.Gate
-	if !holds {
-		holds = f.Tree != "" && f.Tree == fp.Tree
+	holds := false
+	if f.Gate != "" {
+		holds = f.Gate == GateTree(dir)
+	} else if f.Tree != "" && f.Tree == fp.Tree {
+		holds = true
 	}
 	if holds {
 		tail = "the working tree is unchanged since, so that result still holds"
@@ -823,7 +823,7 @@ func (l *Ledger) Verified(d string) bool {
 }
 
 // Summary is one line for "everything is ticked": what was verified, by which run, at which commit, still valid or not.
-func Summary(l *Ledger, finished *Record, fp Fingerprint, total int) string {
+func Summary(l *Ledger, finished *Record, dir string, fp Fingerprint, total int) string {
 	parts := []string{fmt.Sprintf("%d of %d tasks are ticked and verified", total, total)}
 	var lastK string
 	var last *Record
@@ -851,7 +851,7 @@ func Summary(l *Ledger, finished *Record, fp Fingerprint, total int) string {
 	} else {
 		parts = append(parts, "no task check is recorded (the ticks were there before the verifier first ran)")
 	}
-	parts = append(parts, FinishLine(finished, fp))
+	parts = append(parts, FinishLine(finished, dir, fp))
 	return strings.Join(parts, ". ")
 }
 

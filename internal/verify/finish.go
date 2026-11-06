@@ -111,7 +111,7 @@ func (e *Env) Finish() error {
 	var prev runstate.Record
 	previous := ""
 	if runstate.ReadJSON(filepath.Join(base, "finished.json"), &prev) {
-		previous = fmt.Sprintf("an earlier finish: %s; this run checks everything again", runstate.FinishLine(&prev, runstate.Fingerprinted(e.code, true)))
+		previous = fmt.Sprintf("an earlier finish: %s; this run checks everything again", runstate.FinishLine(&prev, e.code, runstate.Fingerprinted(e.code, true)))
 		e.say("%s", previous)
 	}
 	var runs []string
@@ -343,7 +343,7 @@ func (e *Env) finishClose(changeDir, run, fstate, previous string, fs0 finishSta
 		if len(akeys) > 0 {
 			next += " This change rewrites a Why or removes a requirement: the owner must approve it (" + strings.Join(akeys, ", ") + ")."
 		}
-		e.emit(O("result", "finished", "status", runstate.FinishLine(&rec, fp), "previous_finish", If(previous != "", previous), "checks", checks, "seconds", secs, "warnings", warnings, "why_owner_approval", appr, "next", next))
+		e.emit(O("result", "finished", "status", runstate.FinishLine(&rec, e.code, fp), "previous_finish", If(previous != "", previous), "checks", checks, "seconds", secs, "warnings", warnings, "why_owner_approval", appr, "next", next))
 		return nil
 	}
 	attempts := fs0.Attempts + 1

@@ -170,7 +170,7 @@ func (e *Env) RunStatus() (*Obj, error) {
 	if run != "" {
 		runAny = run
 	}
-	return O("progress", prog, "next", next, "run", runAny, "run_status", runStatus, "last_finish", runstate.FinishLine(fin, runstate.Fingerprinted(e.code, true)),
+	return O("progress", prog, "next", next, "run", runAny, "run_status", runStatus, "last_finish", runstate.FinishLine(fin, e.code, runstate.Fingerprinted(e.code, true)),
 		"verified", verified, "review_pending", review, "ambiguous", e.lintReport([]string{tasksFile(changeDir)})), nil
 }
 

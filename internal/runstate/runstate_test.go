@@ -90,20 +90,20 @@ func TestFinishLineSameContentCommit(t *testing.T) {
 	put(t, filepath.Join(d, "app/new.php"), "n\n")
 	put(t, filepath.Join(d, ".wingman-spec/changes/c/tasks.md"), "- [x] 1.1 x\n")
 	fp := Fingerprinted(d, true)
-	rec := &Record{At: "t", Run: "r", Head: fp.Head, Branch: fp.Branch, Tree: fp.Tree, Gate: fp.Gate}
-	if !strings.Contains(FinishLine(rec, fp), "still holds") {
-		t.Fatalf("dirty tree should hold: %s", FinishLine(rec, fp))
+	rec := &Record{At: "t", Run: "r", Head: fp.Head, Branch: fp.Branch, Tree: fp.Tree, Gate: GateTree(d)}
+	if !strings.Contains(FinishLine(rec, d, fp), "still holds") {
+		t.Fatalf("dirty tree should hold: %s", FinishLine(rec, d, fp))
 	}
 	git(t, d, "add", "-A")
 	git(t, d, "commit", "-qm", "after finish")
 	ForgetTrees()
 	after := Fingerprinted(d, true)
-	if !strings.Contains(FinishLine(rec, after), "still holds") {
-		t.Fatalf("same-content commit should keep finish: %s", FinishLine(rec, after))
+	if !strings.Contains(FinishLine(rec, d, after), "still holds") {
+		t.Fatalf("same-content commit should keep finish: %s", FinishLine(rec, d, after))
 	}
 	appendTo(t, filepath.Join(d, "app/main.php"))
 	ForgetTrees()
-	if got := FinishLine(rec, Fingerprinted(d, true)); !strings.Contains(got, "STALE") {
+	if got := FinishLine(rec, d, Fingerprinted(d, true)); !strings.Contains(got, "STALE") {
 		t.Fatalf("code edit should stale finish: %s", got)
 	}
 }

@@ -192,7 +192,7 @@ func (e *Env) nextDispatch(changeDir, run string, files []string, ts []taskRef, 
 		if runstate.ReadJSON(filepath.Join(e.runsDir(), "finished.json"), &f) {
 			fin = &f
 		}
-		e.emit(O("result", "complete", "progress", prog, "status", runstate.Summary(e.readLedger(nil), fin, runstate.Fingerprinted(e.code, true), len(ts))))
+		e.emit(O("result", "complete", "progress", prog, "status", runstate.Summary(e.readLedger(nil), fin, e.code, runstate.Fingerprinted(e.code, true), len(ts))))
 		return quit(Done)
 	}
 	r := run
