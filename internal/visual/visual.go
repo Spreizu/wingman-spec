@@ -28,9 +28,6 @@ const HelperName = "wingman-visual.cjs"
 // ErrNoHelper means neither node nor the helper could be found.
 var ErrNoHelper = errors.New("the visual helper needs Node.js (node on PATH)")
 
-// Item is one scenario to check, with why it is checked: "task" (named by the task), "change" (another scenario of the
-// change) or "guard" (a scenario of the specs that shares its page, checked for regressions); InScope when its component
-// is in the task's Files:.
 // BoundRef is a reference image with the path ResolveReference found.
 type BoundRef struct {
 	Path   string `json:"path"`
@@ -40,6 +37,9 @@ type BoundRef struct {
 	Widths []int  `json:"widths,omitempty"`
 }
 
+// Item is one scenario to check, with why it is checked: "task" (named by the task), "change" (another scenario of the
+// change) or "guard" (a scenario of the specs that shares its page, checked for regressions); InScope when its component
+// is in the task's Files:.
 type Item struct {
 	Scenario *Scenario  `json:"scenario"`
 	Role     string     `json:"role"`

@@ -497,10 +497,8 @@ func mentionsDecision(st *State) bool {
 		if decisionRE.MatchString(m.Title) {
 			return true
 		}
-		for _, d := range m.Details {
-			if decisionRE.MatchString(d) {
-				return true
-			}
+		if slices.ContainsFunc(m.Details, decisionRE.MatchString) {
+			return true
 		}
 	}
 	return false
@@ -518,12 +516,10 @@ func taskHasTests(st *State) bool {
 			if !ok {
 				continue
 			}
-			for _, f := range strings.FieldsFunc(rest, func(r rune) bool {
+			if slices.ContainsFunc(strings.FieldsFunc(rest, func(r rune) bool {
 				return r == ',' || r == ';' || r == ' ' || r == '\t'
-			}) {
-				if testpaths.IsTestFile(f) {
-					return true
-				}
+			}), testpaths.IsTestFile) {
+				return true
 			}
 		}
 	}

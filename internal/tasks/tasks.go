@@ -3,6 +3,7 @@
 package tasks
 
 import (
+	"maps"
 	"regexp"
 	"strconv"
 	"strings"
@@ -106,9 +107,7 @@ func clonePlan(p *Plan) *Plan {
 			nt := *t
 			if t.Details != nil {
 				nt.Details = make(map[string]string, len(t.Details))
-				for k, v := range t.Details {
-					nt.Details[k] = v
-				}
+				maps.Copy(nt.Details, t.Details)
 			}
 			nt.Detail = append([]string(nil), t.Detail...)
 			nt.Files = append([]string(nil), t.Files...)

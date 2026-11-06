@@ -424,15 +424,15 @@ func lsTree(dir, tree string) []blob {
 		if rec == "" {
 			continue
 		}
-		tab := strings.IndexByte(rec, '\t')
-		if tab < 0 {
+		metaPart, path, ok := strings.Cut(rec, "\t")
+		if !ok {
 			continue
 		}
-		meta := strings.Split(rec[:tab], " ")
+		meta := strings.Split(metaPart, " ")
 		if len(meta) < 3 {
 			continue
 		}
-		blobs = append(blobs, blob{meta[0], rec[tab+1:], meta[2]})
+		blobs = append(blobs, blob{meta[0], path, meta[2]})
 	}
 	return blobs
 }
@@ -488,11 +488,12 @@ func indexTree(dir string, drop *regexp.Regexp, dropIgnored bool, stage ...strin
 	return t
 }
 
-// Fingerprint is HEAD, the branch and (optionally) the working-tree hash.
+// Fingerprint is HEAD, the branch and (optionally) the working-tree hashes.
 type Fingerprint struct {
 	Head   string `json:"head"`
 	Branch string `json:"branch"`
 	Tree   string `json:"tree,omitempty"`
+	Gate   string `json:"gate,omitempty"` // GateTree: stable across a same-content commit
 }
 
 // Fingerprinted returns the fingerprint of dir.
@@ -505,6 +506,7 @@ func Fingerprinted(dir string, withTree bool) Fingerprint {
 	fp := Fingerprint{Head: head, Branch: b}
 	if withTree {
 		fp.Tree = WorkTree(dir, NotBase)
+		fp.Gate = GateTree(dir)
 	}
 	return fp
 }
@@ -787,6 +789,8 @@ func Judge(dir string, rec *Record, now Fingerprint, filesHash string) (string, 
 }
 
 // FinishLine says whether the last finish still holds.
+// Prefer Gate (content tree, stable when the user commits the same files) over Tree (WorkTree, which
+// changes shape when untracked files become tracked).
 func FinishLine(f *Record, fp Fingerprint) string {
 	if f == nil {
 		return "finish has not passed yet: run finish"
@@ -796,7 +800,11 @@ func FinishLine(f *Record, fp Fingerprint) string {
 		br = "?"
 	}
 	tail := "the working tree has changed since (STALE): run finish again"
-	if f.Tree != "" && f.Tree == fp.Tree {
+	holds := f.Gate != "" && fp.Gate != "" && f.Gate == fp.Gate
+	if !holds {
+		holds = f.Tree != "" && f.Tree == fp.Tree
+	}
+	if holds {
 		tail = "the working tree is unchanged since, so that result still holds"
 	}
 	return fmt.Sprintf("finish passed %s at %s on %s by run %s: %s", f.At, short(f.Head), br, f.Run, tail)
@@ -872,7 +880,9 @@ func ReviewRange(dir, base string) *Range {
 	}
 	when := "1970-01-01T00:00:00Z"
 	env := []string{"GIT_AUTHOR_DATE=" + when, "GIT_COMMITTER_DATE=" + when}
-	if e, _ := gitx.Run(dir, nil, "config", "user.email"); e == "" {
+	email, _ := gitx.Run(dir, nil, "config", "user.email")
+	name, _ := gitx.Run(dir, nil, "config", "user.name")
+	if email == "" || name == "" {
 		env = append(env, "GIT_AUTHOR_NAME=wingman-spec", "GIT_AUTHOR_EMAIL=wingman-spec@localhost", "GIT_COMMITTER_NAME=wingman-spec", "GIT_COMMITTER_EMAIL=wingman-spec@localhost")
 	}
 	snap, ok := gitx.Run(dir, env, "-c", "commit.gpgsign=false", "commit-tree", tree, "-p", from, "-m", "working tree snapshot for review")

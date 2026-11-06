@@ -113,7 +113,6 @@ func (c Ctx) ArchivedExpectation(pendingDir string) ([]string, map[string]string
 // Observed entries (behaviour seen in code but not confirmed) live in observed/<capability>.md next to specs/.
 var (
 	ObservedKinds = []string{"contradicts-doc", "suspected-bug", "debug-leftover", "incidental", "unclear", "untested"}
-	confirmKinds  = []string{"test", "doc", "owner"}
 	confirmREs    = []*regexp.Regexp{
 		regexp.MustCompile(`(?i)^test\b\s*\S`),
 		regexp.MustCompile(`(?i)^doc\b\s*\S`),

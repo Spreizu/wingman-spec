@@ -80,6 +80,34 @@ func TestCacheTree(t *testing.T) {
 
 // The archive gate on a real project: the app appends to a committed log under an ignored folder between finish and
 // archive, the workflow ticks tasks and writes run state, the user commits. None of it is code; a code edit is.
+func TestFinishLineSameContentCommit(t *testing.T) {
+	d := t.TempDir()
+	git(t, d, "init", "-q")
+	put(t, filepath.Join(d, "app/main.php"), "a\n")
+	put(t, filepath.Join(d, ".wingman-spec/.gitignore"), "runs/\n")
+	git(t, d, "add", "-A")
+	git(t, d, "commit", "-qm", "base")
+	put(t, filepath.Join(d, "app/new.php"), "n\n")
+	put(t, filepath.Join(d, ".wingman-spec/changes/c/tasks.md"), "- [x] 1.1 x\n")
+	fp := Fingerprinted(d, true)
+	rec := &Record{At: "t", Run: "r", Head: fp.Head, Branch: fp.Branch, Tree: fp.Tree, Gate: fp.Gate}
+	if !strings.Contains(FinishLine(rec, fp), "still holds") {
+		t.Fatalf("dirty tree should hold: %s", FinishLine(rec, fp))
+	}
+	git(t, d, "add", "-A")
+	git(t, d, "commit", "-qm", "after finish")
+	ForgetTrees()
+	after := Fingerprinted(d, true)
+	if !strings.Contains(FinishLine(rec, after), "still holds") {
+		t.Fatalf("same-content commit should keep finish: %s", FinishLine(rec, after))
+	}
+	appendTo(t, filepath.Join(d, "app/main.php"))
+	ForgetTrees()
+	if got := FinishLine(rec, Fingerprinted(d, true)); !strings.Contains(got, "STALE") {
+		t.Fatalf("code edit should stale finish: %s", got)
+	}
+}
+
 func TestGateTree(t *testing.T) {
 	d := t.TempDir()
 	git(t, d, "init", "-q")
