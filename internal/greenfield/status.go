@@ -6,6 +6,10 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/Spreizu/wingman-spec/internal/frontmatter"
+	"github.com/Spreizu/wingman-spec/internal/layout"
+	"github.com/Spreizu/wingman-spec/internal/quality"
 )
 
 // Block is one thing a step waits for.
@@ -80,14 +84,14 @@ func (p *Project) phaseInputs() *step {
 func (p *Project) phaseQuestions() *step {
 	const ph = "Questions"
 	caps := p.capabilities()
-	exp, hasExp := read(p.G("exploration.md"))
+	exp, hasExp := layout.ReadString(p.G("exploration.md"))
 	if !hasExp {
 		return &step{Phase: ph, Step: "explore", Do: fmt.Sprintf("Run the whole-product exploration: read %s/, interview the analyst with a grilling interview (one question at a time) until the users and what they need, capabilities, integrations and risks are clear. Create the exploration note with `%s` and fill it in. Write one file per capability or integration with `%s`.",
 			p.Rel(p.path("inputs")), run("greenfield new exploration"), run("greenfield new capability <name> [--integration]")), Run: run("greenfield new exploration")}
 	}
 	lack := false
 	for _, re := range explorationSections {
-		if !hasH2(exp, re) {
+		if !quality.HasSection(exp, re) {
 			lack = true
 		}
 	}
@@ -146,7 +150,7 @@ func (p *Project) phaseQuestions() *step {
 			if t == "" {
 				t = topicText(q.Topic)
 			}
-			s.Problems = append(s.Problems, fmt.Sprintf("%s (%s): %s", q.ID, q.Topic, cut(t, 60)))
+			s.Problems = append(s.Problems, fmt.Sprintf("%s (%s): %s", q.ID, q.Topic, layout.Cut(t, 60)))
 			s.Blocked = append(s.Blocked, Block{Kind: "client-answer", Who: q.Owner, ID: q.ID, Text: fmt.Sprintf("%s (%s)", q.ID, q.Topic)})
 		}
 		return s
@@ -171,14 +175,6 @@ func (p *Project) phaseQuestions() *step {
 		return s
 	}
 	return nil
-}
-
-func cut(s string, n int) string {
-	r := []rune(s)
-	if len(r) > n {
-		return string(r[:n])
-	}
-	return s
 }
 
 func (p *Project) phaseFoundation() *step {
@@ -343,7 +339,7 @@ type handover struct {
 }
 
 func (p *Project) handoverState() *handover {
-	d, _, has := parseFM(readS(p.G("handover.md")))
+	d, _, has := frontmatter.Parse(layout.Text(p.G("handover.md")))
 	if !has {
 		return nil
 	}

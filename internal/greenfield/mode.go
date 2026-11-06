@@ -9,8 +9,12 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Spreizu/wingman-spec/internal/change"
+	"github.com/Spreizu/wingman-spec/internal/codeindex"
+	"github.com/Spreizu/wingman-spec/internal/frontmatter"
 	"github.com/Spreizu/wingman-spec/internal/gitx"
 	"github.com/Spreizu/wingman-spec/internal/layout"
+	"github.com/Spreizu/wingman-spec/internal/tasks"
 	"github.com/Spreizu/wingman-spec/internal/testpaths"
 )
 
@@ -23,8 +27,14 @@ const (
 	Unsupported    = "unsupported"
 )
 
-var skipDirs = map[string]bool{".git": true, "node_modules": true, "docs": true, "doc": true, "vendor": true, "dist": true, "build": true,
-	"out": true, "coverage": true, "__pycache__": true, ".venv": true, "venv": true, "target": true, "openspec": true, "adr": true}
+// skipScan is the code index skip list, plus trees that are not the product: docs and a leftover OpenSpec or adr folder.
+func skipScan(name string) bool {
+	switch name {
+	case "docs", "doc", "openspec", "adr":
+		return true
+	}
+	return codeindex.SkipDir(name)
+}
 
 var srcSkip = regexp.MustCompile(`(?i)(?:\.config\.[a-z]+|\.d\.ts|\.min\.js)$|^(?:setup\.py|conftest\.py)$`)
 
@@ -49,7 +59,7 @@ func sourceScan(root string) scan {
 			}
 			n := e.Name()
 			if e.IsDir() {
-				if skipDirs[n] || (strings.HasPrefix(n, ".") && rel == "") {
+				if skipScan(n) || (strings.HasPrefix(n, ".") && rel == "") {
 					continue
 				}
 				walk(filepath.Join(dir, n), path.Join(rel, n))
@@ -59,7 +69,7 @@ func sourceScan(root string) scan {
 			if !testpaths.IsCode(n) || srcSkip.MatchString(n) {
 				continue
 			}
-			t, ok := read(filepath.Join(dir, n))
+			t, ok := layout.ReadString(filepath.Join(dir, n))
 			if !ok {
 				continue
 			}
@@ -92,7 +102,7 @@ func historyScan(root string) (int, []string) {
 	var set []string
 	for p := range strings.SplitSeq(out, "\n") {
 		p = strings.TrimSpace(p)
-		if p == "" || !testpaths.IsCode(p) || srcSkip.MatchString(path.Base(p)) || skipDirs[strings.Split(p, "/")[0]] || strings.HasPrefix(p, ".") || slices.Contains(set, p) {
+		if p == "" || !testpaths.IsCode(p) || srcSkip.MatchString(path.Base(p)) || skipScan(strings.Split(p, "/")[0]) || strings.HasPrefix(p, ".") || slices.Contains(set, p) {
 			continue
 		}
 		set = append(set, p)
@@ -101,23 +111,23 @@ func historyScan(root string) (int, []string) {
 }
 
 func (p *Project) activeChanges() []string {
-	var out []string
-	for _, n := range ls(p.Root.Changes(), "") {
-		if n != layout.ArchiveDir && isDir(filepath.Join(p.Root.Changes(), n)) {
-			out = append(out, n)
-		}
+	list, err := change.List(p.Root)
+	if err != nil {
+		return nil
+	}
+	out := make([]string, 0, len(list))
+	for _, s := range list {
+		out = append(out, s.Name)
 	}
 	return out
 }
 
 func (p *Project) archivedChanges() []string {
-	var out []string
-	for _, n := range ls(p.Root.Archive(), "") {
-		if isDir(filepath.Join(p.Root.Archive(), n)) {
-			out = append(out, n)
-		}
+	names, err := change.Archived(p.Root)
+	if err != nil {
+		return nil
 	}
-	return out
+	return names
 }
 
 // Marker is the file that says the greenfield flow was started here.
@@ -139,7 +149,7 @@ func (p *Project) readSlices() []*slice {
 	dir := p.path("roadmap")
 	var out []*slice
 	for _, f := range ls(dir, ".md") {
-		d, body, has := parseFM(readS(filepath.Join(dir, f)))
+		d, body, has := frontmatter.Parse(layout.Text(filepath.Join(dir, f)))
 		out = append(out, &slice{ID: strings.TrimSuffix(f, ".md"), File: filepath.Join(dir, f), Data: d, Body: body, Has: has})
 	}
 	return out
@@ -147,24 +157,21 @@ func (p *Project) readSlices() []*slice {
 
 func sliceChange(id string) string { return "slice-" + id }
 
-var (
-	tickedRE    = regexp.MustCompile(`(?m)^\s*[-*]\s+\[[xX]\]`)
-	archDateRE  = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}-(?:\d{4}-)?`)
-	statusOrder = []string{"planned", "proposed", "applying", "done"}
-)
+var statusOrder = []string{"planned", "proposed", "applying", "done"}
 
 // sliceState is planned | proposed | applying | done, from the changes themselves.
 func (p *Project) sliceState(id string) string {
 	name := sliceChange(id)
 	dir := p.Root.Change(name)
 	if isDir(dir) {
-		if tickedRE.MatchString(readS(filepath.Join(dir, "tasks.md"))) {
+		plan := tasks.Parse(layout.Text(filepath.Join(dir, "tasks.md")))
+		if slices.ContainsFunc(plan.All(), func(t *tasks.Task) bool { return t.Done }) {
 			return "applying"
 		}
 		return "proposed"
 	}
 	for _, n := range p.archivedChanges() {
-		if archDateRE.ReplaceAllString(n, "") == name {
+		if change.NameOf(n) == name {
 			return "done"
 		}
 	}
@@ -215,8 +222,8 @@ func (p *Project) ModeFor(cmd string) Mode {
 // ModeOf is the project mode. Pure reads; never writes. The code is that of every repository sharing the specs root.
 func (p *Project) ModeOf() Mode {
 	out := Mode{Mode: Greenfield, Signals: []Signal{}}
-	if t, ok := read(p.Marker()); ok {
-		d, _, _ := parseFM("---\n" + t + "\n---\n")
+	if t, ok := layout.ReadString(p.Marker()); ok {
+		d, _, _ := frontmatter.Parse("---\n" + t + "\n---\n")
 		out.Marker = true
 		applied := p.slicesApplied()
 		out.Mode = InProgress

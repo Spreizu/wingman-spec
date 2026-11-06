@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/Spreizu/wingman-spec/internal/layout"
 )
 
 // Env is where a command reads and writes.
@@ -244,7 +246,7 @@ func (e *Env) cmdStart(p *Project, o opts) error {
 	if err := e.write(p.Marker(), "# Marks this repository as a new product (greenfield). Written once, after the analyst confirmed it. Do not delete.\nschema: wingman-spec\nmode: greenfield\nstarted: "+p.today()+"\nconfirmed_by: "+by+"\n"); err != nil {
 		return err
 	}
-	if !exists(p.path("inputs", "README.md")) {
+	if !layout.Exists(p.path("inputs", "README.md")) {
 		if err := e.write(p.path("inputs", "README.md"), InputsReadme); err != nil {
 			return err
 		}
@@ -260,7 +262,7 @@ func (e *Env) cmdReadme(p *Project, _ opts) error {
 		return nil
 	}
 	f := p.path("inputs", "README.md")
-	if exists(f) {
+	if layout.Exists(f) {
 		e.out(p.Rel(f) + " exists; unchanged")
 		return nil
 	}
@@ -299,7 +301,7 @@ func (e *Env) slugOK(n, what string) error {
 }
 
 func (e *Env) writeNew(p *Project, f, text string) error {
-	if exists(f) {
+	if layout.Exists(f) {
 		e.out("exists, not overwritten: " + p.Rel(f))
 		return nil
 	}
@@ -417,7 +419,7 @@ func (e *Env) cmdApprove(p *Project, o opts) error {
 			return cmdErr{1}
 		}
 		f := p.G("understood.md")
-		if err := e.write(f, SetFM(readS(f), []string{"approved_by", "approved_on", "approved_hash"}, map[string]string{"approved_by": by, "approved_on": p.today(), "approved_hash": us.Hash})); err != nil {
+		if err := e.write(f, SetFM(layout.Text(f), []string{"approved_by", "approved_on", "approved_hash"}, map[string]string{"approved_by": by, "approved_on": p.today(), "approved_hash": us.Hash})); err != nil {
 			return err
 		}
 		e.out(`recorded: "what we understood" approved by ` + by)
@@ -518,7 +520,7 @@ func (e *Env) cmdReview(p *Project, o opts) error {
 		if !filepath.IsAbs(f) {
 			f = filepath.Join(e.Cwd, f)
 		}
-		t, ok := read(f)
+		t, ok := layout.ReadString(f)
 		if !ok {
 			return e.usage("cannot read " + rf)
 		}
@@ -680,7 +682,7 @@ func (p *Project) InputsReadme() string {
 		return ""
 	}
 	f := p.path("inputs", "README.md")
-	if exists(f) {
+	if layout.Exists(f) {
 		return ""
 	}
 	if os.MkdirAll(filepath.Dir(f), 0o755) != nil || os.WriteFile(f, []byte(InputsReadme), 0o644) != nil {

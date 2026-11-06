@@ -7,6 +7,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/Spreizu/wingman-spec/internal/frontmatter"
+	"github.com/Spreizu/wingman-spec/internal/layout"
 )
 
 // InputsReadme is the inputs/README.md the start writes.
@@ -178,7 +181,7 @@ func (p *Project) writeReview(kind string, r *reply) (int, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return 0, err
 	}
-	old, _, _ := parseFM(readS(filepath.Join(dir, kind+".md")))
+	old, _, _ := frontmatter.Parse(layout.Text(filepath.Join(dir, kind+".md")))
 	rounds, _ := strconv.Atoi(or(old.Str("rounds"), "0"))
 	rounds++
 	hash := p.planHash()
@@ -210,7 +213,7 @@ var questionTextRE = regexp.MustCompile(`## Question\n((?s:.*?))\n\n`)
 
 func (p *Project) writeHandover(g *Gate) (int, error) {
 	rm := g.Roadmap
-	old, _, _ := parseFM(readS(p.G("handover.md")))
+	old, _, _ := frontmatter.Parse(layout.Text(p.G("handover.md")))
 	rev, _ := strconv.Atoi(or(old.Str("rev"), "0"))
 	rev++
 	caps := p.capabilities()
@@ -221,8 +224,8 @@ func (p *Project) writeHandover(g *Gate) (int, error) {
 		}
 	}
 	rv, pr, dr := p.reviewOf("spec"), p.reviewOf("plan"), p.reviewOf("dryrun")
-	ud, _, _ := parseFM(readS(p.G("understood.md")))
-	so, _, _ := parseFM(readS(p.G("signoff.md")))
+	ud, _, _ := frontmatter.Parse(layout.Text(p.G("understood.md")))
+	so, _, _ := frontmatter.Parse(layout.Text(p.G("signoff.md")))
 	scoreOf := func(r *review) string {
 		if r.Score != 0 {
 			return ", score " + fmtScore(r.Score)
@@ -291,7 +294,7 @@ func (p *Project) writeHandover(g *Gate) (int, error) {
 		if !q.Blocking && (q.Status == "open" || q.Status == "asked") {
 			t := ""
 			if m := questionTextRE.FindStringSubmatch(q.Body); m != nil {
-				t = cut(wsRE.ReplaceAllString(m[1], " "), 160)
+				t = layout.Cut(wsRE.ReplaceAllString(m[1], " "), 160)
 			}
 			L = append(L, fmt.Sprintf("- %s: owner %s; %s", q.ID, q.Owner, t))
 			n++

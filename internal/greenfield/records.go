@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Spreizu/wingman-spec/internal/frontmatter"
+	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/quality"
 	"github.com/Spreizu/wingman-spec/internal/trace"
 )
@@ -66,7 +68,7 @@ func (p *Project) files(dir, prefix string) []record {
 		if prefix != "" && !strings.HasPrefix(f, prefix) {
 			continue
 		}
-		d, body, _ := parseFM(readS(p.G(dir, f)))
+		d, body, _ := frontmatter.Parse(layout.Text(p.G(dir, f)))
 		out = append(out, record{strings.TrimSuffix(f, ".md"), p.G(dir, f), body, d})
 	}
 	return out
@@ -89,7 +91,7 @@ func (p *Project) questions() []question {
 	var out []question
 	for _, q := range p.files(records, "Q-") {
 		st := strings.ToLower(or(q.Data.Str("status"), "open"))
-		ans := strings.TrimSpace(stripComments(section(q.Body, answerHeadRE)))
+		ans := strings.TrimSpace(layout.StripComments(quality.Section(q.Body, answerHeadRE), false))
 		n := len([]rune(ans))
 		filled := n >= 15
 		if st == "n/a" {
@@ -206,6 +208,8 @@ var understoodSections = []struct {
 }
 
 // hashDir hashes files and folders below the specs root (paths relative to it), line endings normalized.
+// This is not runstate.FilesHash: that hash is git's view of a task's files, and a different digest would
+// make a stored approved_hash look stale. A new product may also have no git repository.
 func (p *Project) hashDir(rels ...string) string {
 	var h []string
 	var walk func(abs, rel string)
@@ -214,7 +218,7 @@ func (p *Project) hashDir(rels ...string) string {
 			for _, f := range ls(abs, "") {
 				walk(filepath.Join(abs, f), rel+"/"+f)
 			}
-		} else if t, ok := read(abs); ok {
+		} else if t, ok := layout.ReadString(abs); ok {
 			h = append(h, rel+"\n"+strings.ReplaceAll(t, "\r\n", "\n"))
 		}
 	}
@@ -254,18 +258,18 @@ func nonBlank(s string) int {
 }
 
 func (p *Project) understoodState() understood {
-	t, ok := read(p.G("understood.md"))
+	t, ok := layout.ReadString(p.G("understood.md"))
 	if !ok {
 		return understood{Problems: []string{p.Rel(p.G("understood.md")) + " does not exist"}}
 	}
-	d, b, _ := parseFM(t)
-	body := stripComments(b)
+	d, b, _ := frontmatter.Parse(t)
+	body := layout.StripComments(b, false)
 	var probs []string
 	if n := nonBlank(body); n > 80 {
 		probs = append(probs, fmt.Sprintf(`it is %d lines: keep "what we understood" to one page (80 lines)`, n))
 	}
 	for _, s := range understoodSections {
-		if !hasH2(body, s.RE) {
+		if !quality.HasSection(body, s.RE) {
 			probs = append(probs, `missing section "## `+s.Name+`"`)
 		}
 	}
@@ -316,7 +320,7 @@ type review struct {
 }
 
 func (p *Project) reviewOf(kind string) *review {
-	d, body, has := parseFM(readS(p.G("reviews", kind+".md")))
+	d, body, has := frontmatter.Parse(layout.Text(p.G("reviews", kind+".md")))
 	if !has {
 		return nil
 	}
@@ -333,7 +337,7 @@ func rvOK(r *review) bool {
 }
 
 func (p *Project) signoffCurrent() (bool, bool) {
-	d, _, has := parseFM(readS(p.G("signoff.md")))
+	d, _, has := frontmatter.Parse(layout.Text(p.G("signoff.md")))
 	if !has {
 		return false, false
 	}
@@ -343,7 +347,7 @@ func (p *Project) signoffCurrent() (bool, bool) {
 var glossaryRE = regexp.MustCompile(`(?m)^[-*]\s+\*\*([^*]+)\*\*\s*[:\x{2013}\x{2014}-]\s*\S+`)
 
 func (p *Project) glossaryTerms() int {
-	return len(glossaryRE.FindAllString(readS(p.path("glossary.md")), -1))
+	return len(glossaryRE.FindAllString(layout.Text(p.path("glossary.md")), -1))
 }
 
 // ---------- spec checks ----------
@@ -426,7 +430,7 @@ func (p *Project) specProblems() []string {
 
 // livingSpec is the parsed living spec of a capability, or nil.
 func (p *Project) livingSpec(cp string) []*trace.Requirement {
-	t, ok := read(filepath.Join(p.Root.LivingSpecs(), cp+".md"))
+	t, ok := layout.ReadString(filepath.Join(p.Root.LivingSpecs(), cp+".md"))
 	if !ok {
 		return nil
 	}
@@ -438,7 +442,7 @@ func (p *Project) livingSpec(cp string) []*trace.Requirement {
 }
 
 func (p *Project) hasLiving(cp string) bool {
-	return exists(filepath.Join(p.Root.LivingSpecs(), cp+".md"))
+	return layout.Exists(filepath.Join(p.Root.LivingSpecs(), cp+".md"))
 }
 
 // ---------- changes that carry the spec (foundation, capabilities) ----------
@@ -457,14 +461,14 @@ func (p *Project) changeState(name, cp string) changeState {
 		return out
 	}
 	for _, f := range []string{"proposal.md", "tasks.md"} {
-		if !exists(filepath.Join(dir, f)) {
+		if !layout.Exists(filepath.Join(dir, f)) {
 			out.Missing = append(out.Missing, f)
 		}
 	}
 	if name == "foundation" {
 		n := 0
 		for _, f := range ls(filepath.Join(dir, "adrs"), ".md") {
-			if !quality.IsNoneADR(f, readS(filepath.Join(dir, "adrs", f))) {
+			if !quality.IsNoneADR(f, layout.Text(filepath.Join(dir, "adrs", f))) {
 				n++
 			}
 		}
@@ -476,7 +480,7 @@ func (p *Project) changeState(name, cp string) changeState {
 	if len(deltas) == 0 {
 		out.Missing = append(out.Missing, "specs/<capability>.md")
 	}
-	if exists(filepath.Join(dir, "proposal.md")) && !trace.IsSpecOnly(dir) {
+	if layout.Exists(filepath.Join(dir, "proposal.md")) && !trace.IsSpecOnly(dir) {
 		out.Problems = append(out.Problems, `proposal.md: add the line "Kind: spec-only" (this change only writes specs; nothing is implemented)`)
 	}
 	isInt := cp != "" && p.capByName(cp) != nil && p.capByName(cp).Kind == "integration"

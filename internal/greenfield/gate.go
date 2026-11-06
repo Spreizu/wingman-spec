@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/Spreizu/wingman-spec/internal/layout"
 )
 
 // Item is one gate item.
@@ -46,7 +48,7 @@ func (p *Project) secretScan(abs ...string) []string {
 		if !secretFileRE.MatchString(a) {
 			return
 		}
-		t, _ := read(a)
+		t, _ := layout.ReadString(a)
 		for i, l := range strings.Split(t, "\n") {
 			if m := secretRE.FindStringSubmatch(l); m != nil && !envNameRE.MatchString(m[2]) && !notSecretRE.MatchString(m[2]) {
 				hits = append(hits, fmt.Sprintf("%s:%d", p.Rel(a), i+1))
@@ -175,6 +177,11 @@ func (p *Project) Gate() *Gate {
 	}
 	add("integrations", len(ip) == 0, "every integration has a contract, 2+ failure scenarios and sandbox data", ip,
 		"Fix with a spec-only change (see the integration-contract template: wingman-spec instructions specs).")
+	return p.gateTail(g, add, rel)
+}
+
+// gateTail checks NFRs, glossary, ADRs, environments, secrets, reviews and the roadmap.
+func (p *Project) gateTail(g *Gate, add func(id string, ok bool, text string, detail []string, fix string), rel func(parts ...string) string) *Gate {
 	var np []string
 	if p.hasLiving(NFRCap) {
 		np = nfrProblems(p.livingSpec(NFRCap))
