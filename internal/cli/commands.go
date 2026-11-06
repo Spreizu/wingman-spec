@@ -2,7 +2,6 @@ package cli
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -10,6 +9,7 @@ import (
 
 	"github.com/Spreizu/wingman-spec/internal/artifacts"
 	"github.com/Spreizu/wingman-spec/internal/change"
+	"github.com/Spreizu/wingman-spec/internal/gitx"
 	"github.com/Spreizu/wingman-spec/internal/harness"
 	"github.com/Spreizu/wingman-spec/internal/layout"
 	"github.com/Spreizu/wingman-spec/internal/validate"
@@ -107,11 +107,11 @@ func executable() string {
 
 // gitRemote is dir's origin URL without credentials ("" when there is none).
 func gitRemote(dir string) string {
-	out, err := exec.Command("git", "-C", dir, "remote", "get-url", "origin").Output()
-	if err != nil {
+	lines := gitx.Lines(dir, "remote", "get-url", "origin")
+	if len(lines) == 0 {
 		return ""
 	}
-	return layout.CleanURL(strings.TrimSpace(string(out)))
+	return layout.CleanURL(lines[0])
 }
 
 func (a *app) newCmd() *command {
