@@ -26,6 +26,18 @@
    | Price | `[data-testid="plan-amount"]` | text-display font-extrabold leading-none | token: --text-display | font-size ~ token:text-display; font-weight = 800; line-height ~ 48px |
    | Plan name | `[data-testid="plan-name"]` | text-lg font-semibold | framework: text-lg | font-size ~ 18px; font-weight = 600; line-height ~ 28px |
 
+   ## Diff vs current code
+   **For UPDATE mode only:** compare the design with the current code and list every fact that differs.
+   | Element | Selector | Property | Figma | Code now | Status | Change |
+   |---|---|---|---|---|---|---|
+   | Account name | `[data-testid="account-name"]` | color | #3b5bdb | #1b1f2a | changed | `text-fg` to `text-primary` |
+   | Account name | `[data-testid="account-name"]` | font-weight | 700 | 600 | changed | `font-semibold` to `font-bold` |
+   | Account text | `[data-testid="account-text"]` | gap | 8px | 4px | changed | `gap-1` to `gap-2` |
+   | Account name | `[data-testid="account-name"]` | font-size | 28px | 28px | same | not edited |
+   | Avatar | `[data-testid="avatar"]` | border-radius | 8px | 8px | close | not edited |
+
+   Status: `same` (exact match), `close` (within visual tolerance, not edited), `changed` (must be implemented), `unknown` (code value not yet read). **Only `changed` rows become tasks.** Each task names the exact class or token to change. Rows that are `same` or `close` are listed as "not edited" and kept unchanged.
+
    ## Gaps
    - <element>: design uses <value>; no matching token (closest: <token>). Proposal: <...>. Question for the designer: <...>
 

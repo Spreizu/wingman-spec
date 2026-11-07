@@ -85,6 +85,12 @@ func (e *Env) visualLint(changeDir string) vlint {
 			probs = append(probs, res.Problems...)
 		}
 	}
+	// Check design diff coverage: every "changed" row must be covered by a task
+	if visual.HasDesignDiff(changeDir) {
+		for _, p := range visual.DiffCoverageLint(changeDir, e.R.Specs) {
+			probs = append(probs, p)
+		}
+	}
 	for _, p := range visual.ExpectScopeLint(scens, e.R.Specs) {
 		probs = append(probs, p)
 	}

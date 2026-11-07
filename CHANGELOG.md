@@ -2,6 +2,10 @@
 
 Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
+## Unreleased
+
+- **Design diff coverage lint.** In UPDATE mode (Figma or design changes to an existing screen), the design map includes a `## Diff vs current code` table comparing each design fact with the current code (`same`, `close`, `changed` or `unknown`). `lint` now fails (`design-diff-coverage`) when a `changed` row is not covered by any task: every changed design element must have a task that implements the change. The harness design-map template now includes the Diff section with examples. Group related changes per component when needed to respect task caps (S/M/L/XL/XXL: 3/6/12/20/30 tasks).
+
 ## 0.13.0
 
 - **Faster check.** A passing `check` lists the code files once, hashes the tree once and reuses spec parses for the rest of the command. The read-only scans overlap. The verdicts are the same.
