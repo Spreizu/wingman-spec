@@ -72,11 +72,11 @@ func TestParseDesignDiff(t *testing.T) {
 
 func TestDiffCoverageLint(t *testing.T) {
 	tests := []struct {
-		name          string
-		mapContent    string
-		tasksContent  string
-		wantProblems  int
-		wantKind      string
+		name         string
+		mapContent   string
+		tasksContent string
+		wantProblems int
+		wantKind     string
 	}{
 		{
 			name: "no diff section",
@@ -155,7 +155,7 @@ func TestDiffCoverageLint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			
+
 			// Write design-map.md
 			mapFile := filepath.Join(tmpDir, "design-map.md")
 			if err := os.WriteFile(mapFile, []byte(tt.mapContent), 0644); err != nil {
@@ -171,7 +171,7 @@ func TestDiffCoverageLint(t *testing.T) {
 			}
 
 			problems := DiffCoverageLint(tmpDir, tmpDir)
-			
+
 			if len(problems) != tt.wantProblems {
 				t.Errorf("DiffCoverageLint() got %d problems, want %d", len(problems), tt.wantProblems)
 				for i, p := range problems {
@@ -214,7 +214,7 @@ func TestExtractClasses(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.change, func(t *testing.T) {
 			got := extractClasses(tt.change)
-			
+
 			// Check that all wanted classes are present
 			for _, w := range tt.want {
 				found := false
@@ -263,16 +263,16 @@ func TestHasDesignDiff(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "no file",
+			name:    "no file",
 			content: "",
-			want: false,
+			want:    false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			
+
 			// Only write file if content is provided
 			if tt.content != "" {
 				mapFile := filepath.Join(tmpDir, "design-map.md")

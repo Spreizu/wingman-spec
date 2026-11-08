@@ -27,6 +27,8 @@ Confirm the kebab-case change name first; that name is also the exploration slug
 
 {{> design-map}}
 
+   **UPDATE mode (design for an existing screen):** If the design map comes from the chat (plan mode) and the `## Diff vs current code` table is missing or incomplete (no rows, or all rows marked `unknown`), rebuild the diff from the Figma cache before writing tasks. Follow `skills/figma-to-code/SKILL.md` section 5 (UPDATE mode) and `references/design-map-recipe.md`: compare each design fact with the current code value (resolve classes through tokens), write the full diff table with `same`, `close`, `changed` or `unknown` status per row. Only `changed` rows become tasks. Without the diff, propose would create only component placement tasks and silently skip actual design changes (colors, spacing, typography); `lint` fails (`design-diff-coverage`) when a `changed` row has no task.
+
 
 3. **Write the artifacts.** Order: proposal, specs, then (full path) app-map, design, adrs, then tasks. For each artifact:
    - Run `.wingman-spec/bin/wingman-spec instructions <artifact-id> <name>` and read the dependency files it lists.

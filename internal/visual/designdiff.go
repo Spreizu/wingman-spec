@@ -176,7 +176,7 @@ func DiffCoverageLint(changeDir, specsRoot string) []Problem {
 // extractClasses pulls out class names from a Change field like "`text-fg` to `text-primary`" or "token gap-4"
 func extractClasses(change string) []string {
 	var classes []string
-	
+
 	// Extract content within backticks
 	backtickRE := regexp.MustCompile("`([^`]+)`")
 	matches := backtickRE.FindAllStringSubmatch(change, -1)

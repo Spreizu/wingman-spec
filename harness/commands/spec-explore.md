@@ -8,7 +8,7 @@ Explore an idea, requirement or problem before planning it, with the `wingman-gr
 
 **Input**: optional topic or change name after `/spec-explore`. If a change name is given (check `.wingman-spec/bin/wingman-spec list`), read its existing artifacts for context.
 
-This is a thinking mode, and it works in the agent's plan mode (Claude Code, Cursor, Codex). Run only commands that read (`.wingman-spec/bin/wingman-spec config`, `list`, `design-system`, `git log`) and write no file: no code and no change artifacts (that is `/spec-propose`). The design map of step 2b is the one exception; in plan mode, where nothing can be written, put its full content in the chat instead.
+This is a thinking mode, and it works in the agent's plan mode (Claude Code, Cursor, Codex). Run only commands that read (`.wingman-spec/bin/wingman-spec config`, `list`, `design-system`, `git log`) and write no file: no code and no change artifacts (that is `/spec-propose`). The design map of step 2b is the one exception; in plan mode, where nothing can be written, put its full content in the chat verbatim, including the complete `## Diff vs current code` table with every row and status if this is UPDATE mode (design for an existing screen). Do not summarize rows or omit the Diff section; `/spec-propose` needs the full diff to create design tasks.
 
 **Slug.** Use a kebab-case slug for the topic (the topic after `/spec-explore`, or ask for one). It names the design map (`explore-design/<slug>.md` in the specs root) and the change `/spec-propose <slug>` creates.
 
@@ -42,4 +42,4 @@ This is a thinking mode, and it works in the agent's plan mode (Claude Code, Cur
 
 **Guardrails**
 - Never guess product or architecture decisions; ask.
-- No code, no planning artifacts. The design map (`explore-design/<slug>.md`) is the exception; in plan mode it stays in the chat.
+- No code, no planning artifacts. The design map (`explore-design/<slug>.md`) is the exception; in plan mode its full content stays in the chat, including the complete `## Diff vs current code` table with every row for UPDATE mode.
