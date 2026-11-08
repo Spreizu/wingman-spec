@@ -3,6 +3,7 @@ package visual
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -217,14 +218,7 @@ func TestExtractClasses(t *testing.T) {
 
 			// Check that all wanted classes are present
 			for _, w := range tt.want {
-				found := false
-				for _, g := range got {
-					if g == w {
-						found = true
-						break
-					}
-				}
-				if !found {
+				if !slices.Contains(got, w) {
 					t.Errorf("extractClasses(%q) missing class %q, got %v", tt.change, w, got)
 				}
 			}
