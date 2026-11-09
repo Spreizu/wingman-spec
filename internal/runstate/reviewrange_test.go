@@ -1,7 +1,6 @@
 package runstate
 
 import (
-	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -51,10 +50,17 @@ func TestReviewRange(t *testing.T) {
 	put(t, filepath.Join(dir, "ignored.log"), "x\n")
 	put(t, filepath.Join(dir, ".wingman-spec", "runs", "x", "state.json"), "x\n")
 	snap := func() string {
-		idx, _ := os.ReadFile(filepath.Join(dir, ".git", "index"))
-		return strings.Join([]string{gitOut(t, dir, "log", "--oneline", "--all"), gitOut(t, dir, "rev-parse", "HEAD"),
-			gitOut(t, dir, "status", "--porcelain"), gitOut(t, dir, "diff", "--cached"), gitOut(t, dir, "stash", "list"),
-			gitOut(t, dir, "for-each-ref"), gitOut(t, dir, "branch"), string(idx)}, "\x00")
+		// Capture the logical index content, not the raw file (which may have stat cache updates)
+		return strings.Join([]string{
+			gitOut(t, dir, "log", "--oneline", "--all"),
+			gitOut(t, dir, "rev-parse", "HEAD"),
+			gitOut(t, dir, "status", "--porcelain"),
+			gitOut(t, dir, "diff", "--cached"),
+			gitOut(t, dir, "stash", "list"),
+			gitOut(t, dir, "for-each-ref"),
+			gitOut(t, dir, "branch"),
+			gitOut(t, dir, "ls-files", "--stage"),
+		}, "\x00")
 	}
 	before := snap()
 	r := ReviewRange(dir, base)
