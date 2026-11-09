@@ -2,7 +2,7 @@
   "name": "wingman-spec",
   "displayName": "Wingman Spec",
   "description": "See and steer Wingman Spec changes: tasks, specs, ADRs, verifier results, build timeline and requirement-to-code traceability. Bundles the wingman-spec CLI.",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "author": "Elmo Egers",
   "publisher": "elmo-egers",
   "icon": "images/icon.png",

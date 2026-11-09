@@ -4,6 +4,8 @@ Versions are git tags on `main` (`v0.5.0`, `v0.6.0`, ...).
 
 ## Unreleased
 
+## 0.13.1
+
 - **Design diff coverage lint.** In UPDATE mode (Figma or design changes to an existing screen), the design map includes a `## Diff vs current code` table comparing each design fact with the current code (`same`, `close`, `changed` or `unknown`). `lint` now fails (`design-diff-coverage`) when a `changed` row is not covered by any task: every changed design element must have a task that implements the change. The harness design-map template now includes the Diff section with examples. Group related changes per component when needed to respect task caps (S/M/L/XL/XXL: 3/6/12/20/30 tasks).
 - **Explore in plan mode with UPDATE.** `/spec-explore` in plan mode (Claude Code, Cursor, Codex) with a Figma design for an existing screen outputs the full design map verbatim in the chat, including the complete `## Diff vs current code` table with every row and status, not a summary. `/spec-propose` reads the diff from the chat; when the diff is missing or incomplete (plan mode with no rows, or rows all `unknown`), propose rebuilds it from the Figma cache before creating tasks, so design changes (styling, spacing, typography, colors) are never silently skipped.
 
