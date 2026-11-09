@@ -27,6 +27,8 @@ Confirm the kebab-case change name first; that name is also the exploration slug
 
 {{> design-map}}
 
+   **UPDATE mode (design for an existing screen):** If the design map comes from the chat (plan mode) and the `## Diff vs current code` table is missing or incomplete (no rows, or all rows marked `unknown`), rebuild the diff from the Figma cache before writing tasks. Follow `skills/figma-to-code/SKILL.md` section 5 (UPDATE mode) and `references/design-map-recipe.md`: compare each design fact with the current code value (resolve classes through tokens), write the full diff table with `same`, `close`, `changed` or `unknown` status per row. Only `changed` rows become tasks. Without the diff, propose would create only component placement tasks and silently skip actual design changes (colors, spacing, typography); `lint` fails (`design-diff-coverage`) when a `changed` row has no task.
+
 
 3. **Write the artifacts.** Order: proposal, specs, then (full path) app-map, design, adrs, then tasks. For each artifact:
    - Run `.wingman-spec/bin/wingman-spec instructions <artifact-id> <name>` and read the dependency files it lists.
@@ -53,7 +55,7 @@ Confirm the kebab-case change name first; that name is also the exploration slug
    - `tasks`: test-first tasks with Spec / Test first / Files / Done when, and no `Size:` line (proposal.md has it).
      - Size M or larger, a Risk kind or a UI change: end with one code review task. It may fix findings in any file the change's tasks name in `Files:`.
      - A task that builds UI has `Visual: <scenario ids>`. Name each visual scenario from the task after which all its key elements exist, not from an earlier shell task.
-     - With a design map, `Files:` follows it: the components and token files it names, and a new component only where the map lists a gap.
+     - With a design map, `Files:` follows it: the components and token files it names, and a new component only where the map lists a gap. In UPDATE mode (design-map.md has a `## Diff vs current code` table), every `changed` row becomes a task that implements the change. Group related changes per component when needed to respect task caps (S/M/L/XL/XXL: 3/6/12/20/30). `lint` fails (`design-diff-coverage`) when a `changed` row is not covered by any task.
 
 3b. **UX checklist** (UI-facing changes only):
 
